@@ -36,6 +36,7 @@ function get_error_msg(env::Env)
     bytestring(sz)
 end
 
+# error
 
 type GurobiError
     code::Int
@@ -44,5 +45,45 @@ type GurobiError
     function GurobiError(env::Env, code::Integer)
         new(convert(Int, code), get_error_msg(env))
     end
+end
+
+# parameters
+
+function get_int_param(env::Env, name::ASCIIString)
+    a = Array(Cint, 1)
+    ret = ccall(GRBgetintparam(), Cint, (Ptr{Void}, Ptr{Uint8}, Ptr{Cint}), 
+        env, name, a)
+    if ret != 0
+        throw(GurobiError(env, ret))
+    end
+    convert(Int, a[1])
+end
+
+function get_dbl_param(env::Env, name::ASCIIString)
+    a = Array(Float64, 1)
+    ret = ccall(GRBgetintparam(), Cint, (Ptr{Void}, Ptr{Uint8}, Ptr{Float64}), 
+        env, name, a)
+    if ret != 0
+        throw(GurobiError(env, ret))
+    end
+    a[1]::Float64
+end
+
+function set_int_param!(env::Env, name::ASCIIString, v::Integer)
+    ret = ccall(GRBsetintparam(), Cint, (Ptr{Void}, Ptr{Uint8}, Cint), 
+        env, name, v)
+    if ret != 0
+        throw(GurobiError(env, ret))
+    end
+    nothing
+end
+
+function set_dbl_param!(env::Env, name::ASCIIString, v::Real)
+    ret = ccall(GRBsetdblparam(), Cint, (Ptr{Void}, Ptr{Uint8}, Float64), 
+        env, name, v)
+    if ret != 0
+        throw(GurobiError(env, ret))
+    end
+    nothing
 end
 

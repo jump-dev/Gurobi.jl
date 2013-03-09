@@ -1,5 +1,7 @@
 module Gurobi
 
+    export set_int_param!, set_dbl_param!, get_int_param, get_dbl_param
+
     export gurobi_model, update_model!, reset_model!
     export set_sense!
     export add_var!, add_vars!, add_cvar!, add_cvars!
