@@ -224,6 +224,8 @@ add_ivar!(model, 2., 0, 10)   # y
 
  # add binary variable 
 add_bvar!(model, 5.)          # z
+
+ # have the variables incorporated into the model
 update_model!(model)
 
 add_constr!(model, ones(3), '<', 10.)
