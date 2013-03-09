@@ -41,6 +41,7 @@ end
 @grb_def GRBcopymodel
 @grb_def GRBfreemodel
 @grb_def GRBupdatemodel
+@grb_def GRBresetmodel
 
 @grb_def GRBaddvar
 @grb_def GRBaddvars

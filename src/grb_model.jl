@@ -38,6 +38,15 @@ function update_model!(model::Model)
     nothing
 end
 
+function reset_model!(model::Model)
+    @assert model.ptr_model != C_NULL
+    ret = ccall(GRBresetmodel(), Cint, (Ptr{Void},), model.ptr_model)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
 convert(ty::Type{Ptr{Void}}, model::Model) = model.ptr_model::Ptr{Void}
 
 #################################################

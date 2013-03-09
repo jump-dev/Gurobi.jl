@@ -1,6 +1,7 @@
 module Gurobi
 
-    export gurobi_model, update_model!, set_sense!
+    export gurobi_model, update_model!, reset_model!
+    export set_sense!
     export add_var!, add_vars!, add_cvar!, add_cvars!
     export add_constr!, add_constrs!, add_qpterms!
     export optimize
