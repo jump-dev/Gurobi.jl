@@ -55,7 +55,7 @@ using Gurobi
  # creates an environment, which captures the solver setting 
 env = Gurobi.Env()
 
- # creates an empty model  
+ # creates an empty model ("lp_01" is the model name)
 model = gurobi_model(env, "lp_01", :maximize)
 
  # add variables
@@ -126,8 +126,6 @@ s.t. x >= 30, y >= 0
 
 Julia code:
 ```julia
-using Gurobi
-
 env = Gurobi.Env()
 
 f = [1000., 350.]
@@ -137,7 +135,7 @@ Aeq = nothing
 beq = nothing
 lb = [0., 30.]
 ub = nothing
-
+ 
 model = lp_model(env, "lp_02", :maximize, f, A, b, Aeq, beq, lb, ub)
 optimize(model)
 ```
@@ -145,11 +143,56 @@ optimize(model)
 
 #### Example 3: Quadratic programming  
 
+To construct a QP model, you have to add QP terms to a model using ``add_qpterms``
 
+Problem formulation:
+```
+minimize 2 x^2 + y^2 + xy + x + y
 
+s.t.  x, y >= 0
+      x + y = 1
+```
 
+Julia code:
+```julia
+env = Gurobi.Env()
 
+model = gurobi_model(env, "qp_02")
 
+add_cvars!(model, [1., 1.], 0., Inf)
+update_model!(model)
 
+ # add quadratic terms: x^2, x * y, y^2
+ # add_qpterms!(model, rowinds, colinds, coeffs)
+add_qpterms!(model, Cint[1, 1, 2], Cint[1, 2, 2], [2., 1., 1.])
+add_constr!(model, [1., 1.], '=', 1.)
+update_model!(model)
 
+optimize(model)
+```
+
+#### Example 4: Quadratic programming (in MATLAB-like style)
+
+This package provides a ``qp_model`` function to construct QP problems in a style like MATLAB's ``quadprog``.
+
+Problem formulation:
+```
+minimize x^2 + xy + y^2 + yz + z^2
+
+s.t.  x + 2 y + 3 z >= 4
+      x +   y       >= 1
+```
+
+Julia code:
+```julia
+env = Gurobi.Env()
+
+H = [2. 1. 0.; 1. 2. 1.; 0. 1. 2.]
+f = zeros(3)
+A = -[1. 2. 3.; 1. 1. 0.]
+b = -[4., 1.]
+
+model = qp_model(env, "qp_02", H, f, A, b)
+optimize(model)
+```
 
