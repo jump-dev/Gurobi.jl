@@ -11,6 +11,8 @@ type Model
     end
 end
 
+convert(ty::Type{Ptr{Void}}, model::Model) = model.ptr_model::Ptr{Void}
+
 function free_model(model::Model)
     if model.ptr_model != C_NULL
         ccall(GRBfreemodel(), Void, (Ptr{Void},), model.ptr_model)
@@ -47,7 +49,29 @@ function reset_model!(model::Model)
     nothing
 end
 
-convert(ty::Type{Ptr{Void}}, model::Model) = model.ptr_model::Ptr{Void}
+# read / write file
+
+function read_model(env::Env, filename::ASCIIString)
+    a = Array(Ptr{Void}, 1)
+    ret = ccall(GRBreadmodel(), Cint, 
+        (Ptr{Void}, Ptr{Uint8}, Ptr{Ptr{Void}}), 
+        env, filename, a)
+    if ret != 0
+        throw(GurobiError(env, ret))
+    end
+    Model(env, a[1])
+end
+
+function write_model(model::Model, filename::ASCIIString)
+    ret = ccall(GRBwrite(), Cint, (Ptr{Void}, Ptr{Uint8}), 
+        model.ptr_model, filename)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
+
 
 #################################################
 #

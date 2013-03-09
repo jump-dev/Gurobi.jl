@@ -43,6 +43,9 @@ end
 @grb_def GRBupdatemodel
 @grb_def GRBresetmodel
 
+@grb_def GRBreadmodel
+@grb_def GRBwrite
+
 @grb_def GRBaddvar
 @grb_def GRBaddvars
 @grb_def GRBaddconstr

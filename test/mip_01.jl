@@ -30,4 +30,3 @@ optimize(model)
 
 println("sol = $(get_solution(model))")
 println("objv = $(get_objval(model))")
-
