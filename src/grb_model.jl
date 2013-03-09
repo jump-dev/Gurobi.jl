@@ -392,12 +392,12 @@ function add_vars!(model::Model, vtypes::Union(Cchar, Vector{Cchar}), c::Vector{
 end
 
 add_cvars!(model::Model, c::Vector{Float64}, lb::Bounds, ub::Bounds) = add_vars!(model, GRB_CONTINUOUS, c, lb, ub)
-add_cvars!(model::Model, c::Vector{Float64}) = add_cvars!(model, c, lb, ub)
+add_cvars!(model::Model, c::Vector{Float64}) = add_cvars!(model, c, nothing, nothing)
 
 add_bvars!(model::Model, c::Vector{Float64}) = add_vars!(model, GRB_BINARY, c, 0., 1.)
 
 add_ivars!(model::Model, c::Vector{Float64}, lb::Bounds, ub::Bounds) = add_vars!(model, GRB_INTEGER, c, lb, ub)
-add_ivars!(model::Model, c::Vector{Float64}) = add_ivars!(model, GRB_INTEGER, c, -Inf, Inf) 
+add_ivars!(model::Model, c::Vector{Float64}) = add_ivars!(model, GRB_INTEGER, c, nothing, nothing) 
 
 # add_constr
 
@@ -569,8 +569,145 @@ lp_model(env::Env, name, sense, f, A, b, Aeq, beq) = lp_model(env, name, sense, 
 lp_model(env::Env, name, sense, f, A, b) = lp_model(env, name, sense, f, A, b, nothing, nothing, nothing, nothing)
 
 
+#################################################
+#
+#  QP construction
+#
+#  minimize (1/2) x'Hx + f'x
+#
+#   s.t.    A x <= b
+#           Aeq x = beq
+#           lb <= x <= ub
+#
+#################################################
+
+function _add_qpterms!(model, H::Vector{Float64})  # H stores only the diagonal element
+    n = num_vars(model)
+    if n != length(H)
+        throw(ArgumentError("Incompatible dimensions."))
+    end
+    qr = convert(Vector{Cint}, [0:n-1])
+    qc = copy(qr)
+    add_qpterms!(model, qr, qc, qv)
+end
+
+function _add_qpterms!(model, H::Float64)  # all diagonal elements are H
+    n = num_vars(model)
+    qr = convert(Vector{Cint}, [0:n-1])
+    qc = copy(qr)
+    qv = fill(H, n)
+    add_qpterms!(model, qr, qc, qv)
+end
+
+function _add_qpterms!(model, H::SparseMatrixCSC{Float64}) # H must be symmetric
+    n = num_vars(model)
+    if !(H.m == n && H.n == n)
+        throw(ArgumentError("H must be a symmetric matrix."))
+    end
+    
+    nnz_h = nnz(H)
+    qr = Array(Cint, nnz_h)
+    qc = Array(Cint, nnz_h)
+    qv = Array(Float64, nnz_h)
+    k::Int = 0
+    
+    colptr::Vector{Int} = H.colptr
+    rowval::Vector{Cint} = convert(Vector{Cint}, H.rowval)
+    nzval::Vector{Float64} = convert(Vector{Float64}, H.nzval)
+    
+    for i = 1 : n
+        qi::Cint = convert(Cint, i)
+        for j = colptr[i]:(colptr[i+1]-1)
+            qj::Cint = rowval[j] 
+            
+            if qi < qj
+                k += 1
+                qr[k] = qi
+                qc[k] = qj
+                qv[k] = nzval[j]
+            elseif qi == qj
+                k += 1
+                qr[k] = qi
+                qc[k] = qj
+                qv[k] = nzval[j] * 0.5
+            end
+        end
+    end
+    
+    add_qpterms!(model, qr[1:k], qc[1:k], qv[1:k])
+end
+
+function _add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
+    n = num_vars(model)
+    if !(size(H) == (n, n))
+        throw(ArgumentError("H must be a symmetric matrix."))
+    end
+    
+    nmax = int(n * (n + 1) / 2)
+    qr = Array(Cint, nmax)
+    qc = Array(Cint, nmax)
+    qv = Array(Float64, nmax)
+    k::Int = 0
+    
+    for i = 1 : n
+        qi::Cint = convert(Cint, i)
+        
+        v::Float64 = H[i,i]
+        if v != 0.
+            k += 1
+            qr[k] = qi
+            qc[k] = qi
+            qv[k] = v * 0.5
+        end
+        
+        for j = i+1 : n
+            v = H[j, i]
+            if v != 0.
+                k += 1
+                qr[k] = qi
+                qc[k] = convert(Cint, j)
+                qv[k] = v
+            end
+        end
+    end
+        
+    add_qpterms!(model, qr[1:k], qc[1:k], qv[1:k])
+end
 
 
+function qp_model(env::Env, name::ASCIIString, 
+    H::Union(Vector{Float64}, Matrix{Float64}, SparseMatrixCSC{Float64}, Float64), 
+    f::Vector{Float64}, 
+    A::Union(ConstrMat, Nothing), 
+    b::Union(Vector{Float64}, Nothing), 
+    Aeq::Union(ConstrMat, Nothing), 
+    beq::Union(Vector{Float64}, Nothing), 
+    lb::Bounds, ub::Bounds)
+    
+    # create model
+    model = gurobi_model(env, name)
+    
+    # add variables
+    add_cvars!(model, f, lb, ub)
+    update_model!(model)
+    
+    # add qpterms
+    
+    _add_qpterms!(model, H)
+    
+    # add constraints
+    if A != nothing && b != nothing
+        add_constrs!(model, A, '<', b)
+    end
+    
+    if Aeq != nothing && beq != nothing
+        add_constrs!(model, Aeq, '=', beq)
+    end
+    update_model!(model)
+    
+    model
+end
 
-
+qp_model(env::Env, name, H, f, A, b, Aeq, beq) = qp_model(env, name, H, f, A, b, Aeq, beq, nothing, nothing)
+qp_model(env::Env, name, H, f, A, b) = qp_model(env, name, H, f, A, b, nothing, nothing, nothing, nothing)
 

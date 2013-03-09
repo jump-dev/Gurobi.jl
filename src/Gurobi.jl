@@ -9,7 +9,7 @@ module Gurobi
     export add_bvar!, add_bvars!, add_ivar!, add_ivars!
     export add_constr!, add_constrs!, add_qpterms!
     
-    export lp_model
+    export lp_model, qp_model
     export optimize
     
     export get_status, OptimInfo, get_optim_info, get_objval
