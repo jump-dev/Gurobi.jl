@@ -92,6 +92,33 @@ function get_dbl_attrarray(model::Model, name::ASCIIString, start::Integer, len:
     r
 end
 
+function set_int_attr!(model::Model, name::ASCIIString, v::Integer)
+    ret = ccall(GRBsetintattr(), Cint, 
+        (Ptr{Void}, Ptr{Uint8}, Cint), model, name, v)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
+function set_dbl_attr!(model::Model, name::ASCIIString, v::Real)
+    ret = ccall(GRBsetdblattr(), Cint, 
+        (Ptr{Void}, Ptr{Uint8}, Float64), model, name, v)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
+function set_str_attr!(model::Model, name::ASCIIString, v::ASCIIString)
+    ret = ccall(GRBsetstrattr(), Cint, 
+        (Ptr{Void}, Ptr{Uint8}, Ptr{Uint8}), model, name, v)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
 
 macro grb_int_attr(fun, attrname)
     @eval $(fun)(model::Model) = get_int_attr(model, $(attrname))
@@ -125,6 +152,14 @@ is_qcp(model::Model) = get_int_attr(model, "IsQCP") != 0
 function model_type(model::Model) 
     is_qp(model)  ? (:QP)  :
     is_qcp(model) ? (:QCP) : (:LP)
+end
+
+function set_sense!(model::Model, sense::Symbol)
+    v = sense == :maximize ? -1 :
+        sense == :minimize ? 1 : 
+        throw(ArgumentError("Invalid model sense."))
+    
+    set_int_attr!(model, "ModelSense", v)
 end
 
 
@@ -217,6 +252,7 @@ add_var!(model::Model, vtype::Cchar, c::Float64) = add_var!(model, vtype, c, -In
 add_cvar!(model::Model, c::Float64, lb::Float64, ub::Float64) = add_var!(model, GRB_CONTINUOUS, c, lb, ub)
 add_cvar!(model::Model, c::Float64) = add_cvar!(model, c, -Inf, Inf)
 
+# add_vars!
 
 function add_vars!(model::Model, vtypes::Union(Cchar, Vector{Cchar}), c::Vector{Float64}, lb::Bounds, ub::Bounds)
     
@@ -265,8 +301,8 @@ function add_vars!(model::Model, vtypes::Union(Cchar, Vector{Cchar}), c::Vector{
     elseif isa(lb, Float64)
         if lb != 0.
             lb = fill(lb, n)
+            lb_ptr = pointer(lb)
         end
-        lb_ptr = pointer(lb)
     else
         lb_ptr = pointer(lb)
     end
@@ -306,4 +342,73 @@ end
 
 add_cvars!(model::Model, c::Vector{Float64}, lb::Bounds, ub::Bounds) = add_vars!(model, GRB_CONTINUOUS, c, lb, ub)
 add_cvars!(model::Model, c::Vector{Float64}) = add_cvars!(model, c, lb, ub)
+
+# add_constr
+
+function add_constr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, rel::Char, rhs::Float64)
+    inds = inds - 1
+    if !isempty(inds)
+        ret = ccall(GRBaddconstr(), Cint, (
+            Ptr{Void},    # model
+            Cint,         # numnz
+            Ptr{Cint},    # cind
+            Ptr{Float64}, # cvals
+            Cchar,        # sense
+            Float64,      # rhs
+            Ptr{Uint8}    # name
+            ), 
+            model, length(inds), inds, coeffs, rel, rhs, C_NULL)
+        if ret != 0
+            throw(GurobiError(model.env, ret))
+        end
+    end
+    nothing 
+end
+
+function add_constr!(model::Model, coeffs::Vector{Float64}, rel::Char, rhs::Float64)
+    inds = convert(Vector{Cint}, find(coeffs)) 
+    vals = coeffs[inds]
+    add_constr!(model, inds, vals, rel, rhs)
+end
+
+# add_constrs
+
+function add_constrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, coeffs::Vector{Float64}, 
+    senses::Vector{Cchar}, rhs::Vector{Float64})
+        
+    m = length(cbegins)
+    nnz = length(inds)
+    
+    if !(m == length(senses) == length(rhs) && nnz == length(coeffs))
+        throw(ArgumentError("Incompatible dimensions."))
+    end 
+        
+    if m > 0 && nnz > 0
+        ret = ccall(GRBaddconstrs(), Cint, (
+            Ptr{Void},    # model
+            Cint,         # num constraints
+            Cint,         # num non-zeros
+            Ptr{Cint},    # cbeg
+            Ptr{Cint},    # cind
+            Ptr{Float64}, # cval
+            Ptr{Cchar},   # sense
+            Ptr{Float64}, # rhs
+            Ptr{Uint8}    # names
+            ), 
+            model, m, nnz, cbegins - 1, inds - 1, coeffs, 
+            senses, rhs, C_NULL)
+        
+        if ret != 0
+            throw(GurobiError(model.env, ret))
+        end
+        nothing
+    end
+end
+
+
+function add_constrs!(
+    model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, coeffs::Vector{Float64}, 
+    rel::Char, rhs::Vector{Float64})
+    add_constrs!(model, cbegins, inds, coeffs, fill(convert(Cchar, rel), length(cbegins)), rhs)
+end
 

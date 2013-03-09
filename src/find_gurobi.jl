@@ -42,7 +42,10 @@ end
 @grb_def GRBfreemodel
 @grb_def GRBupdatemodel
 
+@grb_def GRBaddvar
 @grb_def GRBaddvars
+@grb_def GRBaddconstr
+@grb_def GRBaddconstrs
 
 @grb_def GRBgetintattr
 @grb_def GRBgetdblattr
@@ -50,5 +53,9 @@ end
 @grb_def GRBgetintattrarray
 @grb_def GRBgetdblattrarray
 @grb_def GRBgetstrattrarray
+
+@grb_def GRBsetintattr
+@grb_def GRBsetdblattr
+@grb_def GRBsetstrattr
 
 @grb_def GRBoptimize

@@ -16,13 +16,12 @@ model = gurobi_model(env, "lp_01")
 set_sense!(model, :maximize)
 
 # add variables
-add_cvar!(model, 1.0, 45., Inf)  # x
-add_cvar!(model, 1.0,  5., Inf)  # y
+add_cvars!(model, [1., 1.], [45., 5.], nothing)
 update_model!(model)
 
 # add constraints
-add_constr!(model, [50., 24.], '<', 2400.)
-add_constr!(model, [30., 33.], '<', 2100.)
+add_constrs!(model, Cint[1, 3], Cint[1, 2, 1, 2], 
+    [50., 24., 30., 33.], '<', [2400., 2100.])
 update_model!(model)
 
 println(model)
