@@ -494,3 +494,83 @@ function add_qpterms!(model::Model, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vect
 end
 
 
+#################################################
+#
+#  LP construction
+#
+#  minimize/maximize f'x
+#
+#   s.t.    A x <= b
+#           Aeq x = beq
+#           lb <= x <= ub
+#
+#################################################
+
+typealias ConstrMat Union(Matrix{Float64}, SparseMatrixCSC{Float64})
+
+function _add_constrs_t!(model::Model, At::SparseMatrixCSC{Float64}, rel::Char, b::Vector{Float64})    
+    cbeg = convert(Vector{Cint}, At.colptr[1:At.n])
+    cind = convert(Vector{Cint}, At.rowval)
+    add_constrs!(model, cbeg, cind, At.nzval, rel, b)
+end
+
+function add_constrs!(model::Model, A::Matrix{Float64}, rel::Char, b::Vector{Float64})
+    n::Int = num_vars(model)
+    m::Int = size(A, 1)
+    if !(m == length(b) && n == size(A, 2))
+        throw(ArgumentError("Incompatible dimensions."))
+    end 
+    
+    At = sparse(transpose(A))  # each column of At now is a constraint
+    _add_constrs_t!(model, At, rel, b) 
+end
+
+function add_constrs!(model::Model, A::SparseMatrixCSC{Float64}, rel::Char, b::Vector{Float64})
+    n::Int = num_vars(model)
+    m::Int = size(A, 1)
+    if !(m == length(b) && n == size(A, 2))
+        throw(ArgumentError("Incompatible dimensions."))
+    end 
+    
+    At = transpose(A)  # each column of At now is a constraint
+    _add_constrs_t!(model, At, rel, b)
+end
+
+
+function lp_model(env::Env, name::ASCIIString, sense::Symbol, 
+    f::Vector{Float64}, 
+    A::Union(ConstrMat, Nothing), 
+    b::Union(Vector{Float64}, Nothing), 
+    Aeq::Union(ConstrMat, Nothing), 
+    beq::Union(Vector{Float64}, Nothing), 
+    lb::Bounds, ub::Bounds)
+    
+    # create model
+    model = gurobi_model(env, name, sense)
+    
+    # add variables
+    add_cvars!(model, f, lb, ub)
+    update_model!(model)
+    
+    # add constraints
+    if A != nothing && b != nothing
+        add_constrs!(model, A, '<', b)
+    end
+    
+    if Aeq != nothing && beq != nothing
+        add_constrs!(model, Aeq, '=', beq)
+    end
+    update_model!(model)
+    
+    model
+end
+
+lp_model(env::Env, name, sense, f, A, b, Aeq, beq) = lp_model(env, name, sense, f, A, b, Aeq, beq, nothing, nothing)
+lp_model(env::Env, name, sense, f, A, b) = lp_model(env, name, sense, f, A, b, nothing, nothing, nothing, nothing)
+
+
+
+
+
+
+

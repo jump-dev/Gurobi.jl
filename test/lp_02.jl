@@ -1,43 +1,34 @@
-# a simple LP example
+# LP programming using MATLAB-like construction
 #
-#   maximize x + y
+#   maximize 1000 x + 350 y
 #
-#   s.t. 50 x + 24 y <= 2400
-#        30 x + 33 y <= 2100
-#        x >= 45, y >= 5
+#       s.t. x >= 30, y >= 0
+#            x - 1.5y >= 0  (i.e. -x + 1.5 y <= 0)
+#            12 x + 8 y <= 1000
+#            1000 x + 300 y <= 70000
+#            
+#   solution: (59.0909, 36.3636)
+#   objv: 71818.1818
 #
-#   solution: x = 45, y = 6.25, objv = 51.25
 
 using Gurobi
 
 env = Gurobi.Env()
-set_int_param!(env, "Method", 2)  # using barrier method
 
-model = gurobi_model(env, "lp_02", :maximize)
+f = [1000., 350.]
+A = [-1. 1.5; 12. 8.; 1000. 300.]
+b = [0., 1000., 70000.]
+Aeq = nothing
+beq = nothing
+lb = [0., 30.]
+ub = nothing
 
-# add variables
-add_cvars!(model, [1., 1.], [45., 5.], nothing)
-update_model!(model)
-
-# add constraints
-add_constrs!(model, Cint[1, 3], Cint[1, 2, 1, 2], 
-    [50., 24., 30., 33.], '<', [2400., 2100.])
-update_model!(model)
+model = lp_model(env, "lp_02", :maximize, f, A, b, Aeq, beq, lb, ub)
 
 println(model)
 
-# perform optimization
 optimize(model)
 
-# show results
-info = get_optim_info(model)
 println()
-println(info)
-
-sol = get_solution(model)
-println("soln = $(sol)")
-
-objv = get_objval(model)
-println("objv = $(objv)")
-
-gc()  # test finalizers
+println("soln = $(get_solution(model))")
+println("objv = $(get_objval(model))")
