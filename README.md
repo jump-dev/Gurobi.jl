@@ -196,3 +196,40 @@ model = qp_model(env, "qp_02", H, f, A, b)
 optimize(model)
 ```
 
+### Example 5: Mixed Integer Programming
+
+This package also supports mixed integer programming.
+
+Problem formulation:
+```
+maximize x + 2 y + 5 z
+
+s.t.  x + y + z <= 10
+      x + 2 y + z <= 15
+      x is continuous: 0 <= x <= 5
+      y is integer: 0 <= y <= 10
+      z is binary
+```
+
+Julia code:
+```julia
+env = Gurobi.Env()
+model = gurobi_model(env, "mip_01", :maximize)
+
+ # add continuous variable
+add_cvar!(model, 1., 0., 5.)  # x
+
+ # add integer variable
+add_ivar!(model, 2., 0, 10)   # y
+
+ # add binary variable 
+add_bvar!(model, 5.)          # z
+update_model!(model)
+
+add_constr!(model, ones(3), '<', 10.)
+add_constr!(model, [1., 2., 1.], '<', 15.)
+
+optimize(model)
+```
+
+Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer or binary variables in batch.
