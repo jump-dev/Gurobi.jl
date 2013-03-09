@@ -39,6 +39,7 @@ The usage of this package is straight forward. Here, it demonstrates the use of 
 
 #### Example 1: Linear Programming
 
+Problem formulation:
 ```
 maximize x + y
 
@@ -47,6 +48,7 @@ s.t. 50 x + 24 y <= 2400
      x >= 45, y >= 5
 ```
 
+Julia code:
 ```julia
 using Gurobi
 
@@ -64,8 +66,8 @@ update_model!(model)
 
  # add constraints
  # add_constr!(model, coefs, sense, rhs)
-add_constr!(model, [50., 24.], '<', 2400.)
-add_constr!(model, [30., 33.], '<', 2100.)
+add_constr!(model, [50., 24.], '<', 2400.) # 50 x + 24 y <= 2400
+add_constr!(model, [30., 33.], '<', 2100.) # 30 x + 33 y <= 2100
 update_model!(model)
 
 println(model)
