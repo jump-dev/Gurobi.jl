@@ -2,7 +2,7 @@ module Gurobi
 
     export gurobi_model, update_model!, set_sense!
     export add_var!, add_vars!, add_cvar!, add_cvars!
-    export add_constr!, add_constrs!
+    export add_constr!, add_constrs!, add_qpterms!
     export optimize
     
     export get_status, OptimInfo, get_optim_info, get_objval

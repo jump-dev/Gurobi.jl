@@ -46,6 +46,7 @@ end
 @grb_def GRBaddvars
 @grb_def GRBaddconstr
 @grb_def GRBaddconstrs
+@grb_def GRBaddqpterms
 
 @grb_def GRBgetintattr
 @grb_def GRBgetdblattr

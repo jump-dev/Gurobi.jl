@@ -178,6 +178,8 @@ function show(io::IO, model::Model)
         println(io, "    number of linear constraints    = $(num_constrs(model))")
         println(io, "    number of quadratic constraints = $(num_qconstrs(model))")
         println(io, "    number of sos constraints       = $(num_sos(model))")
+        println(io, "    number of non-zero coeffs       = $(num_cnzs(model))")
+        println(io, "    number of non-zero qp-terms     = $(num_qnzs(model))")
     else
         println(io, "Gurobi Model: NULL")
     end
@@ -310,8 +312,8 @@ function add_vars!(model::Model, vtypes::Union(Cchar, Vector{Cchar}), c::Vector{
     if isa(ub, Float64)
         if !(ub == Inf)
             ub = fill(ub, n)
+            ub_ptr = pointer(ub)
         end
-        ub_ptr = pointer(ub)
     elseif isa(ub, Vector)
         ub_ptr = pointer(ub)
     end
@@ -371,7 +373,7 @@ function add_constr!(model::Model, coeffs::Vector{Float64}, rel::Char, rhs::Floa
     add_constr!(model, inds, vals, rel, rhs)
 end
 
-# add_constrs
+# add_constrs!
 
 function add_constrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, coeffs::Vector{Float64}, 
     senses::Vector{Cchar}, rhs::Vector{Float64})
@@ -401,14 +403,40 @@ function add_constrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, c
         if ret != 0
             throw(GurobiError(model.env, ret))
         end
-        nothing
     end
+    nothing
 end
-
 
 function add_constrs!(
     model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, coeffs::Vector{Float64}, 
     rel::Char, rhs::Vector{Float64})
     add_constrs!(model, cbegins, inds, coeffs, fill(convert(Cchar, rel), length(cbegins)), rhs)
 end
+
+
+# add_qterms!
+
+function add_qpterms!(model::Model, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vector{Float64})
+    nnz = length(qr)
+    if !(nnz == length(qc) == length(qv))
+        throw(ArgumentError("Inconsistent dimensions."))
+    end
+    
+    if nnz > 0
+        ret = ccall(GRBaddqpterms(), Cint, (
+            Ptr{Void},    # model
+            Cint,         # nnz
+            Ptr{Cint},    # qrow
+            Ptr{Cint},    # qcol
+            Ptr{Float64}, # qval
+            ), 
+            model, nnz, qr-1, qc-1, qv)
+            
+        if ret != 0
+            throw(GurobiError(model.env, ret))
+        end 
+    end
+    nothing
+end
+
 
