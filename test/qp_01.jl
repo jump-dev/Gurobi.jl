@@ -11,7 +11,6 @@
 using Gurobi 
 
 env = Gurobi.Env()
-set_int_param!(env, "Method", 1)  # using primal simplex method
 
 model = gurobi_model(env, "qp_02")
 

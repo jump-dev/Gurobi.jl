@@ -229,6 +229,16 @@ function gurobi_model(env::Env, name::ASCIIString)
     Model(env, a[1])
 end
 
+
+function gurobi_model(env::Env, name::ASCIIString, sense::Symbol)
+    model = gurobi_model(env, name)
+    if sense != :minimize
+        set_sense!(model, sense)
+    end
+    model
+end
+
+
 # add variables
 
 const GRB_CONTINUOUS = convert(Cchar, 'C')
@@ -262,6 +272,12 @@ add_var!(model::Model, vtype::Cchar, c::Float64) = add_var!(model, vtype, c, -In
 
 add_cvar!(model::Model, c::Float64, lb::Float64, ub::Float64) = add_var!(model, GRB_CONTINUOUS, c, lb, ub)
 add_cvar!(model::Model, c::Float64) = add_cvar!(model, c, -Inf, Inf)
+
+add_bvar!(model::Model, c::Float64) = add_var!(model, GRB_BINARY, c, 0., 1.)
+
+add_ivar!(model::Model, c::Float64, lb::Real, ub::Real) = add_var!(model, GRB_INTEGER, c, float64(lb), float64(ub))
+add_ivar!(model::Model, c::Float64) = add_ivar!(model, c, -Inf, Inf)
+
 
 # add_vars!
 
@@ -353,6 +369,11 @@ end
 
 add_cvars!(model::Model, c::Vector{Float64}, lb::Bounds, ub::Bounds) = add_vars!(model, GRB_CONTINUOUS, c, lb, ub)
 add_cvars!(model::Model, c::Vector{Float64}) = add_cvars!(model, c, lb, ub)
+
+add_bvars!(model::Model, c::Vector{Float64}) = add_vars!(model, GRB_BINARY, c, 0., 1.)
+
+add_ivars!(model::Model, c::Vector{Float64}, lb::Bounds, ub::Bounds) = add_vars!(model, GRB_INTEGER, c, lb, ub)
+add_ivars!(model::Model, c::Vector{Float64}) = add_ivars!(model, GRB_INTEGER, c, -Inf, Inf) 
 
 # add_constr
 

@@ -12,8 +12,7 @@ using Gurobi
 
 env = Gurobi.Env()
 
-model = gurobi_model(env, "lp_01")
-set_sense!(model, :maximize)
+model = gurobi_model(env, "lp_01", :maximize)
 
 # add variables
 add_cvar!(model, 1.0, 45., Inf)  # x
