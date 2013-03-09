@@ -235,3 +235,25 @@ optimize(model)
 ```
 
 Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer or binary variables in batch.
+
+
+### Parameter Settings
+
+In Gurobi, solver parameters are encapsulated by the ``Env`` instance. This package provides functions to get and set parameters
+
+```julia
+get_int_param(env, name)      # get an integer parameter
+get_dbl_param(env, name)      # get a real-valued parameter
+
+set_int_param(env, name, v)   # set an integer parameter
+set_dbl_param(env, name, v)   # set a real-valued parameter
+```
+
+You may refer to Gurobi's [Parameter Reference](http://www.gurobi.com/documentation/5.0/reference-manual/node653) for the whole list of parameters. 
+
+Here are some simple examples
+```julia
+set_int_param(env, "Method", 2)   # choose to use Barrier method
+set_dbl_param(env, "IterationLimit", 100.) # set the maximum iterations (for Simplex)
+```
+
