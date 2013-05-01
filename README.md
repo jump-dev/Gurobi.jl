@@ -164,7 +164,7 @@ update_model!(model)
 
  # add quadratic terms: 2 x^2, x * y, y^2
  # add_qpterms!(model, rowinds, colinds, coeffs)
-add_qpterms!(model, Cint[1, 1, 2], Cint[1, 2, 2], [2., 1., 1.])
+add_qpterms!(model, [1, 1, 2], [1, 2, 2], [2., 1., 1.])
 add_constr!(model, [1., 1.], '=', 1.)
 update_model!(model)
 
