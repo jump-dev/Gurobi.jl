@@ -401,6 +401,9 @@ add_ivars!(model::Model, c::Vector{Float64}) = add_ivars!(model, GRB_INTEGER, c,
 
 # add_constr
 
+add_constr!(model::Model, inds::Vector, coeffs::Vector{Float64}, rel::Char, rhs::Float64) =
+    add_constr!(model, convert(Vector{Cint},inds), coeffs, rel, rhs)
+
 function add_constr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, rel::Char, rhs::Float64)
     inds = inds - 1
     if !isempty(inds)
@@ -470,6 +473,9 @@ end
 
 # add_qterms!
 
+add_qpterms!(model::Model, qr::Vector, qc::Vector, qv::Vector{Float64}) =
+    add_qpterms!(model, convert(Vector{Cint}, qr), convert(Vector{Cint}, qc),qv)
+
 function add_qpterms!(model::Model, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vector{Float64})
     nnz = length(qr)
     if !(nnz == length(qc) == length(qv))
@@ -485,6 +491,47 @@ function add_qpterms!(model::Model, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vect
             Ptr{Float64}, # qval
             ), 
             model, nnz, qr-1, qc-1, qv)
+            
+        if ret != 0
+            throw(GurobiError(model.env, ret))
+        end 
+    end
+    nothing
+end
+
+# add_qconstr!
+
+add_qconstr!(model::Model, lind::Vector, lval::Vector, qr::Vector, qc::Vector,
+    qv::Vector{Float64}, rel::Char, rhs::Float64) =
+    add_qconstr!(model, convert(Vector{Cint},lind), convert(Vector{Float64}, lval),
+        convert(Vector{Cint}, qr), convert(Vector{Cint}, qc), qv, rel, rhs)
+
+function add_qconstr!(model::Model, lind::Vector{Cint}, lval::Vector{Float64}, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vector{Float64}, rel::Char, rhs::Float64)
+    qnnz = length(qr)
+    if !(qnnz == length(qc) == length(qv))
+        throw(ArgumentError("Inconsistent dimensions."))
+    end
+
+    lnnz = length(lind)
+    if lnnz != length(lval)
+        throw(ArgumentError("Inconsistent dimensions."))
+    end
+    
+    if qnnz > 0
+        ret = ccall(GRBaddqconstr(), Cint, (
+            Ptr{Void},    # model
+            Cint,         # lnnz
+            Ptr{Cint},    # lind
+            Ptr{Float64}, # lval
+            Cint,         # qnnz
+            Ptr{Cint},    # qrow
+            Ptr{Cint},    # qcol
+            Ptr{Float64}, # qval
+            Cchar,        # sense
+            Float64,      # rhs
+            Ptr{Uint8}    # name
+            ), 
+            model, lnnz, lind-1, lval-1, qnnz, qr-1, qc-1, qv, rel, rhs, C_NULL)
             
         if ret != 0
             throw(GurobiError(model.env, ret))
