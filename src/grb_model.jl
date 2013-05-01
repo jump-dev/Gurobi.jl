@@ -499,6 +499,47 @@ function add_qpterms!(model::Model, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vect
     nothing
 end
 
+# add_qconstr!
+
+add_qconstr!(model::Model, lind::Vector, lval::Vector, qr::Vector, qc::Vector,
+    qv::Vector{Float64}, rel::Char, rhs::Float64) =
+    add_qconstr!(model, convert(Vector{Cint},lind), convert(Vector{Float64}, lval),
+        convert(Vector{Cint}, qr), convert(Vector{Cint}, qc), qv, rel, rhs)
+
+function add_qconstr!(model::Model, lind::Vector{Cint}, lval::Vector{Float64}, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vector{Float64}, rel::Char, rhs::Float64)
+    qnnz = length(qr)
+    if !(qnnz == length(qc) == length(qv))
+        throw(ArgumentError("Inconsistent dimensions."))
+    end
+
+    lnnz = length(lind)
+    if lnnz != length(lval)
+        throw(ArgumentError("Inconsistent dimensions."))
+    end
+    
+    if qnnz > 0
+        ret = ccall(GRBaddqconstr(), Cint, (
+            Ptr{Void},    # model
+            Cint,         # lnnz
+            Ptr{Cint},    # lind
+            Ptr{Float64}, # lval
+            Cint,         # qnnz
+            Ptr{Cint},    # qrow
+            Ptr{Cint},    # qcol
+            Ptr{Float64}, # qval
+            Cchar,        # sense
+            Float64,      # rhs
+            Ptr{Uint8}    # name
+            ), 
+            model, lnnz, lind-1, lval-1, qnnz, qr-1, qc-1, qv, rel, rhs, C_NULL)
+            
+        if ret != 0
+            throw(GurobiError(model.env, ret))
+        end 
+    end
+    nothing
+end
+
 
 #################################################
 #

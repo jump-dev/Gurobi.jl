@@ -236,6 +236,34 @@ optimize(model)
 
 Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer or binary variables in batch.
 
+#### Example 3: Quadratic constrants
+
+The ``add_qconstr!`` function may be used to add quadratic constraints to a model.
+
+Problem formulation:
+```
+maximize x + y
+
+s.t.  x, y >= 0
+      x^2 + y^2 <= 1
+```
+
+Julia code:
+```julia
+env = Gurobi.Env()
+
+model = gurobi_model(env, "qp_03", :maximize)
+
+add_cvars!(model, [1., 1.], 0., Inf)
+update_model!(model)
+
+ # add_qpterms!(model, linearindices, linearcoeffs, qrowinds, qcolinds, qcoeffs, sense, rhs)
+add_qconstr!(model, [], [], [1, 2], [1, 2], [1, 1.], '<', 1.0)
+update_model!(model)
+
+optimize(model)
+```
+
 
 ### Parameter Settings
 

@@ -7,7 +7,7 @@ module Gurobi
     export set_sense!
     export add_var!, add_vars!, add_cvar!, add_cvars!
     export add_bvar!, add_bvars!, add_ivar!, add_ivars!
-    export add_constr!, add_constrs!, add_qpterms!
+    export add_constr!, add_constrs!, add_qpterms!, add_qconstr!
     
     export lp_model, qp_model
     export optimize
