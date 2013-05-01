@@ -401,6 +401,9 @@ add_ivars!(model::Model, c::Vector{Float64}) = add_ivars!(model, GRB_INTEGER, c,
 
 # add_constr
 
+add_constr!(model::Model, inds::Vector, coeffs::Vector{Float64}, rel::Char, rhs::Float64) =
+    add_constr!(model, convert(Vector{Cint},inds), coeffs, rel, rhs)
+
 function add_constr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, rel::Char, rhs::Float64)
     inds = inds - 1
     if !isempty(inds)
