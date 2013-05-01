@@ -4,7 +4,7 @@
 #
 
 function _find_library_path()
-	if !has(ENV, "GUROBI_LIB")
+	if !haskey(ENV, "GUROBI_LIB")
 		error("Please set the environment variable GUROBI_LIB to specify the dynamic library path.")
 	end
 	p = ENV["GUROBI_LIB"]
