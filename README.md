@@ -252,7 +252,7 @@ Julia code:
 ```julia
 env = Gurobi.Env()
 
-model = gurobi_model(env, "qp_03", :maximize)
+model = gurobi_model(env, "qcqp_01", :maximize)
 
 add_cvars!(model, [1., 1.], 0., Inf)
 update_model!(model)
