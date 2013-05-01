@@ -470,9 +470,8 @@ end
 
 # add_qterms!
 
-add_qpterms!(model::Model, qr::Vector, qc::Vector, qv::Vector) =
-    add_qpterms!(model, convert(Vector{Cint}, qr), convert(Vector{Cint}, qc),
-        convert(Vector{Float64},qv))
+add_qpterms!(model::Model, qr::Vector, qc::Vector, qv::Vector{Float64}) =
+    add_qpterms!(model, convert(Vector{Cint}, qr), convert(Vector{Cint}, qc),qv)
 
 function add_qpterms!(model::Model, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vector{Float64})
     nnz = length(qr)
