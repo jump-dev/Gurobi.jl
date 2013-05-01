@@ -273,15 +273,15 @@ In Gurobi, solver parameters are encapsulated by the ``Env`` instance. This pack
 get_int_param(env, name)      # get an integer parameter
 get_dbl_param(env, name)      # get a real-valued parameter
 
-set_int_param(env, name, v)   # set an integer parameter
-set_dbl_param(env, name, v)   # set a real-valued parameter
+set_int_param!(env, name, v)   # set an integer parameter
+set_dbl_param!(env, name, v)   # set a real-valued parameter
 ```
 
 You may refer to Gurobi's [Parameter Reference](http://www.gurobi.com/documentation/5.0/reference-manual/node653) for the whole list of parameters. 
 
 Here are some simple examples
 ```julia
-set_int_param(env, "Method", 2)   # choose to use Barrier method
-set_dbl_param(env, "IterationLimit", 100.) # set the maximum iterations (for Simplex)
+set_int_param!(env, "Method", 2)   # choose to use Barrier method
+set_dbl_param!(env, "IterationLimit", 100.) # set the maximum iterations (for Simplex)
 ```
 
