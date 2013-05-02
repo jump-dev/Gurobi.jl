@@ -13,6 +13,9 @@ This package is a wrapper of the Gurobi solver (through its C interface). Curren
 * Mixed Integer Linear Programming (MILP)
 * Quadratic programming (QP)
 * Mixed Integer Quadratic Programming (MIQP)
+* Quadratically constrained quadratic programming (QCQP)
+* Second order cone programming (SOCP)
+* Mixed integer second order cone programming (MISOCP)
 
 ### Installation
 
@@ -236,7 +239,7 @@ optimize(model)
 
 Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer or binary variables in batch.
 
-#### Example 3: Quadratic constrants
+#### Example 6: Quadratic constrants
 
 The ``add_qconstr!`` function may be used to add quadratic constraints to a model.
 
@@ -264,6 +267,7 @@ update_model!(model)
 optimize(model)
 ```
 
+SOCP constraints of the form ``x'x <= y^2`` and ``x'x <= yz`` can be added using this method as well.
 
 ### Parameter Settings
 
