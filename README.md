@@ -239,7 +239,7 @@ optimize(model)
 
 Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer or binary variables in batch.
 
-#### Example 6: Quadratic constrants
+#### Example 6: Quadratic constraints
 
 The ``add_qconstr!`` function may be used to add quadratic constraints to a model.
 
