@@ -114,16 +114,7 @@ function getconstrsolution(m::GurobiSolver)
   error("GurobiSolver: Not implemented (need to do Ax manually?)")
 end
 
-# TODO
-function getreducedcosts(m::GurobiSolver)
-  println("WARNING: getreducedcosts not implemented yet, returning zeros")
-  return zeros(num_vars(m.inner))
-end
-
-# TODO
-function getconstrduals(m::GurobiSolver)
-  println("WARNING: getconstrduals not implemented yet, returning zeros")
-  return zeros(num_constrs(m.inner))
-end
+getreducedcosts(m::GurobiSolver) = get_dbl_attrarray(model, "RC", 1, num_vars(m.inner))
+getconstrduals(m::GurobiSolver)  = get_dbl_attrarray(model, "Pi", 1, num_contrs(m.inner))
 
 getrawsolver(m::GurobiSolver) = m.inner
