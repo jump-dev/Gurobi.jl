@@ -541,6 +541,90 @@ function add_qconstr!(model::Model, lind::Vector{Cint}, lval::Vector{Float64}, q
 end
 
 
+# add_rangeconstr
+
+function add_rangeconstr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, lower::Float64, upper::Float64)
+   inds = inds - 1 # Zero-based indexing
+   if !isempty(inds)
+        ret = ccall(GRBaddrangeconstr(), Cint, (
+            Ptr{Void},    # model
+            Cint,         # numnz
+            Ptr{Cint},    # cind
+            Ptr{Float64}, # cvals
+            Float64,      # lower
+			Float64,	  # upper
+            Ptr{Uint8}    # name
+            ),
+            model, length(inds), inds, coeffs, lower, upper, C_NULL)
+        if ret != 0
+            throw(GurobiError(model.env, ret))
+        end
+    end
+    nothing
+end
+
+function add_rangeconstrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, coeffs::Vector{Float64}, lower::Vector{Float64}, upper::Vector{Float64})
+        
+    m = length(cbegins)
+    nnz = length(inds)
+    
+    if !(m == length(lower) == length(upper) && nnz == length(coeffs))
+        throw(ArgumentError("Incompatible dimensions."))
+    end 
+        
+    if m > 0 && nnz > 0
+        ret = ccall(GRBaddrangeconstrs(), Cint, (
+            Ptr{Void},    # model
+            Cint,         # num constraints
+            Cint,         # num non-zeros
+            Ptr{Cint},    # cbeg
+            Ptr{Cint},    # cind
+            Ptr{Float64}, # cval
+            Ptr{Float64}, # lower
+            Ptr{Float64}, # upper
+            Ptr{Uint8}    # names
+            ), 
+            model, m, nnz, cbegins - 1, inds - 1, coeffs, 
+            lower, upper, C_NULL)
+        
+        if ret != 0
+            throw(GurobiError(model.env, ret))
+        end
+    end
+    nothing
+end
+
+
+function _add_rangeconstrs_t!(model::Model, At::SparseMatrixCSC{Float64}, lower::Vector{Float64}, upper::Vector{Float64})
+    cbeg = convert(Vector{Cint}, At.colptr[1:At.n])
+    cind = convert(Vector{Cint}, At.rowval)
+    add_rangeconstrs!(model, cbeg, cind, At.nzval, lower, upper)
+end
+
+
+function add_rangeconstrs!(model::Model, A::Matrix{Float64}, lower::Vector{Float64}, upper::Vector{Float64})
+    n::Int = num_vars(model)
+    m::Int = size(A, 1)
+    if !(m == length(upper) && n == size(A, 2))
+        throw(ArgumentError("Incompatible dimensions."))
+    end 
+    
+    At = sparse(transpose(A))  # each column of At now is a constraint
+    _add_rangeconstrs_t!(model, At, lower, upper)
+end
+
+function add_rangeconstrs!(model::Model, A::SparseMatrixCSC{Float64}, lower::Vector{Float64}, upper::Vector{Float64})
+    n::Int = num_vars(model)
+    m::Int = size(A, 1)
+    if !(m == length(upper) && n == size(A, 2))
+        throw(ArgumentError("Incompatible dimensions."))
+    end 
+    
+    At = transpose(A)  # each column of At now is a constraint
+    _add_rangeconstrs_t!(model, At, lower, upper)
+end
+
+
 #################################################
 #
 #  LP construction
