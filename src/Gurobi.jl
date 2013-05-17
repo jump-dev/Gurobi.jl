@@ -1,4 +1,8 @@
 module Gurobi
+    
+	# Standard LP interface
+	require(joinpath(Pkg.dir("MathProgBase"),"src","LinprogSolverInterface.jl"))
+    importall LinprogSolverInterface
 
     export set_int_param!, set_dbl_param!, get_int_param, get_dbl_param
 
@@ -21,4 +25,6 @@ module Gurobi
     include("grb_env.jl")
     include("grb_model.jl")
     include("grb_solve.jl")
+
+	include("GurobiSolverInterface.jl")
 end

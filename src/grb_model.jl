@@ -541,6 +541,35 @@ function add_qconstr!(model::Model, lind::Vector{Cint}, lval::Vector{Float64}, q
 end
 
 
+# add_rangeconstrs
+#int	 GRBaddrangeconstr (	GRBmodel	*model,
+# 	 	int	numnz,
+# 	 	int	*cind,
+# 	 	double	*cval,
+# 	 	double	lower,
+# 	 	double	upper,
+# 	 	const char	*constrname )
+
+function add_rangeconstr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, lower::Float64, upper::Float64)
+   inds = inds - 1 # Zero-based indexing
+   if !isempty(inds)
+        ret = ccall(GRBaddrangeconstr(), Cint, (
+            Ptr{Void},    # model
+            Cint,         # numnz
+            Ptr{Cint},    # cind
+            Ptr{Float64}, # cvals
+            Float64,      # lower
+			Float64,	  # upper
+            Ptr{Uint8}    # name
+            ),
+            model, length(inds), inds, coeffs, lower, upper, C_NULL)
+        if ret != 0
+            throw(GurobiError(model.env, ret))
+        end
+    end
+    nothing
+end
+
 #################################################
 #
 #  LP construction
