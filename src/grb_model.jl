@@ -568,7 +568,7 @@ function add_rangeconstrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cin
     m = length(cbegins)
     nnz = length(inds)
     
-    if !(m == length(senses) == length(upper) && nnz == length(coeffs))
+    if !(m == length(lower) == length(upper) && nnz == length(coeffs))
         throw(ArgumentError("Incompatible dimensions."))
     end 
         
@@ -595,7 +595,7 @@ function add_rangeconstrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cin
 end
 
 
-function _add_rangeconstrs_t!(model::Model, At::SparseMatrixCSC{Float64}, lower::Vector{Float64}, b::Vector{Float64})
+function _add_rangeconstrs_t!(model::Model, At::SparseMatrixCSC{Float64}, lower::Vector{Float64}, upper::Vector{Float64})
     cbeg = convert(Vector{Cint}, At.colptr[1:At.n])
     cind = convert(Vector{Cint}, At.rowval)
     add_rangeconstrs!(model, cbeg, cind, At.nzval, lower, upper)
