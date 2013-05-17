@@ -115,6 +115,6 @@ function getconstrsolution(m::GurobiSolver)
 end
 
 getreducedcosts(m::GurobiSolver) = get_dbl_attrarray(m.inner, "RC", 1, num_vars(m.inner))
-getconstrduals(m::GurobiSolver)  = get_dbl_attrarray(m.inner, "Pi", 1, num_contrs(m.inner))
+getconstrduals(m::GurobiSolver)  = get_dbl_attrarray(m.inner, "Pi", 1, num_constrs(m.inner))
 
 getrawsolver(m::GurobiSolver) = m.inner
