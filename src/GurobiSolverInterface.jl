@@ -58,9 +58,38 @@ function writeproblem(m::GurobiSolver, filename::String)
   write_model(m.inner, filename)
 end
 
-function optimize(m::GurobiSolver)
-  optimize(m.inner)
+
+######
+# More functions need to be exposed here really
+######
+
+# TODO
+function updatemodel(m::GurobiSolver)
+  error("Not Implemented - what is this?")
 end
+
+function setsense(m::GurobiSolver,sense)
+  if sense == :Min
+    set_sense!(m.inner, :minimize)
+  elseif sense == :Max
+    set_sense!(m.inner, :maximize)
+  else
+    error("Unrecognized objective sense $sense")
+  end
+end
+function getsense(m::GurobiSolver)
+  v = get_int_attr(m.inner, "ModelSense")
+  if v == -1 
+    return :Max 
+  else
+    return :Min
+  end
+end
+
+numvar(m::GurobiSolver)    = num_vars(m.inner)
+numconstr(m::GurobiSolver) = num_constrs(m.inner)
+
+optimize(m::GurobiSolver)  = optimize(m.inner)
 
 function status(m::GurobiSolver)
   s = get_status(m.inner)
@@ -77,16 +106,24 @@ function status(m::GurobiSolver)
   end
 end
 
+getobjval(m::GurobiSolver)   = get_objval(m.inner)
+getsolution(m::GurobiSolver) = get_solution(m.inner)
+
+# TODO
+function getconstrsolution(m::GurobiSolver)
+  error("GurobiSolver: Not implemented (need to do Ax manually?)")
+end
+
 # TODO
 function getreducedcosts(m::GurobiSolver)
-  return zeros(num_vars(model))
+  println("WARNING: getreducedcosts not implemented yet, returning zeros")
+  return zeros(num_vars(m.inner))
 end
 
 # TODO
 function getconstrduals(m::GurobiSolver)
-  return zeros(num_constrs(model))
+  println("WARNING: getconstrduals not implemented yet, returning zeros")
+  return zeros(num_constrs(m.inner))
 end
 
-function getrawsolver(m::GurobiSolver)
-  return m.inner
-end
+getrawsolver(m::GurobiSolver) = m.inner
