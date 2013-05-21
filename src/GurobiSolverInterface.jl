@@ -25,18 +25,21 @@ export GurobiSolver,
     optimize,
     status,
     getobjval,
+    getobjbound,
     getsolution,
     getconstrsolution,
     getreducedcosts,
     getconstrduals,
-    getrawsolver
+    getrawsolver,
+    setvartype
 
 type GurobiSolver <: LinprogSolver
 	inner::Model
 end
 
 # Not right...
-function model()
+function model(;options...)
+	if length(options) != 0; warn("Options not yet supported"); end
 	m = GurobiSolver(gurobi_model(Env(),""))
 	return m
 end
@@ -107,6 +110,7 @@ function status(m::GurobiSolver)
 end
 
 getobjval(m::GurobiSolver)   = get_objval(m.inner)
+getobjbound(m::GurobiSolver) = get_objbound(m.inner)
 getsolution(m::GurobiSolver) = get_solution(m.inner)
 
 # TODO
@@ -118,3 +122,6 @@ getreducedcosts(m::GurobiSolver) = get_dbl_attrarray(m.inner, "RC", 1, num_vars(
 getconstrduals(m::GurobiSolver)  = get_dbl_attrarray(m.inner, "Pi", 1, num_constrs(m.inner))
 
 getrawsolver(m::GurobiSolver) = m.inner
+
+setvartype(m::GurobiSolver, vartype) =
+    set_char_attr_array!(m.inner, "VType", 1, length(vartype), vartype)

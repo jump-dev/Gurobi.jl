@@ -152,6 +152,15 @@ function set_str_attr!(model::Model, name::ASCIIString, v::ASCIIString)
     nothing
 end
 
+function set_char_attr_array!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector{Char})
+    values = convert(Vector{Cchar},values)
+    ret = ccall(GRBsetcharattrarray(), Cint, 
+        (Ptr{Void}, Ptr{Uint8}, Cint, Cint, Ptr{Cchar}), model, name, start-1, len-1, values)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
 
 macro grb_int_attr(fun, attrname)
     @eval $(fun)(model::Model) = get_int_attr(model, $(attrname))

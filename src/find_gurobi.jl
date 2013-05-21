@@ -66,6 +66,8 @@ end
 @grb_def GRBsetdblattr
 @grb_def GRBsetstrattr
 
+@grb_def GRBsetcharattrarray
+
 @grb_def GRBgetintparam
 @grb_def GRBgetdblparam
 @grb_def GRBgetstrparam
