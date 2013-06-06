@@ -611,7 +611,8 @@ function _add_rangeconstrs_t!(model::Model, At::SparseMatrixCSC{Float64}, lower:
 end
 
 
-function add_rangeconstrs!(model::Model, A::Matrix{Float64}, lower::Vector{Float64}, upper::Vector{Float64})
+function add_rangeconstrs!(model::Model, A::Matrix, lower::Vector{Float64}, upper::Vector{Float64})
+    A = convert(Matrix{Float64},A)
     n::Int = num_vars(model)
     m::Int = size(A, 1)
     if !(m == length(upper) && n == size(A, 2))
@@ -622,7 +623,8 @@ function add_rangeconstrs!(model::Model, A::Matrix{Float64}, lower::Vector{Float
     _add_rangeconstrs_t!(model, At, lower, upper)
 end
 
-function add_rangeconstrs!(model::Model, A::SparseMatrixCSC{Float64}, lower::Vector{Float64}, upper::Vector{Float64})
+function add_rangeconstrs!(model::Model, A::SparseMatrixCSC, lower::Vector{Float64}, upper::Vector{Float64})
+    A = convert(SparseMatrixCSC{Float64,Cint},A)
     n::Int = num_vars(model)
     m::Int = size(A, 1)
     if !(m == length(upper) && n == size(A, 2))
