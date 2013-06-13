@@ -155,7 +155,7 @@ end
 function set_char_attr_array!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector{Char})
     values = convert(Vector{Cchar},values)
     ret = ccall(GRBsetcharattrarray(), Cint, 
-        (Ptr{Void}, Ptr{Uint8}, Cint, Cint, Ptr{Cchar}), model, name, start-1, len-1, values)
+        (Ptr{Void}, Ptr{Uint8}, Cint, Cint, Ptr{Cchar}), model, name, start-1, len, values)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
