@@ -6,7 +6,7 @@ type Env
     
     function Env()
         a = Array(Ptr{Void}, 1)
-        ret = ccall(GRBloadenv(), Cint, (Ptr{Ptr{Void}}, Ptr{Uint8}), 
+        ret = @grb_ccall(loadenv, Cint, (Ptr{Ptr{Void}}, Ptr{Uint8}), 
             a, C_NULL)
         if ret != 0
             error("Failed to create environment (error code = $ret).")
@@ -25,14 +25,14 @@ end
 
 function free_env(env::Env)
     if env.ptr_env != C_NULL
-        ccall(GRBfreeenv(), Void, (Ptr{Void},), env.ptr_env)
+        @grb_ccall(freeenv, Void, (Ptr{Void},), env.ptr_env)
         env.ptr_env = C_NULL
     end
 end
 
 function get_error_msg(env::Env)
     @assert env.ptr_env != C_NULL
-    sz = ccall(GRBgeterrormsg(), Ptr{Uint8}, (Ptr{Void},), env.ptr_env)
+    sz = @grb_ccall(geterrormsg, Ptr{Uint8}, (Ptr{Void},), env.ptr_env)
     bytestring(sz)
 end
 
@@ -51,7 +51,7 @@ end
 
 function get_int_param(env::Env, name::ASCIIString)
     a = Array(Cint, 1)
-    ret = ccall(GRBgetintparam(), Cint, (Ptr{Void}, Ptr{Uint8}, Ptr{Cint}), 
+    ret = @grb_ccall(getintparam, Cint, (Ptr{Void}, Ptr{Uint8}, Ptr{Cint}), 
         env, name, a)
     if ret != 0
         throw(GurobiError(env, ret))
@@ -61,7 +61,7 @@ end
 
 function get_dbl_param(env::Env, name::ASCIIString)
     a = Array(Float64, 1)
-    ret = ccall(GRBgetintparam(), Cint, (Ptr{Void}, Ptr{Uint8}, Ptr{Float64}), 
+    ret = @grb_ccall(getintparam, Cint, (Ptr{Void}, Ptr{Uint8}, Ptr{Float64}), 
         env, name, a)
     if ret != 0
         throw(GurobiError(env, ret))
@@ -70,7 +70,7 @@ function get_dbl_param(env::Env, name::ASCIIString)
 end
 
 function set_int_param!(env::Env, name::ASCIIString, v::Integer)
-    ret = ccall(GRBsetintparam(), Cint, (Ptr{Void}, Ptr{Uint8}, Cint), 
+    ret = @grb_ccall(setintparam, Cint, (Ptr{Void}, Ptr{Uint8}, Cint), 
         env, name, v)
     if ret != 0
         throw(GurobiError(env, ret))
@@ -79,7 +79,7 @@ function set_int_param!(env::Env, name::ASCIIString, v::Integer)
 end
 
 function set_dbl_param!(env::Env, name::ASCIIString, v::Real)
-    ret = ccall(GRBsetdblparam(), Cint, (Ptr{Void}, Ptr{Uint8}, Float64), 
+    ret = @grb_ccall(setdblparam, Cint, (Ptr{Void}, Ptr{Uint8}, Float64), 
         env, name, v)
     if ret != 0
         throw(GurobiError(env, ret))

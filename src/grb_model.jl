@@ -15,7 +15,7 @@ convert(ty::Type{Ptr{Void}}, model::Model) = model.ptr_model::Ptr{Void}
 
 function free_model(model::Model)
     if model.ptr_model != C_NULL
-        ccall(GRBfreemodel(), Void, (Ptr{Void},), model.ptr_model)
+        @grb_ccall(freemodel, Void, (Ptr{Void},), model.ptr_model)
         model.ptr_model = C_NULL
     end
 end
@@ -23,7 +23,7 @@ end
 function copy(model::Model)
     pm::Ptr{Void} = C_NULL
     if model.ptr_model != C_NULL
-        pm = ccall(GRBcopymodel(), Ptr{Void}, (Ptr{Void},), model.ptr_model)
+        pm = @grb_ccall(copymodel, Ptr{Void}, (Ptr{Void},), model.ptr_model)
         if pm == C_NULL
             error("Failed to copy a Gurobi model.")
         end
@@ -33,7 +33,7 @@ end
 
 function update_model!(model::Model)
     @assert model.ptr_model != C_NULL
-    ret = ccall(GRBupdatemodel(), Cint, (Ptr{Void},), model.ptr_model)
+    ret = @grb_ccall(updatemodel, Cint, (Ptr{Void},), model.ptr_model)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -42,7 +42,7 @@ end
 
 function reset_model!(model::Model)
     @assert model.ptr_model != C_NULL
-    ret = ccall(GRBresetmodel(), Cint, (Ptr{Void},), model.ptr_model)
+    ret = @grb_ccall(resetmodel, Cint, (Ptr{Void},), model.ptr_model)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -53,7 +53,7 @@ end
 
 function read_model(env::Env, filename::ASCIIString)
     a = Array(Ptr{Void}, 1)
-    ret = ccall(GRBreadmodel(), Cint, 
+    ret = @grb_ccall(readmodel, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Ptr{Ptr{Void}}), 
         env, filename, a)
     if ret != 0
@@ -63,7 +63,7 @@ function read_model(env::Env, filename::ASCIIString)
 end
 
 function write_model(model::Model, filename::ASCIIString)
-    ret = ccall(GRBwrite(), Cint, (Ptr{Void}, Ptr{Uint8}), 
+    ret = @grb_ccall(write, Cint, (Ptr{Void}, Ptr{Uint8}), 
         model.ptr_model, filename)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -81,7 +81,7 @@ end
 
 function get_int_attr(model::Model, name::ASCIIString)
     a = Array(Cint, 1)
-    ret = ccall(GRBgetintattr(), Cint, 
+    ret = @grb_ccall(getintattr, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Ptr{Cint}),
         model, name, a);
     if ret != 0
@@ -92,7 +92,7 @@ end
 
 function get_dbl_attr(model::Model, name::ASCIIString)
     a = Array(Float64, 1)
-    ret = ccall(GRBgetdblattr(), Cint, 
+    ret = @grb_ccall(getdblattr, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Ptr{Float64}),
         model, name, a);
     if ret != 0
@@ -103,7 +103,7 @@ end
 
 function get_str_attr(model::Model, name::ASCIIString)
     a = Array(Ptr{Uint8}, 1)
-    ret = ccall(GRBgetstrattr(), Cint, 
+    ret = @grb_ccall(getstrattr, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Ptr{Ptr{Uint8}}), 
         model, name, a)
     if ret != 0
@@ -116,7 +116,7 @@ function get_dbl_attrarray(model::Model, name::ASCIIString, start::Integer, len:
     # start is one-based
     
     r = Array(Float64, len)
-    ret = ccall(GRBgetdblattrarray(), Cint, 
+    ret = @grb_ccall(getdblattrarray, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Cint, Cint, Ptr{Float64}), 
         model, name, start - 1, len, pointer(r))
     if ret != 0
@@ -126,7 +126,7 @@ function get_dbl_attrarray(model::Model, name::ASCIIString, start::Integer, len:
 end
 
 function set_int_attr!(model::Model, name::ASCIIString, v::Integer)
-    ret = ccall(GRBsetintattr(), Cint, 
+    ret = @grb_ccall(setintattr, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Cint), model, name, v)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -135,7 +135,7 @@ function set_int_attr!(model::Model, name::ASCIIString, v::Integer)
 end
 
 function set_dbl_attr!(model::Model, name::ASCIIString, v::Real)
-    ret = ccall(GRBsetdblattr(), Cint, 
+    ret = @grb_ccall(setdblattr, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Float64), model, name, v)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -144,7 +144,7 @@ function set_dbl_attr!(model::Model, name::ASCIIString, v::Real)
 end
 
 function set_str_attr!(model::Model, name::ASCIIString, v::ASCIIString)
-    ret = ccall(GRBsetstrattr(), Cint, 
+    ret = @grb_ccall(setstrattr, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Ptr{Uint8}), model, name, v)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -154,7 +154,7 @@ end
 
 function set_char_attr_array!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector{Char})
     values = convert(Vector{Cchar},values)
-    ret = ccall(GRBsetcharattrarray(), Cint, 
+    ret = @grb_ccall(setcharattrarray, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Cint, Cint, Ptr{Cchar}), model, name, start-1, len, values)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -240,7 +240,7 @@ function gurobi_model(env::Env, name::ASCIIString)
     @assert is_valid(env)
     
     a = Array(Ptr{Void}, 1)
-    ret = ccall(GRBnewmodel(), Cint, (
+    ret = @grb_ccall(newmodel, Cint, (
         Ptr{Void},  # env
         Ptr{Ptr{Void}},  # modelp
         Ptr{Uint8},  # name
@@ -282,7 +282,7 @@ const GRB_INTEGER    = convert(Cchar, 'I')
 
 function add_var!(model::Model, vtype::Cchar, c::Float64, lb::Float64, ub::Float64)
     
-    ret = ccall(GRBaddvar(), Cint, (
+    ret = @grb_ccall(addvar, Cint, (
         Ptr{Void},    # model
         Cint,         # numnz
         Ptr{Cint},    # vind
@@ -378,7 +378,7 @@ function add_vars!(model::Model, vtypes::Union(Cchar, Vector{Cchar}), c::Vector{
 
     # main call
 
-    ret = ccall(GRBaddvars(), Cint, (
+    ret = @grb_ccall(addvars, Cint, (
         Ptr{Void},  # model
         Cint,       # numvars
         Cint,       # numnz
@@ -416,7 +416,7 @@ add_constr!(model::Model, inds::Vector, coeffs::Vector{Float64}, rel::Char, rhs:
 function add_constr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, rel::Char, rhs::Float64)
     inds = inds - 1
     if !isempty(inds)
-        ret = ccall(GRBaddconstr(), Cint, (
+        ret = @grb_ccall(addconstr, Cint, (
             Ptr{Void},    # model
             Cint,         # numnz
             Ptr{Cint},    # cind
@@ -452,7 +452,7 @@ function add_constrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, c
     end 
         
     if m > 0 && nnz > 0
-        ret = ccall(GRBaddconstrs(), Cint, (
+        ret = @grb_ccall(addconstrs, Cint, (
             Ptr{Void},    # model
             Cint,         # num constraints
             Cint,         # num non-zeros
@@ -492,7 +492,7 @@ function add_qpterms!(model::Model, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vect
     end
     
     if nnz > 0
-        ret = ccall(GRBaddqpterms(), Cint, (
+        ret = @grb_ccall(addqpterms, Cint, (
             Ptr{Void},    # model
             Cint,         # nnz
             Ptr{Cint},    # qrow
@@ -527,7 +527,7 @@ function add_qconstr!(model::Model, lind::Vector{Cint}, lval::Vector{Float64}, q
     end
     
     if qnnz > 0
-        ret = ccall(GRBaddqconstr(), Cint, (
+        ret = @grb_ccall(addqconstr, Cint, (
             Ptr{Void},    # model
             Cint,         # lnnz
             Ptr{Cint},    # lind
@@ -555,7 +555,7 @@ end
 function add_rangeconstr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, lower::Float64, upper::Float64)
    inds = inds - 1 # Zero-based indexing
    if !isempty(inds)
-        ret = ccall(GRBaddrangeconstr(), Cint, (
+        ret = @grb_ccall(addrangeconstr, Cint, (
             Ptr{Void},    # model
             Cint,         # numnz
             Ptr{Cint},    # cind
@@ -582,7 +582,7 @@ function add_rangeconstrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cin
     end 
         
     if m > 0 && nnz > 0
-        ret = ccall(GRBaddrangeconstrs(), Cint, (
+        ret = @grb_ccall(addrangeconstrs, Cint, (
             Ptr{Void},    # model
             Cint,         # num constraints
             Cint,         # num non-zeros

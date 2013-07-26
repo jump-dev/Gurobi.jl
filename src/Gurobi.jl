@@ -1,5 +1,8 @@
 module Gurobi
-    
+   
+using BinDeps
+@BinDeps.load_dependencies
+
 	# Standard LP interface
 	require(joinpath(Pkg.dir("MathProgBase"),"src","LinprogSolverInterface.jl"))
     importall LinprogSolverInterface
@@ -21,8 +24,14 @@ module Gurobi
     export get_solution
     
     import Base.convert, Base.show, Base.copy
+    
+    macro grb_ccall(func, args...)
+        f = "GRB$(func)"
+        quote
+            ccall(($f,libgurobi), $(args...))
+        end
+    end
 
-    include("find_gurobi.jl")
     include("grb_env.jl")
     include("grb_model.jl")
     include("grb_solve.jl")

@@ -23,16 +23,10 @@ Here is the procedure to setup this package:
 
 1. Obtain a license of Gurobi and install Gurobi solver, following the instructions on [Gurobi's website](http://www.gurobi.com).
 
-2. Check out this package to your Julia package directory (e.g. ``~/.julia``)
+2. Install this package using ``Pkg.add("Gurobi")``.
 
-3. Set environment variable ``GUROBI_LIB`` to the absolute path of the Gurobi shared library. For example, in Mac OS X, you may add the following statement to ``~/.profile``:
+3. Make sure the ``GUROBI_HOME`` environmental variable is set to the path of the Gurobi directory. This is part of a standard installation. The Gurobi library will be searched for in ``GUROBI_HOME/lib``. If the library is not found, check that your version is listed in ``deps/build.jl``.
 
-    ```bash
-    export GUROBI_LIB=/Library/gurobi510/mac64/lib/libgurobi51.so
-    ```
-    
-    Note that the name of the library varies by version, so you have to specify the path to the file itself instead of the directory.
-    
 4. Now, you can start using it.
 
 

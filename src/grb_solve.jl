@@ -2,7 +2,7 @@
 
 function optimize(model::Model)
     @assert model.ptr_model != C_NULL
-    ret = ccall(GRBoptimize(), Cint, (Ptr{Void},), model)
+    ret = @grb_ccall(optimize, Cint, (Ptr{Void},), model)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
