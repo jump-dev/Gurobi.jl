@@ -9,6 +9,15 @@ function optimize(model::Model)
     nothing
 end
 
+function computeIIS(model::Model)
+    @assert model.ptr_model != C_NULL
+    ret = @grb_ccall(computeIIS, Cint, (Ptr{Void},), model)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
 
 #################################################
 #

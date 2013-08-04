@@ -18,7 +18,7 @@ using BinDeps
 	export add_rangeconstr!, add_rangeconstrs!
     
     export lp_model, qp_model
-    export optimize
+    export optimize, computeIIS
     
     export get_status, OptimInfo, get_optim_info, get_objval
     export get_solution
