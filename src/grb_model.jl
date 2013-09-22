@@ -540,7 +540,7 @@ function add_qconstr!(model::Model, lind::Vector{Cint}, lval::Vector{Float64}, q
             Float64,      # rhs
             Ptr{Uint8}    # name
             ), 
-            model, lnnz, lind-1, lval-1, qnnz, qr-1, qc-1, qv, rel, rhs, C_NULL)
+            model, lnnz, lind-1, lval, qnnz, qr-1, qc-1, qv, rel, rhs, C_NULL)
             
         if ret != 0
             throw(GurobiError(model.env, ret))
