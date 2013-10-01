@@ -73,12 +73,11 @@ end
 
 
 ######
-# More functions need to be exposed here really
+# Incomplete implementation of LinprogSolver
 ######
 
-# TODO
 function updatemodel(m::GurobiSolver)
-  error("Not Implemented - what is this?")
+  update_model!(m.inner)
 end
 
 function setsense(m::GurobiSolver,sense)
