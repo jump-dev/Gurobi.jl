@@ -229,7 +229,7 @@ model = qp_model(env, "qp_02", H, f, A, b)
 optimize(model)
 ```
 
-### Example 6: Mixed Integer Programming
+#### Example 6: Mixed Integer Programming
 
 This package also supports mixed integer programming.
 
