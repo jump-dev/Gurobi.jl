@@ -344,7 +344,7 @@ solver = LPSolver(:Gurobi, Method=2)
 solver = LPSolver(:Gurobi, IterationLimit=100.)
 ```
 
-Note that type of the value of the parameter is used to infer whether it corresponds to
+Note that the type of the value of the parameter is used to infer whether it corresponds to
 an integer or real-valued parameter in Gurobi. ``LPSolver(:Gurobi, IterationLimit=100)``
 will therefore cause an error, because ``100`` is an integer and ``IterationLimit``
 is a real-valued parameter.
