@@ -34,7 +34,7 @@ Here is the procedure to setup this package:
 
 The usage of this package is straight forward. Here, it demonstrates the use of this package through several examples.
 
-#### Example 1: Linear Programming
+#### Example 1: Low-level Linear Programming
 
 Problem formulation:
 ```
@@ -107,9 +107,13 @@ coeffs = [50., 24., 30., 33.]
 
 Here, ``Cint[1, 3]`` implies the range ``1:2`` is for the first row. Therefore, the first row have nonzeros at positions ``[1, 2]`` and their values are ``[50., 24.]``. Likewise, the second row have nonzeros at ``[1, 2]`` and their values are ``[30., 33.]``.
 
-#### Example 2: Linear programming (in MATLAB-like style)
+#### Example 2: Linear programming (MATLAB-like style)
 
-You may also specify the entire problem in one function call (like MATLAB's ``linprog``).
+You may also specify the entire problem in one function call, using the 
+solver-independent **[MathProgBase]** package. See that package
+for more information.
+
+[MathProgBase]: https://github.com/mlubin/MathProgBase.jl
 
 Problem formulation:
 ```
@@ -123,24 +127,57 @@ s.t. x >= 30, y >= 0
 
 Julia code:
 ```julia
-env = Gurobi.Env()
+using MathProgBase
 
 f = [1000., 350.]
 A = [-1. 1.5; 12. 8.; 1000. 300.]
 b = [0., 1000., 70000.]
-Aeq = nothing
-beq = nothing
 lb = [0., 30.]
-ub = nothing
  
-model = lp_model(env, "lp_02", :maximize, f, A, b, Aeq, beq, lb, ub)
-optimize(model)
+# linprog always minimizes, so we flip the objective
+solution = linprog(-f,A,'<',b,lb,Inf, LPSolver(:Gurobi))
+```
+
+#### Example 3: Linear programming (Algebraic model)
+
+Using **[JuMP]**, we can specify linear programming problems using a more
+natural algebraic approach.
+
+[JuMP]: https://github.com/IainNZ/JuMP.jl
+
+Problem formulation:
+```
+maximize 1000 x + 350 y
+
+s.t. x >= 30, y >= 0
+     -1. x + 1.5 y <= 0
+     12. x + 8.  y <= 1000
+     1000 x + 300 y <= 70000
+```
+
+Julia code:
+```julia
+using JuMP
+
+m = Model(:Max,lpsolver=LPSolver(:Gurobi))
+
+@defVar(m, x >= 30)
+@defVar(m, y >= 0)
+
+@setObjective(m, 1000x + 350y)
+@addConstraint(m, -x + 1.5y <= 0)
+@addConstraint(m, 12x + 8y <= 1000)
+@addConstraint(m, 1000x + 300y <= 70000)
+
+status = solve(m)
+println("Optimal objective: ",getObjectiveValue(m), 
+	". x = ", getValue(x), " y = ", getValue(y))
 ```
 
 
-#### Example 3: Quadratic programming  
+#### Example 3: Low-level Quadratic programming  
 
-To construct a QP model, you have to add QP terms to a model using ``add_qpterms``
+To construct a QP model using the low-level interface, you have to add QP terms to a model using ``add_qpterms``
 
 Problem formulation:
 ```
@@ -168,9 +205,10 @@ update_model!(model)
 optimize(model)
 ```
 
-#### Example 4: Quadratic programming (in MATLAB-like style)
+#### Example 4: Quadratic programming (MATLAB-like style)
 
-This package provides a ``qp_model`` function to construct QP problems in a style like MATLAB's ``quadprog``.
+As MathProgBase does not yet support quadratic programming,
+this package provides a ``qp_model`` function to construct QP problems in a style like MATLAB's ``quadprog``.
 
 Problem formulation:
 ```
@@ -233,6 +271,24 @@ optimize(model)
 
 Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer or binary variables in batch.
 
+The same model can be more easily expressed by using JuMP:
+
+```julia
+using JuMP
+
+m = Model(:Max, mipsolver=MIPSolver(:Gurobi))
+
+@defVar(m, 0 <= x <= 5)
+@defVar(m, 0 <= y <= 10, Int)
+@defVar(m, z, Bin)
+
+@setObjective(m, x + 2y + 5z)
+@addConstraint(m, x + y + z <= 10)
+@addConstraint(m, x + 2y + z <= 15)
+
+solve(m)
+```
+
 #### Example 6: Quadratic constraints
 
 The ``add_qconstr!`` function may be used to add quadratic constraints to a model.
@@ -282,4 +338,16 @@ Here are some simple examples
 set_int_param!(env, "Method", 2)   # choose to use Barrier method
 set_dbl_param!(env, "IterationLimit", 100.) # set the maximum iterations (for Simplex)
 ```
+
+These parameters may be used directly with the Gurobi ``LPSolver`` and ``MIPSolver``
+objects from MathProgBase. For example:
+```julia
+solver = LPSolver(:Gurobi, Method=2)
+solver = LPSolver(:Gurobi, IterationLimit=100.)
+```
+
+Note that type of the value of the parameter is used to infer whether it corresponds to
+an integer or real-valued parameter in Gurobi. ``LPSolver(:Gurobi, IterationLimit=100)``
+will therefore cause an error, because ``100`` is an integer and ``IterationLimit``
+is a real-valued parameter.
 

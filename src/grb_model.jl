@@ -679,38 +679,6 @@ function add_constrs!(model::Model, A::SparseMatrixCSC{Float64}, rel::Char, b::V
 end
 
 
-function lp_model(env::Env, name::ASCIIString, sense::Symbol, 
-    f::Vector{Float64}, 
-    A::Union(ConstrMat, Nothing), 
-    b::Union(Vector{Float64}, Nothing), 
-    Aeq::Union(ConstrMat, Nothing), 
-    beq::Union(Vector{Float64}, Nothing), 
-    lb::Bounds, ub::Bounds)
-    
-    # create model
-    model = gurobi_model(env, name, sense)
-    
-    # add variables
-    add_cvars!(model, f, lb, ub)
-    update_model!(model)
-    
-    # add constraints
-    if A != nothing && b != nothing
-        add_constrs!(model, A, '<', b)
-    end
-    
-    if Aeq != nothing && beq != nothing
-        add_constrs!(model, Aeq, '=', beq)
-    end
-    update_model!(model)
-    
-    model
-end
-
-lp_model(env::Env, name, sense, f, A, b, Aeq, beq) = lp_model(env, name, sense, f, A, b, Aeq, beq, nothing, nothing)
-lp_model(env::Env, name, sense, f, A, b) = lp_model(env, name, sense, f, A, b, nothing, nothing, nothing, nothing)
-
-
 #################################################
 #
 #  QP construction
