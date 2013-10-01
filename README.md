@@ -1,7 +1,5 @@
 ## Gurobi.jl
 
-Julia Port of Gurobi Solver. 
-
 The [Gurobi](http://www.gurobi.com) Optimizer is a commercial optimization solver for a variety of mathematical programming problems, including linear programming (LP), quadratic programming (QP), quadratically constrained programming (QCP), mixed integer linear programming (MILP), mixed-integer quadratic programming (MIQP), and mixed-integer quadratically constrained programming (MIQCP).
 
 The Gurobi solver is considered one of the best solvers (in terms of performance and success rate of tackling hard problems) in math programming, and its performance is comparable to (and sometimes superior to) CPLEX.
@@ -175,7 +173,7 @@ println("Optimal objective: ",getObjectiveValue(m),
 ```
 
 
-#### Example 3: Low-level Quadratic programming  
+#### Example 4: Low-level Quadratic programming  
 
 To construct a QP model using the low-level interface, you have to add QP terms to a model using ``add_qpterms``
 
@@ -205,7 +203,7 @@ update_model!(model)
 optimize(model)
 ```
 
-#### Example 4: Quadratic programming (MATLAB-like style)
+#### Example 5: Quadratic programming (MATLAB-like style)
 
 As MathProgBase does not yet support quadratic programming,
 this package provides a ``qp_model`` function to construct QP problems in a style like MATLAB's ``quadprog``.
@@ -231,7 +229,7 @@ model = qp_model(env, "qp_02", H, f, A, b)
 optimize(model)
 ```
 
-### Example 5: Mixed Integer Programming
+### Example 6: Mixed Integer Programming
 
 This package also supports mixed integer programming.
 
@@ -289,7 +287,7 @@ m = Model(:Max, mipsolver=MIPSolver(:Gurobi))
 solve(m)
 ```
 
-#### Example 6: Quadratic constraints
+#### Example 7: Quadratic constraints
 
 The ``add_qconstr!`` function may be used to add quadratic constraints to a model.
 
@@ -310,7 +308,7 @@ model = gurobi_model(env, "qcqp_01", :maximize)
 add_cvars!(model, [1., 1.], 0., Inf)
 update_model!(model)
 
- # add_qpterms!(model, linearindices, linearcoeffs, qrowinds, qcolinds, qcoeffs, sense, rhs)
+ # add_qpconstr!(model, linearindices, linearcoeffs, qrowinds, qcolinds, qcoeffs, sense, rhs)
 add_qconstr!(model, [], [], [1, 2], [1, 2], [1, 1.], '<', 1.0)
 update_model!(model)
 
