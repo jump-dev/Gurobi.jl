@@ -3,7 +3,7 @@
 The [Gurobi](http://www.gurobi.com) Optimizer is a commercial optimization solver for a variety of mathematical programming problems, including linear programming (LP), quadratic programming (QP), quadratically constrained programming (QCP), mixed integer linear programming (MILP), mixed-integer quadratic programming (MIQP), and mixed-integer quadratically constrained programming (MIQCP).
 
 The Gurobi solver is considered one of the best solvers (in terms of performance and success rate of tackling hard problems) in math programming, and its performance is comparable to (and sometimes superior to) CPLEX.
-While in general it would be expensive to purchase a Gurobi license, academic users can get a license for free. 
+Academic users can obtain a Gurobi license for free.
 
 This package is a wrapper of the Gurobi solver (through its C interface). Currently, this package supports the following types of problems:
 
@@ -23,7 +23,7 @@ Here is the procedure to setup this package:
 
 2. Install this package using ``Pkg.add("Gurobi")``.
 
-3. Make sure the ``GUROBI_HOME`` environmental variable is set to the path of the Gurobi directory. This is part of a standard installation. The Gurobi library will be searched for in ``GUROBI_HOME/lib``. If the library is not found, check that your version is listed in ``deps/build.jl``.
+3. Make sure the ``GUROBI_HOME`` environmental variable is set to the path of the Gurobi directory. This is part of a standard installation. The Gurobi library will be searched for in ``GUROBI_HOME/lib`` on unix platforms and ``GUROBI_HOME/bin`` on Windows. If the library is not found, check that your version is listed in ``deps/build.jl``.
 
 4. Now, you can start using it.
 
