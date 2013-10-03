@@ -21,7 +21,7 @@ Here is the procedure to setup this package:
 
 1. Obtain a license of Gurobi and install Gurobi solver, following the instructions on [Gurobi's website](http://www.gurobi.com).
 
-2. Install this package using ``Pkg.add("Gurobi")``.
+2. Install this package using ``Pkg.add("Gurobi")``. (Julia version 0.2 required)
 
 3. Make sure the ``GUROBI_HOME`` environmental variable is set to the path of the Gurobi directory. This is part of a standard installation. The Gurobi library will be searched for in ``GUROBI_HOME/lib`` on unix platforms and ``GUROBI_HOME/bin`` on Windows. If the library is not found, check that your version is listed in ``deps/build.jl``.
 
