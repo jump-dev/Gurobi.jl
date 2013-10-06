@@ -35,6 +35,7 @@ using BinDeps
     include("grb_env.jl")
     include("grb_model.jl")
     include("grb_solve.jl")
+    include("grb_callbacks.jl")
 
 	include("GurobiSolverInterface.jl")
 end

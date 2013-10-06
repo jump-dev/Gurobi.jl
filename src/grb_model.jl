@@ -3,9 +3,10 @@
 type Model
     env::Env
     ptr_model::Ptr{Void}
+    callback::Any
     
     function Model(env::Env, p::Ptr{Void})
-        model = new(env, p)
+        model = new(env, p, nothing)
         finalizer(model, free_model)
         model
     end
