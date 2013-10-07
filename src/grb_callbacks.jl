@@ -31,16 +31,17 @@ end
 export CallbackData, set_callback_func!
 
 for f in (:cbcut, :cblazy)
-@eval function ($f)(cbdata::CallbackData, ind::Vector{Cint}, val::Vector{Float64},
-    sense::Char, rhs::Float64)
+    @eval function ($f)(cbdata::CallbackData, ind::Vector{Cint}, val::Vector{Float64},
+        sense::Char, rhs::Float64)
 
-    len = length(ind)
-    @assert length(val) == len
+        len = length(ind)
+        @assert length(val) == len
 
-    ret = @grb_ccall($f, Cint, (Ptr{Void},Cint,Ptr{Cint},Ptr{Float64},
-        Char,Float64), cbdata.cbdata, len, ind, val, sense, rhs)
-    if ret != 0
-        throw(GurobiError(cbdata.model.env, ret))
+        ret = @grb_ccall($f, Cint, (Ptr{Void},Cint,Ptr{Cint},Ptr{Float64},
+            Char,Float64), cbdata.cbdata, len, ind, val, sense, rhs)
+        if ret != 0
+            throw(GurobiError(cbdata.model.env, ret))
+        end
     end
 end
 
