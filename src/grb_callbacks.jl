@@ -38,7 +38,7 @@ for f in (:cbcut, :cblazy)
         @assert length(val) == len
 
         ret = @grb_ccall($f, Cint, (Ptr{Void},Cint,Ptr{Cint},Ptr{Float64},
-            Char,Float64), cbdata.cbdata, len, ind, val, sense, rhs)
+            Char,Float64), cbdata.cbdata, len, ind-1, val, sense, rhs)
         if ret != 0
             throw(GurobiError(cbdata.model.env, ret))
         end
