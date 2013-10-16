@@ -322,19 +322,17 @@ SOCP constraints of the form ``x'x <= y^2`` and ``x'x <= yz`` can be added using
 In Gurobi, solver parameters are encapsulated by the ``Env`` instance. This package provides functions to get and set parameters
 
 ```julia
-get_int_param(env, name)      # get an integer parameter
-get_dbl_param(env, name)      # get a real-valued parameter
-
-set_int_param!(env, name, v)   # set an integer parameter
-set_dbl_param!(env, name, v)   # set a real-valued parameter
+getparam(env, name)       # get the value of a parameter
+setparam!(env, name, v)   # set the value of a parameter
+setparams!(env, name1=value1, name2=value2, ...)  # set parameters using keyword arguments
 ```
 
 You may refer to Gurobi's [Parameter Reference](http://www.gurobi.com/documentation/5.0/reference-manual/node653) for the whole list of parameters. 
 
 Here are some simple examples
 ```julia
-set_int_param!(env, "Method", 2)   # choose to use Barrier method
-set_dbl_param!(env, "IterationLimit", 100.) # set the maximum iterations (for Simplex)
+setparam!(env, "Method", 2)   # choose to use Barrier method
+setparams!(env; IterationLimit=100, Method=1) # set the maximum iterations and choose to use Simplex method
 ```
 
 These parameters may be used directly with the Gurobi ``LPSolver`` and ``MIPSolver``
@@ -343,9 +341,4 @@ objects from MathProgBase. For example:
 solver = LPSolver(:Gurobi, Method=2)
 solver = LPSolver(:Gurobi, IterationLimit=100.)
 ```
-
-Note that the type of the value of the parameter is used to infer whether it corresponds to
-an integer or real-valued parameter in Gurobi. ``LPSolver(:Gurobi, IterationLimit=100)``
-will therefore cause an error, because ``100`` is an integer and ``IterationLimit``
-is a real-valued parameter.
 

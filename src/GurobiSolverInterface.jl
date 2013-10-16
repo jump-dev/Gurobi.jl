@@ -42,13 +42,7 @@ function model(;options...)
 	#if length(options) != 0; warn("Options not yet supported"); end
 	env = Env()
 	for (name,value) in options
-		if isa(value,Integer)
-			set_int_param!(env,string(name),value)
-		elseif isa(value,Real)
-			set_dbl_param!(env,string(name),value)
-		else
-			error("Only integer and real parameters are recognized")
-		end
+		setparam!(env, string(name), value)
 	end
 	m = GurobiSolver(Model(env,""))
 	return m

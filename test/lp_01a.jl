@@ -12,6 +12,9 @@ using Gurobi
 
 env = Gurobi.Env()
 
+method = getparam(env, "Method")
+println("method = $method")
+
 model = Gurobi.Model(env, "lp_01", :maximize)
 
 # add variables

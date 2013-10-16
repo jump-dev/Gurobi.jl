@@ -7,7 +7,7 @@ using BinDeps
     require(joinpath(Pkg.dir("MathProgBase"),"src","LinprogSolverInterface.jl"))
     importall LinprogSolverInterface
 
-    export set_int_param!, set_dbl_param!, get_int_param, get_dbl_param
+    export getparam, setparam, setparams!
 
     export update_model!, reset_model!
     export read_model, write_model
@@ -49,6 +49,7 @@ using BinDeps
     # include source files
 
     include("grb_env.jl")
+    include("grb_params.jl")
     include("grb_model.jl")
     include("grb_solve.jl")
     include("grb_callbacks.jl")

@@ -11,7 +11,10 @@
 using Gurobi
 
 env = Gurobi.Env()
-set_int_param!(env, "Method", 2)  # using barrier method
+setparams!(env, Method=2)  # using barrier method
+
+method = getparam(env, "Method")
+println("method = $method")
 
 model = Gurobi.Model(env, "lp_02", :maximize)
 
