@@ -51,7 +51,7 @@ using Gurobi
 env = Gurobi.Env()
 
  # creates an empty model ("lp_01" is the model name)
-model = gurobi_model(env, "lp_01", :maximize)
+model = Gurobi.Model(env, "lp_01", :maximize)
 
  # add variables
  # add_cvar!(model, obj_coef, lower_bound, upper_bound)
@@ -189,7 +189,7 @@ Julia code:
 ```julia
 env = Gurobi.Env()
 
-model = gurobi_model(env, "qp_02")
+model = Gurobi.Model(env, "qp_02")
 
 add_cvars!(model, [1., 1.], 0., Inf)
 update_model!(model)
@@ -247,7 +247,7 @@ s.t.  x + y + z <= 10
 Julia code:
 ```julia
 env = Gurobi.Env()
-model = gurobi_model(env, "mip_01", :maximize)
+model = Gurobi.Model(env, "mip_01", :maximize)
 
  # add continuous variable
 add_cvar!(model, 1., 0., 5.)  # x
@@ -303,7 +303,7 @@ Julia code:
 ```julia
 env = Gurobi.Env()
 
-model = gurobi_model(env, "qcqp_01", :maximize)
+model = Gurobi.Model(env, "qcqp_01", :maximize)
 
 add_cvars!(model, [1., 1.], 0., Inf)
 update_model!(model)

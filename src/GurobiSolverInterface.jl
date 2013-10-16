@@ -50,7 +50,7 @@ function model(;options...)
 			error("Only integer and real parameters are recognized")
 		end
 	end
-	m = GurobiSolver(gurobi_model(env,""))
+	m = GurobiSolver(Model(env,""))
 	return m
 end
 

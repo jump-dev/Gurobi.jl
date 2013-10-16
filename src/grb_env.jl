@@ -12,7 +12,7 @@ type Env
             error("Failed to create environment (error code = $ret).")
         end
         env = new(a[1])
-        finalizer(env, free_env)
+        # finalizer(env, free_env)  ## temporary disable: which tends to sometimes caused warnings
         env
     end
 end

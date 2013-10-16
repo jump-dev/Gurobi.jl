@@ -11,9 +11,9 @@
 #   objv: 71818.1818
 #
 
+using MathProgBase
 using Gurobi
 
-env = Gurobi.Env()
 
 f = [1000., 350.]
 A = [-1. 1.5; 12. 8.; 1000. 300.]

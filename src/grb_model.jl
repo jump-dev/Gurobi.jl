@@ -1,5 +1,11 @@
 # Gurobi model
 
+#################################################
+#
+#  model type & constructors
+#
+#################################################
+
 type Model
     env::Env
     ptr_model::Ptr{Void}
@@ -11,6 +17,47 @@ type Model
         model
     end
 end
+
+function Model(env::Env, name::ASCIIString)
+    @assert is_valid(env)
+    
+    a = Array(Ptr{Void}, 1)
+    ret = @grb_ccall(newmodel, Cint, (
+        Ptr{Void},  # env
+        Ptr{Ptr{Void}},  # modelp
+        Ptr{Uint8},  # name
+        Cint,  # numvars
+        Ptr{Float64}, # obj coeffs
+        Ptr{Float64}, # lbounds
+        Ptr{Float64}, # ubounds
+        Ptr{Uint8},   # var types,
+        Ptr{Ptr{Uint8}} # varnames
+        ), 
+        env, a, name, 0, 
+        C_NULL, C_NULL, C_NULL, C_NULL, C_NULL
+    )
+    
+    if ret != 0
+        throw(GurobiError(env, ret))
+    end
+    
+    Model(env, a[1])
+end
+
+function Model(env::Env, name::ASCIIString, sense::Symbol)
+    model = Model(env, name)
+    if sense != :minimize
+        set_sense!(model, sense)
+    end
+    model
+end
+
+
+#################################################
+#
+#  model manipulation
+#
+#################################################
 
 convert(ty::Type{Ptr{Void}}, model::Model) = model.ptr_model::Ptr{Void}
 
@@ -231,49 +278,13 @@ end
 
 #################################################
 #
-#  model construction
+#  add variables
 #
 #################################################
 
 typealias Bounds Union(Nothing, Float64, Vector{Float64})
 
-function gurobi_model(env::Env, name::ASCIIString)
-    @assert is_valid(env)
-    
-    a = Array(Ptr{Void}, 1)
-    ret = @grb_ccall(newmodel, Cint, (
-        Ptr{Void},  # env
-        Ptr{Ptr{Void}},  # modelp
-        Ptr{Uint8},  # name
-        Cint,  # numvars
-        Ptr{Float64}, # obj coeffs
-        Ptr{Float64}, # lbounds
-        Ptr{Float64}, # ubounds
-        Ptr{Uint8},   # var types,
-        Ptr{Ptr{Uint8}} # varnames
-        ), 
-        env, a, name, 0, 
-        C_NULL, C_NULL, C_NULL, C_NULL, C_NULL
-    )
-    
-    if ret != 0
-        throw(GurobiError(env, ret))
-    end
-    
-    Model(env, a[1])
-end
-
-
-function gurobi_model(env::Env, name::ASCIIString, sense::Symbol)
-    model = gurobi_model(env, name)
-    if sense != :minimize
-        set_sense!(model, sense)
-    end
-    model
-end
-
-
-# add variables
+# variable kinds
 
 const GRB_CONTINUOUS = convert(Cchar, 'C')
 const GRB_BINARY     = convert(Cchar, 'B')
@@ -409,7 +420,16 @@ add_bvars!(model::Model, c::Vector{Float64}) = add_vars!(model, GRB_BINARY, c, 0
 add_ivars!(model::Model, c::Vector{Float64}, lb::Bounds, ub::Bounds) = add_vars!(model, GRB_INTEGER, c, lb, ub)
 add_ivars!(model::Model, c::Vector{Float64}) = add_ivars!(model, GRB_INTEGER, c, nothing, nothing) 
 
-# add_constr
+
+#################################################
+#
+#  add constraints
+#
+#################################################
+
+#### low-level functions
+
+# add_constr!
 
 add_constr!(model::Model, inds::Vector, coeffs::Vector{Float64}, rel::Char, rhs::Float64) =
     add_constr!(model, convert(Vector{Cint},inds), coeffs, rel, rhs)
@@ -480,8 +500,7 @@ function add_constrs!(
     add_constrs!(model, cbegins, inds, coeffs, fill(convert(Cchar, rel), length(cbegins)), rhs)
 end
 
-
-# add_qterms!
+# add_qpterms!
 
 add_qpterms!(model::Model, qr::Vector, qc::Vector, qv::Vector{Float64}) =
     add_qpterms!(model, convert(Vector{Cint}, qr), convert(Vector{Cint}, qc),qv)
@@ -550,8 +569,7 @@ function add_qconstr!(model::Model, lind::Vector{Cint}, lval::Vector{Float64}, q
     nothing
 end
 
-
-# add_rangeconstr
+# add_rangeconstr!
 
 function add_rangeconstr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, lower::Float64, upper::Float64)
    inds = inds - 1 # Zero-based indexing
@@ -572,6 +590,8 @@ function add_rangeconstr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float
     end
     nothing
 end
+
+# add_rangeconstrs!
 
 function add_rangeconstrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, coeffs::Vector{Float64}, lower::Vector{Float64}, upper::Vector{Float64})
         
@@ -796,7 +816,7 @@ function qp_model(env::Env, name::ASCIIString,
     lb::Bounds, ub::Bounds)
     
     # create model
-    model = gurobi_model(env, name)
+    model = Model(env, name)
     
     # add variables
     add_cvars!(model, f, lb, ub)

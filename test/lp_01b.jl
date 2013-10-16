@@ -13,7 +13,7 @@ using Gurobi
 env = Gurobi.Env()
 set_int_param!(env, "Method", 2)  # using barrier method
 
-model = gurobi_model(env, "lp_01", :maximize)
+model = Gurobi.Model(env, "lp_01", :maximize)
 
 # add variables
 add_cvars!(model, [1., 1.], [45., 5.], nothing)

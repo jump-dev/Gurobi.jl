@@ -14,7 +14,7 @@ using Gurobi
 
 env = Gurobi.Env()
 
-model = gurobi_model(env, "mip_01", :maximize)
+model = Gurobi.Model(env, "mip_01", :maximize)
 
 add_cvar!(model, 1., 0., 5.)  # x
 add_ivar!(model, 2., 0, 10)   # y

@@ -12,7 +12,7 @@ using Gurobi
 
 env = Gurobi.Env()
 
-model = gurobi_model(env, "qp_02")
+model = Gurobi.Model(env, "qp_02")
 
 add_cvars!(model, [1., 1.], 0., Inf)
 update_model!(model)
