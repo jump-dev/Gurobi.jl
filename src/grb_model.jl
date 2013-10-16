@@ -6,6 +6,9 @@
 #
 #################################################
 
+typealias Bounds Union(Nothing, Float64, Vector{Float64})
+typealias ConstrMat Union(Matrix{Float64}, SparseMatrixCSC{Float64})
+
 type Model
     env::Env
     ptr_model::Ptr{Void}
@@ -19,6 +22,7 @@ type Model
 end
 
 function Model(env::Env, name::ASCIIString)
+
     @assert is_valid(env)
     
     a = Array(Ptr{Void}, 1)
@@ -44,12 +48,66 @@ function Model(env::Env, name::ASCIIString)
     Model(env, a[1])
 end
 
+
 function Model(env::Env, name::ASCIIString, sense::Symbol)
     model = Model(env, name)
     if sense != :minimize
         set_sense!(model, sense)
     end
-    model
+    model 
+end
+
+
+#################################################
+#
+#  Higher-level model construction
+#
+#  minimize/maximize f'x or (1/2) x'Hx + f'x
+#
+#   s.t.    A x <= b
+#           Aeq x = beq
+#           lb <= x <= ub
+#
+#################################################
+
+function Model(env::Env, name::ASCIIString, f::Vector{Float64};
+    sense::Symbol=:minimize,       # :minimize or :maximize
+    H=nothing,                     # quadratic matrix 
+    A::Union(ConstrMat, Nothing)=nothing,         # inequality constraints
+    b::Union(Vector{Float64}, Nothing)=nothing,           
+    Aeq::Union(ConstrMat, Nothing)=nothing,       # equality constraints 
+    beq::Union(Vector{Float64}, Nothing)=nothing, 
+    lb::Bounds=nothing,    # upper bounds 
+    ub::Bounds=nothing)    # lower bounds
+
+    # create model
+    model = Model(env, name)
+    
+    # set sense
+    if sense != :minimize
+        set_sense!(model, sense)
+    end
+
+    # add variables
+    add_cvars!(model, f, lb, ub)
+    update_model!(model)
+    
+    # add qpterms
+    if !is(H, nothing)
+        add_qpterms!(model, H)
+    end
+    
+    # add constraints
+    if !is(A, nothing) && !is(b, nothing)
+        add_constrs!(model, A, '<', b)
+    end
+    
+    if !is(Aeq, nothing) && !is(beq, nothing)
+        add_constrs!(model, Aeq, '=', beq)
+    end
+    update_model!(model)
+    
+    return model
 end
 
 
@@ -282,8 +340,6 @@ end
 #
 #################################################
 
-typealias Bounds Union(Nothing, Float64, Vector{Float64})
-
 # variable kinds
 
 const GRB_CONTINUOUS = convert(Cchar, 'C')
@@ -500,76 +556,36 @@ function add_constrs!(
     add_constrs!(model, cbegins, inds, coeffs, fill(convert(Cchar, rel), length(cbegins)), rhs)
 end
 
-# add_qpterms!
-
-add_qpterms!(model::Model, qr::Vector, qc::Vector, qv::Vector{Float64}) =
-    add_qpterms!(model, convert(Vector{Cint}, qr), convert(Vector{Cint}, qc),qv)
-
-function add_qpterms!(model::Model, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vector{Float64})
-    nnz = length(qr)
-    if !(nnz == length(qc) == length(qv))
-        throw(ArgumentError("Inconsistent dimensions."))
-    end
-    
-    if nnz > 0
-        ret = @grb_ccall(addqpterms, Cint, (
-            Ptr{Void},    # model
-            Cint,         # nnz
-            Ptr{Cint},    # qrow
-            Ptr{Cint},    # qcol
-            Ptr{Float64}, # qval
-            ), 
-            model, nnz, qr-1, qc-1, qv)
-            
-        if ret != 0
-            throw(GurobiError(model.env, ret))
-        end 
-    end
-    nothing
+function _add_constrs_t!(model::Model, At::SparseMatrixCSC{Float64}, rel::Char, b::Vector{Float64})    
+    cbeg = convert(Vector{Cint}, At.colptr[1:At.n])
+    cind = convert(Vector{Cint}, At.rowval)
+    add_constrs!(model, cbeg, cind, At.nzval, rel, b)
 end
 
-# add_qconstr!
-
-add_qconstr!(model::Model, lind::Vector, lval::Vector, qr::Vector, qc::Vector,
-    qv::Vector{Float64}, rel::Char, rhs::Float64) =
-    add_qconstr!(model, convert(Vector{Cint},lind), convert(Vector{Float64}, lval),
-        convert(Vector{Cint}, qr), convert(Vector{Cint}, qc), qv, rel, rhs)
-
-function add_qconstr!(model::Model, lind::Vector{Cint}, lval::Vector{Float64}, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vector{Float64}, rel::Char, rhs::Float64)
-    qnnz = length(qr)
-    if !(qnnz == length(qc) == length(qv))
-        throw(ArgumentError("Inconsistent dimensions."))
-    end
-
-    lnnz = length(lind)
-    if lnnz != length(lval)
-        throw(ArgumentError("Inconsistent dimensions."))
-    end
+function add_constrs!(model::Model, A::Matrix{Float64}, rel::Char, b::Vector{Float64})
+    n::Int = num_vars(model)
+    m::Int = size(A, 1)
+    if !(m == length(b) && n == size(A, 2))
+        throw(ArgumentError("Incompatible dimensions."))
+    end 
     
-    if qnnz > 0
-        ret = @grb_ccall(addqconstr, Cint, (
-            Ptr{Void},    # model
-            Cint,         # lnnz
-            Ptr{Cint},    # lind
-            Ptr{Float64}, # lval
-            Cint,         # qnnz
-            Ptr{Cint},    # qrow
-            Ptr{Cint},    # qcol
-            Ptr{Float64}, # qval
-            Cchar,        # sense
-            Float64,      # rhs
-            Ptr{Uint8}    # name
-            ), 
-            model, lnnz, lind-1, lval, qnnz, qr-1, qc-1, qv, rel, rhs, C_NULL)
-            
-        if ret != 0
-            throw(GurobiError(model.env, ret))
-        end 
-    end
-    nothing
+    At = sparse(transpose(A))  # each column of At now is a constraint
+    _add_constrs_t!(model, At, rel, b) 
 end
 
-# add_rangeconstr!
+function add_constrs!(model::Model, A::SparseMatrixCSC{Float64}, rel::Char, b::Vector{Float64})
+    n::Int = num_vars(model)
+    m::Int = size(A, 1)
+    if !(m == length(b) && n == size(A, 2))
+        throw(ArgumentError("Incompatible dimensions."))
+    end 
+    
+    At = transpose(A)  # each column of At now is a constraint
+    _add_constrs_t!(model, At, rel, b)
+end
+
+
+# add_rangeconstr! & add_rangeconstrs!
 
 function add_rangeconstr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, lower::Float64, upper::Float64)
    inds = inds - 1 # Zero-based indexing
@@ -580,7 +596,7 @@ function add_rangeconstr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float
             Ptr{Cint},    # cind
             Ptr{Float64}, # cvals
             Float64,      # lower
-			Float64,	  # upper
+            Float64,      # upper
             Ptr{Uint8}    # name
             ),
             model, length(inds), inds, coeffs, lower, upper, C_NULL)
@@ -590,8 +606,6 @@ function add_rangeconstr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float
     end
     nothing
 end
-
-# add_rangeconstrs!
 
 function add_rangeconstrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, coeffs::Vector{Float64}, lower::Vector{Float64}, upper::Vector{Float64})
         
@@ -659,78 +673,39 @@ end
 
 #################################################
 #
-#  LP construction
-#
-#  minimize/maximize f'x
-#
-#   s.t.    A x <= b
-#           Aeq x = beq
-#           lb <= x <= ub
+#  Quadratic terms and constraints
 #
 #################################################
 
-typealias ConstrMat Union(Matrix{Float64}, SparseMatrixCSC{Float64})
+# add_qpterms!
 
-function _add_constrs_t!(model::Model, At::SparseMatrixCSC{Float64}, rel::Char, b::Vector{Float64})    
-    cbeg = convert(Vector{Cint}, At.colptr[1:At.n])
-    cind = convert(Vector{Cint}, At.rowval)
-    add_constrs!(model, cbeg, cind, At.nzval, rel, b)
-end
+add_qpterms!(model::Model, qr::Vector, qc::Vector, qv::Vector{Float64}) =
+    add_qpterms!(model, convert(Vector{Cint}, qr), convert(Vector{Cint}, qc),qv)
 
-function add_constrs!(model::Model, A::Matrix{Float64}, rel::Char, b::Vector{Float64})
-    n::Int = num_vars(model)
-    m::Int = size(A, 1)
-    if !(m == length(b) && n == size(A, 2))
-        throw(ArgumentError("Incompatible dimensions."))
-    end 
-    
-    At = sparse(transpose(A))  # each column of At now is a constraint
-    _add_constrs_t!(model, At, rel, b) 
-end
-
-function add_constrs!(model::Model, A::SparseMatrixCSC{Float64}, rel::Char, b::Vector{Float64})
-    n::Int = num_vars(model)
-    m::Int = size(A, 1)
-    if !(m == length(b) && n == size(A, 2))
-        throw(ArgumentError("Incompatible dimensions."))
-    end 
-    
-    At = transpose(A)  # each column of At now is a constraint
-    _add_constrs_t!(model, At, rel, b)
-end
-
-
-#################################################
-#
-#  QP construction
-#
-#  minimize (1/2) x'Hx + f'x
-#
-#   s.t.    A x <= b
-#           Aeq x = beq
-#           lb <= x <= ub
-#
-#################################################
-
-function _add_qpterms!(model, H::Vector{Float64})  # H stores only the diagonal element
-    n = num_vars(model)
-    if n != length(H)
-        throw(ArgumentError("Incompatible dimensions."))
+function add_qpterms!(model::Model, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vector{Float64})
+    nnz = length(qr)
+    if !(nnz == length(qc) == length(qv))
+        throw(ArgumentError("Inconsistent dimensions."))
     end
-    qr = convert(Vector{Cint}, [0:n-1])
-    qc = copy(qr)
-    add_qpterms!(model, qr, qc, qv)
+    
+    if nnz > 0
+        ret = @grb_ccall(addqpterms, Cint, (
+            Ptr{Void},    # model
+            Cint,         # nnz
+            Ptr{Cint},    # qrow
+            Ptr{Cint},    # qcol
+            Ptr{Float64}, # qval
+            ), 
+            model, nnz, qr-1, qc-1, qv)
+            
+        if ret != 0
+            throw(GurobiError(model.env, ret))
+        end 
+    end
+    nothing
 end
 
-function _add_qpterms!(model, H::Float64)  # all diagonal elements are H
-    n = num_vars(model)
-    qr = convert(Vector{Cint}, [0:n-1])
-    qc = copy(qr)
-    qv = fill(H, n)
-    add_qpterms!(model, qr, qc, qv)
-end
-
-function _add_qpterms!(model, H::SparseMatrixCSC{Float64}) # H must be symmetric
+function add_qpterms!(model, H::SparseMatrixCSC{Float64}) # H must be symmetric
     n = num_vars(model)
     if !(H.m == n && H.n == n)
         throw(ArgumentError("H must be a symmetric matrix."))
@@ -768,7 +743,7 @@ function _add_qpterms!(model, H::SparseMatrixCSC{Float64}) # H must be symmetric
     add_qpterms!(model, qr[1:k], qc[1:k], qv[1:k])
 end
 
-function _add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
+function add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
     n = num_vars(model)
     if !(size(H) == (n, n))
         throw(ArgumentError("H must be a symmetric matrix."))
@@ -805,40 +780,63 @@ function _add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
     add_qpterms!(model, qr[1:k], qc[1:k], qv[1:k])
 end
 
-
-function qp_model(env::Env, name::ASCIIString, 
-    H::Union(Vector{Float64}, Matrix{Float64}, SparseMatrixCSC{Float64}, Float64), 
-    f::Vector{Float64}, 
-    A::Union(ConstrMat, Nothing), 
-    b::Union(Vector{Float64}, Nothing), 
-    Aeq::Union(ConstrMat, Nothing), 
-    beq::Union(Vector{Float64}, Nothing), 
-    lb::Bounds, ub::Bounds)
-    
-    # create model
-    model = Model(env, name)
-    
-    # add variables
-    add_cvars!(model, f, lb, ub)
-    update_model!(model)
-    
-    # add qpterms
-    
-    _add_qpterms!(model, H)
-    
-    # add constraints
-    if A != nothing && b != nothing
-        add_constrs!(model, A, '<', b)
+function add_diag_qpterms!(model, H::Vector{Float64})  # H stores only the diagonal element
+    n = num_vars(model)
+    if n != length(H)
+        throw(ArgumentError("Incompatible dimensions."))
     end
-    
-    if Aeq != nothing && beq != nothing
-        add_constrs!(model, Aeq, '=', beq)
-    end
-    update_model!(model)
-    
-    model
+    qr = convert(Vector{Cint}, [0:n-1])
+    qc = copy(qr)
+    add_qpterms!(model, qr, qc, qv)
 end
 
-qp_model(env::Env, name, H, f, A, b, Aeq, beq) = qp_model(env, name, H, f, A, b, Aeq, beq, nothing, nothing)
-qp_model(env::Env, name, H, f, A, b) = qp_model(env, name, H, f, A, b, nothing, nothing, nothing, nothing)
+function add_diag_qpterms!(model, H::Float64)  # all diagonal elements are H
+    n = num_vars(model)
+    qr = convert(Vector{Cint}, [0:n-1])
+    qc = copy(qr)
+    qv = fill(H, n)
+    add_qpterms!(model, qr, qc, qv)
+end
+
+
+# add_qconstr!
+
+add_qconstr!(model::Model, lind::Vector, lval::Vector, qr::Vector, qc::Vector,
+    qv::Vector{Float64}, rel::Char, rhs::Float64) =
+    add_qconstr!(model, convert(Vector{Cint},lind), convert(Vector{Float64}, lval),
+        convert(Vector{Cint}, qr), convert(Vector{Cint}, qc), qv, rel, rhs)
+
+function add_qconstr!(model::Model, lind::Vector{Cint}, lval::Vector{Float64}, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vector{Float64}, rel::Char, rhs::Float64)
+    qnnz = length(qr)
+    if !(qnnz == length(qc) == length(qv))
+        throw(ArgumentError("Inconsistent dimensions."))
+    end
+
+    lnnz = length(lind)
+    if lnnz != length(lval)
+        throw(ArgumentError("Inconsistent dimensions."))
+    end
+    
+    if qnnz > 0
+        ret = @grb_ccall(addqconstr, Cint, (
+            Ptr{Void},    # model
+            Cint,         # lnnz
+            Ptr{Cint},    # lind
+            Ptr{Float64}, # lval
+            Cint,         # qnnz
+            Ptr{Cint},    # qrow
+            Ptr{Cint},    # qcol
+            Ptr{Float64}, # qval
+            Cchar,        # sense
+            Float64,      # rhs
+            Ptr{Uint8}    # name
+            ), 
+            model, lnnz, lind-1, lval, qnnz, qr-1, qc-1, qv, rel, rhs, C_NULL)
+            
+        if ret != 0
+            throw(GurobiError(model.env, ret))
+        end 
+    end
+    nothing
+end
 

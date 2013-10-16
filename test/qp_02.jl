@@ -10,12 +10,11 @@ using Gurobi
 
 env = Gurobi.Env()
 
-H = [2. 1. 0.; 1. 2. 1.; 0. 1. 2.]
-f = zeros(3)
-A = -[1. 2. 3.; 1. 1. 0.]
-b = -[4., 1.]
+model = Gurobi.Model(env, "qp_02", zeros(3);
+	H = [2. 1. 0.; 1. 2. 1.; 0. 1. 2.],
+	A = -[1. 2. 3.; 1. 1. 0.], 
+	b = -[4., 1.])
 
-model = qp_model(env, "qp_02", H, f, A, b)
 optimize(model)
 
 println("sol = $(get_solution(model))")

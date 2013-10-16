@@ -14,16 +14,13 @@
 using MathProgBase
 using Gurobi
 
+env = Gurobi.Env()
 
-f = [1000., 350.]
-A = [-1. 1.5; 12. 8.; 1000. 300.]
-b = [0., 1000., 70000.]
-Aeq = nothing
-beq = nothing
-lb = [0., 30.]
-ub = nothing
-
-model = lp_model(env, "lp_02", :maximize, f, A, b, Aeq, beq, lb, ub)
+model = Gurobi.Model(env, "lp_02", [1000., 350.]; 
+	sense=:maximize, 
+	A = [-1. 1.5; 12. 8.; 1000. 300.], 
+	b = [0., 1000., 70000.], 
+	lb = [0., 30.])
 
 println(model)
 
