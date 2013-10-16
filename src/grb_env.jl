@@ -61,7 +61,7 @@ end
 
 function get_dbl_param(env::Env, name::ASCIIString)
     a = Array(Float64, 1)
-    ret = @grb_ccall(getintparam, Cint, (Ptr{Void}, Ptr{Uint8}, Ptr{Float64}), 
+    ret = @grb_ccall(getdblparam, Cint, (Ptr{Void}, Ptr{Uint8}, Ptr{Float64}), 
         env, name, a)
     if ret != 0
         throw(GurobiError(env, ret))
