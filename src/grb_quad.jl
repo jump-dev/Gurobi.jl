@@ -1,14 +1,9 @@
 # Quadratic terms & constraints
 #
 
-add_qpterms!(model::Model, qr::Vector, qc::Vector, qv::Vector{Float64}) =
-    add_qpterms!(model, convert(Vector{Cint}, qr), convert(Vector{Cint}, qc),qv)
-
-function add_qpterms!(model::Model, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vector{Float64})
+function add_qpterms!(model::Model, qr::IVec, qc::IVec, qv::FVec)
     nnz = length(qr)
-    if !(nnz == length(qc) == length(qv))
-        throw(ArgumentError("Inconsistent dimensions."))
-    end
+    (nnz == length(qc) == length(qv)) || error("Inconsistent argument dimensions.")
     
     if nnz > 0
         ret = @grb_ccall(addqpterms, Cint, (
@@ -27,26 +22,28 @@ function add_qpterms!(model::Model, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vect
     nothing
 end
 
+function add_qpterms!(model::Model, qr::Vector, qc::Vector, qv::Vector)
+    add_qpterms!(model, ivec(qr), ivec(qc), fvec(qv))
+end
+
+
 function add_qpterms!(model, H::SparseMatrixCSC{Float64}) # H must be symmetric
     n = num_vars(model)
-    if !(H.m == n && H.n == n)
-        throw(ArgumentError("H must be a symmetric matrix."))
-    end
+    (H.m == n && H.n == n) || error("H must be an n-by-n symmetric matrix.")
     
     nnz_h = nnz(H)
     qr = Array(Cint, nnz_h)
     qc = Array(Cint, nnz_h)
     qv = Array(Float64, nnz_h)
-    k::Int = 0
+    k = 0
     
     colptr::Vector{Int} = H.colptr
-    rowval::Vector{Cint} = convert(Vector{Cint}, H.rowval)
-    nzval::Vector{Float64} = convert(Vector{Float64}, H.nzval)
+    nzval::Vector{Float64} = H.nzval
     
     for i = 1 : n
         qi::Cint = convert(Cint, i)
         for j = colptr[i]:(colptr[i+1]-1)
-            qj::Cint = rowval[j] 
+            qj = convert(Cint, H.rowval[j])
             
             if qi < qj
                 k += 1
@@ -67,9 +64,7 @@ end
 
 function add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
     n = num_vars(model)
-    if !(size(H) == (n, n))
-        throw(ArgumentError("H must be a symmetric matrix."))
-    end
+    size(H) == (n, n) || error("H must be an n-by-n symmetric matrix.")
     
     nmax = int(n * (n + 1) / 2)
     qr = Array(Cint, nmax)
@@ -78,9 +73,9 @@ function add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
     k::Int = 0
     
     for i = 1 : n
-        qi::Cint = convert(Cint, i)
+        qi = convert(Cint, i)
         
-        v::Float64 = H[i,i]
+        v = H[i,i]
         if v != 0.
             k += 1
             qr[k] = qi
@@ -102,42 +97,28 @@ function add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
     add_qpterms!(model, qr[1:k], qc[1:k], qv[1:k])
 end
 
-function add_diag_qpterms!(model, H::Vector{Float64})  # H stores only the diagonal element
+function add_diag_qpterms!(model, H::Vector)  # H stores only the diagonal element
     n = num_vars(model)
-    if n != length(H)
-        throw(ArgumentError("Incompatible dimensions."))
-    end
-    qr = convert(Vector{Cint}, [0:n-1])
-    qc = copy(qr)
-    add_qpterms!(model, qr, qc, qv)
+    n == length(H) || error("Incompatible dimensions.")
+    q = [convert(Cint,1):convert(Cint,n)]
+    add_qpterms!(model, q, q, fvec(h))
 end
 
-function add_diag_qpterms!(model, H::Float64)  # all diagonal elements are H
+function add_diag_qpterms!(model, hv::Real)  # all diagonal elements are H
     n = num_vars(model)
-    qr = convert(Vector{Cint}, [0:n-1])
-    qc = copy(qr)
-    qv = fill(H, n)
-    add_qpterms!(model, qr, qc, qv)
+    q = [convert(Cint,1):convert(Cint,n)]
+    add_qpterms!(model, q, q, fill(float64(hv), n))
 end
 
 
 # add_qconstr!
 
-add_qconstr!(model::Model, lind::Vector, lval::Vector, qr::Vector, qc::Vector,
-    qv::Vector{Float64}, rel::Char, rhs::Float64) =
-    add_qconstr!(model, convert(Vector{Cint},lind), convert(Vector{Float64}, lval),
-        convert(Vector{Cint}, qr), convert(Vector{Cint}, qc), qv, rel, rhs)
-
-function add_qconstr!(model::Model, lind::Vector{Cint}, lval::Vector{Float64}, qr::Vector{Cint}, qc::Vector{Cint}, qv::Vector{Float64}, rel::Char, rhs::Float64)
+function add_qconstr!(model::Model, lind::IVec, lval::FVec, qr::IVec, qc::IVec, qv::FVec, rel::Cchar, rhs::Float64)
     qnnz = length(qr)
-    if !(qnnz == length(qc) == length(qv))
-        throw(ArgumentError("Inconsistent dimensions."))
-    end
+    qnnz == length(qc) == length(qv) || error("Inconsistent argument dimensions.")
 
     lnnz = length(lind)
-    if lnnz != length(lval)
-        throw(ArgumentError("Inconsistent dimensions."))
-    end
+    lnnz == length(lval) || error("Inconsistent argument dimensions.")
     
     if qnnz > 0
         ret = @grb_ccall(addqconstr, Cint, (
@@ -161,3 +142,10 @@ function add_qconstr!(model::Model, lind::Vector{Cint}, lval::Vector{Float64}, q
     end
     nothing
 end
+
+function add_qconstr!(model::Model, lind::Vector, lval::Vector, qr::Vector, qc::Vector,
+    qv::Vector{Float64}, rel::GChars, rhs::Real)
+
+    add_qconstr!(model, ivec(lind), fvec(lval), ivec(qr), ivec(qc), fvec(qv), cchar(rel), float64(rhs))
+end
+
