@@ -3,27 +3,47 @@ module Gurobi
 using BinDeps
 @BinDeps.load_dependencies
 
+    ### imports
+
+    import Base.convert, Base.show, Base.copy
+
     # Standard LP interface
     require(joinpath(Pkg.dir("MathProgBase"),"src","LinprogSolverInterface.jl"))
     importall LinprogSolverInterface
 
-    export getparam, setparam, setparams!
+    ### exports
+    export 
 
-    export update_model!, reset_model!
-    export read_model, write_model
-    export set_sense!
-    export add_var!, add_vars!, add_cvar!, add_cvars!
-    export add_bvar!, add_bvars!, add_ivar!, add_ivars!
-    export add_constr!, add_constrs!, add_qpterms!, add_qconstr!
-    export add_rangeconstr!, add_rangeconstrs!
-    
-    export gurobi_model, qp_model
-    export optimize, computeIIS
-    
-    export get_status, OptimInfo, get_optim_info, get_objval
-    export get_solution
-    
-    import Base.convert, Base.show, Base.copy
+    # grb_env
+    free_env,
+
+    # grb_params
+    getparam, setparam!, setparams!,
+
+    # grb_model
+    set_sense!, update_model!, reset_model!, 
+    read_model, write_model,
+
+    # grb_vars
+    GRB_CONTINUOUS, GRB_BINARY, GRB_INTEGER,
+    add_var!, add_vars!, add_cvar!, add_cvars!,
+    add_bvar!, add_bvars!, add_ivar!, add_ivars!,
+
+    # grb_constrs
+    add_constr!, add_constrs!, add_rangeconstr!, add_rangeconstrs!,
+
+    # grb_quad
+    add_qpterms!, add_qconstr!,
+
+    # higher level
+    gurobi_model, qp_model,
+
+    # grb_solve
+    optimize, computeIIS, get_solution,
+    get_status, OptimInfo, get_optim_info, get_objval
+
+
+    ### common support
     
     # macro to call a Gurobi C function
     macro grb_ccall(func, args...)
@@ -46,7 +66,8 @@ using BinDeps
     # one can write Gurobi.version to get the version numbers
     const version = getlibversion()
 
-    # include source files
+
+    ### include source files
 
     include("grb_env.jl")
     include("grb_params.jl")
