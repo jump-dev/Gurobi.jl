@@ -41,34 +41,11 @@ using BinDeps
     # grb_solve
     optimize, computeIIS, get_solution,
     get_status, OptimInfo, get_optim_info, get_objval
-
-
-    ### common support
     
-    # macro to call a Gurobi C function
-    macro grb_ccall(func, args...)
-        f = "GRB$(func)"
-        quote
-            ccall(($f,libgurobi), $(args...))
-        end
-    end
-
-    # Gurobi library version
-    function getlibversion()
-        _major = Cint[0]
-        _minor = Cint[0]
-        _tech = Cint[0]
-        @grb_ccall(version, Void, (Ptr{Cint}, Ptr{Cint}, Ptr{Cint}), _major, _minor, _tech)
-        return VersionNumber(_major[1], _minor[1], _tech[1])        
-    end
-
-    # version need not be export
-    # one can write Gurobi.version to get the version numbers
-    const version = getlibversion()
-
 
     ### include source files
 
+    include("grb_common.jl")
     include("grb_env.jl")
     include("grb_params.jl")
 

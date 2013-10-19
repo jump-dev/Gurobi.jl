@@ -1,4 +1,4 @@
-## Gurobi.jl
+# Gurobi.jl
 
 The [Gurobi](http://www.gurobi.com) Optimizer is a commercial optimization solver for a variety of mathematical programming problems, including linear programming (LP), quadratic programming (QP), quadratically constrained programming (QCP), mixed integer linear programming (MILP), mixed-integer quadratic programming (MIQP), and mixed-integer quadratically constrained programming (MIQCP).
 
@@ -15,7 +15,7 @@ This package is a wrapper of the Gurobi solver (through its C interface). Curren
 * Second order cone programming (SOCP)
 * Mixed integer second order cone programming (MISOCP)
 
-### Installation
+## Installation
 
 Here is the procedure to setup this package:
 
@@ -27,12 +27,136 @@ Here is the procedure to setup this package:
 
 4. Now, you can start using it.
 
+## API Overview
 
-### Examples
+This package provides both APIs at different levels for constructing models and solving optimization problems.
 
-The usage of this package is straight forward. Here, it demonstrates the use of this package through several examples.
+#### Gurobi Environment
 
-#### Example 1: Low-level Linear Programming
+A Gurobi model is always associated with an Gurobi environment, which maintains a solver configuration. By setting parameters to this environment, one can control or tune the behavior of a Gurobi solver.
+
+To construct a Gurobi Environment, one can write:
+```
+env = Gurobi.Env()
+```
+
+This package provides functions to get and set parameters:
+
+```julia
+getparam(env, name)       # get the value of a parameter
+setparam!(env, name, v)   # set the value of a parameter
+setparams!(env, name1=value1, name2=value2, ...)  # set parameters using keyword arguments
+```
+
+You may refer to Gurobi's [Parameter Reference](http://www.gurobi.com/documentation/5.0/reference-manual/node653) for the whole list of parameters. 
+
+Here are some simple examples
+```julia
+setparam!(env, "Method", 2)   # choose to use Barrier method
+setparams!(env; IterationLimit=100, Method=1) # set the maximum iterations and choose to use Simplex method
+```
+
+These parameters may be used directly with the Gurobi ``LPSolver`` and ``MIPSolver``
+objects from MathProgBase. For example:
+```julia
+solver = LPSolver(:Gurobi, Method=2)
+solver = LPSolver(:Gurobi, IterationLimit=100.)
+```
+
+#### High-level API
+
+If the objective coefficients and the constraints have already been given, one may use a high-level function ``gurobi_model`` to construct a model:
+
+```julia
+gurobi_model(env, ...) 
+```
+One can use keyword arguments to specify the models:
+* ``name``:  the model name.
+* ``sense``: the sense of optimization (a symbol, which can be either ``:minimize`` (default) or ``:maximize``). 
+* ``f``:   the linear coefficient vector.
+* ``H``:   the quadratic coefficient matrix (can be dense or sparse).
+* ``A``:   the coefficient matrix of the linear inequality constraints.
+* ``b``:   the right-hand-side of the linear inequality constraints.
+* ``Aeq``:  the coefficient matrix of the equality constraints.
+* ``beq``:  the right-hand-side of the equality constraints.
+* ``lb``:   the variable lower bounds.
+* ``ub``:   the variable upper bounds.
+
+This function constructs a model that represents the following problem:
+```
+objective:  (1/2) x' H x + f' x
+
+s.t.            A x <= b
+              Aeq x <= beq
+            lb <= x <= ub
+```
+
+The caller *must* specify ``f`` using a non-empty vector, while other keyword arguments are optional. When ``H`` is omitted, this reduces to an LP problem. When ``lb`` is omitted, the variables are not lower bounded, and when ``ub`` is omitted, the variables are not upper bounded. 
+
+
+#### Low-level API
+
+This package also provides functions to build the model from scratch and gradually add variables and constraints. 
+To construct an empty model, one can write:
+```julia
+env = Gurobi.Env()    # creates a Gurobi environment
+
+model = Gurobi.Model(env, name)   # creates an empty model 
+model = Gurobi.Model(env, name, sense)  
+```
+
+Here, ``sense`` is a symbol, which can be either ``:minimize`` or ``:maximize`` (default to ``:minimize`` when omitted). 
+
+Then, the following functions can be used to add variables and constraints to the model:
+```julia
+## add variables
+
+add_var!(model, vtype, c)   # add an variable with coefficient c
+                            # vtype can be either of 
+                            # - GRB_CONTINUOUS  (for continuous variable)
+                            # - GRB_INTEGER (for integer variable)
+                            # - GRB_BINARY (for binary variable, i.e. 0/1)
+
+add_cvar!(model, c)            # add a continuous variable
+add_cvar!(model, c, lb, ub)    # add a continuous variable with specified bounds
+
+add_ivar!(model, c)            # add an integer variable
+add_ivar!(model, c, lb, ub)    # add an integer variable with specified bounds
+
+add_bvar!(model, c)            # add a binary variable
+
+## add constraints
+
+# add a constraint with non-zero coefficients on specific variables. 
+# rel can be '<', '>', or '='
+add_constr!(model, inds, coeffs, rel, rhs)  
+
+# add a constraint with coefficient vector for all variables.
+add_constr!(model, coeffs, rel, rhs)
+
+# add constraints using CSR format
+add_constrs!(model, cbegin, inds, coeffs, rel, rhs)
+
+# add constraints using matrix
+add_constrs!(model, A, rel, rhs)  # here A can be dense or sparse
+
+# add a range constraint
+add_rangeconstr!(model, inds, coeffs, lb, ub)
+
+
+
+```
+
+
+
+
+
+
+## Examples
+
+The usage of this package is straight forward. Below, we use several examples to demonstrate the use of this package to solve optimization problems.
+
+### Linear Programming Examples
 
 Problem formulation:
 ```
@@ -42,6 +166,50 @@ s.t. 50 x + 24 y <= 2400
      30 x + 33 y <= 2100
      x >= 45, y >= 5
 ```
+
+Below, we show how this problem can be constructed and solved in different ways. In all examples below, we assume that the preamble codes like the following exist in the script:
+
+```julia
+using Gurobi
+env = Gurobi.Env()
+... optional codes to set parameters to env ...
+```
+
+
+##### Example 1.1: High-level Linear Programming API
+
+Using the ``gurobi_model`` function:
+
+```julia
+
+ # construct the model
+model = gurobi_model(env;
+    name = "lp_01", 
+    f = ones(2), 
+    A = [50. 24.; 30. 33.], 
+    b = [2400., 2100.],
+    lb = [5., 45.])
+
+ # run optimization
+optimize(model)
+
+ # show results
+sol = get_solution(model)
+println("soln = $(sol)")
+
+objv = get_objval(model)
+println("objv = $(objv)")
+```
+
+
+
+
+
+
+
+##### Example 1.2: Low-level Linear Programming API
+
+
 
 Julia code:
 ```julia
@@ -105,7 +273,7 @@ coeffs = [50., 24., 30., 33.]
 
 Here, ``Cint[1, 3]`` implies the range ``1:2`` is for the first row. Therefore, the first row have nonzeros at positions ``[1, 2]`` and their values are ``[50., 24.]``. Likewise, the second row have nonzeros at ``[1, 2]`` and their values are ``[30., 33.]``.
 
-#### Example 2: Linear programming (MATLAB-like style)
+#### Example 3: Linear programming (MATLAB-like style)
 
 You may also specify the entire problem in one function call, using the 
 solver-independent **[MathProgBase]** package. See that package
@@ -136,7 +304,7 @@ lb = [0., 30.]
 solution = linprog(-f,A,'<',b,lb,Inf, LPSolver(:Gurobi))
 ```
 
-#### Example 3: Linear programming (Algebraic model)
+#### Example 4: Linear programming with JuMP (Algebraic model)
 
 Using **[JuMP]**, we can specify linear programming problems using a more
 natural algebraic approach.
@@ -173,7 +341,7 @@ println("Optimal objective: ",getObjectiveValue(m),
 ```
 
 
-#### Example 4: Low-level Quadratic programming  
+#### Example 5: Low-level Quadratic programming  
 
 To construct a QP model using the low-level interface, you have to add QP terms to a model using ``add_qpterms``
 
@@ -203,10 +371,9 @@ update_model!(model)
 optimize(model)
 ```
 
-#### Example 5: Quadratic programming (MATLAB-like style)
+#### Example 5: Quadratic programming
 
-As MathProgBase does not yet support quadratic programming,
-this package provides a ``qp_model`` function to construct QP problems in a style like MATLAB's ``quadprog``.
+The function ``gurobi_model`` can be used to construct a QP model, as below.
 
 Problem formulation:
 ```
@@ -220,12 +387,12 @@ Julia code:
 ```julia
 env = Gurobi.Env()
 
-H = [2. 1. 0.; 1. 2. 1.; 0. 1. 2.]
-f = zeros(3)
-A = -[1. 2. 3.; 1. 1. 0.]
-b = -[4., 1.]
-
-model = qp_model(env, "qp_02", H, f, A, b)
+model = gurobi_model(env; 
+        name = "qp_02", 
+        H = [2. 1. 0.; 1. 2. 1.; 0. 1. 2.], 
+        f = [0., 0., 0.], 
+        A = -[1. 2. 3.; 1. 1. 0.], 
+        b = -[4., 1.])
 optimize(model)
 ```
 
@@ -317,28 +484,4 @@ optimize(model)
 
 SOCP constraints of the form ``x'x <= y^2`` and ``x'x <= yz`` can be added using this method as well.
 
-### Parameter Settings
-
-In Gurobi, solver parameters are encapsulated by the ``Env`` instance. This package provides functions to get and set parameters
-
-```julia
-getparam(env, name)       # get the value of a parameter
-setparam!(env, name, v)   # set the value of a parameter
-setparams!(env, name1=value1, name2=value2, ...)  # set parameters using keyword arguments
-```
-
-You may refer to Gurobi's [Parameter Reference](http://www.gurobi.com/documentation/5.0/reference-manual/node653) for the whole list of parameters. 
-
-Here are some simple examples
-```julia
-setparam!(env, "Method", 2)   # choose to use Barrier method
-setparams!(env; IterationLimit=100, Method=1) # set the maximum iterations and choose to use Simplex method
-```
-
-These parameters may be used directly with the Gurobi ``LPSolver`` and ``MIPSolver``
-objects from MathProgBase. For example:
-```julia
-solver = LPSolver(:Gurobi, Method=2)
-solver = LPSolver(:Gurobi, IterationLimit=100.)
-```
 

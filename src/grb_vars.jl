@@ -29,15 +29,16 @@ function add_var!(model::Model, vtype::Cchar, c::Float64, lb::Float64, ub::Float
     nothing
 end
 
-add_var!(model::Model, vtype::Cchar, c::Float64) = add_var!(model, vtype, c, -Inf, Inf)
+add_var!(model::Model, vtype::GChars, c::Real, lb::Real, ub::Real) = add_var!(model, cchar(vtype), float64(c), float64(lb), float64(ub))
+add_var!(model::Model, vtype::GChars, c::Real) = add_var!(model, vtype, c, -Inf, Inf)
 
-add_cvar!(model::Model, c::Float64, lb::Float64, ub::Float64) = add_var!(model, GRB_CONTINUOUS, c, lb, ub)
-add_cvar!(model::Model, c::Float64) = add_cvar!(model, c, -Inf, Inf)
+add_cvar!(model::Model, c::Real, lb::Real, ub::Real) = add_var!(model, GRB_CONTINUOUS, c, lb, ub)
+add_cvar!(model::Model, c::Real) = add_cvar!(model, c, -Inf, Inf)
 
-add_bvar!(model::Model, c::Float64) = add_var!(model, GRB_BINARY, c, 0., 1.)
+add_bvar!(model::Model, c::Real) = add_var!(model, GRB_BINARY, c, 0., 1.)
 
-add_ivar!(model::Model, c::Float64, lb::Real, ub::Real) = add_var!(model, GRB_INTEGER, c, float64(lb), float64(ub))
-add_ivar!(model::Model, c::Float64) = add_ivar!(model, c, -Inf, Inf)
+add_ivar!(model::Model, c::Real, lb::Real, ub::Real) = add_var!(model, GRB_INTEGER, c, lb, ub)
+add_ivar!(model::Model, c::Real) = add_ivar!(model, c, -Inf, Inf)
 
 
 # add_vars!
