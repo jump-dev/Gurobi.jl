@@ -126,4 +126,4 @@ getconstrduals(m::GurobiSolver)  = get_dbl_attrarray(m.inner, "Pi", 1, num_const
 getrawsolver(m::GurobiSolver) = m.inner
 
 setvartype(m::GurobiSolver, vartype) =
-    set_char_attr_array!(m.inner, "VType", 1, length(vartype), vartype)
+    set_char_attrarray!(m.inner, "VType", 1, length(vartype), vartype)

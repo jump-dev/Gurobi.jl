@@ -73,7 +73,7 @@ function set_str_attr!(model::Model, name::ASCIIString, v::ASCIIString)
     nothing
 end
 
-function set_char_attr_array!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector{Char})
+function set_char_attrarray!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector{Char})
     values = convert(Vector{Cchar},values)
     ret = @grb_ccall(setcharattrarray, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Cint, Cint, Ptr{Cchar}), model, name, start-1, len, values)
