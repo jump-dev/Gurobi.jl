@@ -1,16 +1,16 @@
 # High level model construction
 
-function gurobi_model(env::Env;
-	name::ASCIIString="", 
-	f::Vector{Float64}=Float64[],
+function gurobi_model(env::Env;    # solver environment
+	name::ASCIIString="", 	       # model name
     sense::Symbol=:minimize,       # :minimize or :maximize
-    H=nothing,                     # quadratic matrix 
-    A::Union(ConstrMat, Nothing)=nothing,         # inequality constraints
-    b::Union(Vector{Float64}, Nothing)=nothing,           
-    Aeq::Union(ConstrMat, Nothing)=nothing,       # equality constraints 
-    beq::Union(Vector{Float64}, Nothing)=nothing, 
-    lb::Bounds=nothing,    # upper bounds 
-    ub::Bounds=nothing)    # lower bounds
+    H::CoeffMat=emptyfmat,         # quadratic coefficient matrix 
+    f::FVec=emptyfvec,             # linear coefficient vector
+    A::CoeffMat=emptyfmat,         # LHS of inequality constraints
+    b::FVec=emptyfvec,             # RHS of inequality constraints      
+    Aeq::CoeffMat=emptyfmat,       # LHS of equality constraints 
+    beq::FVec=emptyfvec,           # RHS of equality constraints 
+    lb::Bounds=-Inf,               # upper bounds 
+    ub::Bounds=Inf)                # lower bounds
 
 	# check f
 	if isempty(f)
@@ -30,16 +30,16 @@ function gurobi_model(env::Env;
     update_model!(model)
     
     # add qpterms
-    if !is(H, nothing)
+    if !isempty(H)
         add_qpterms!(model, H)
     end
     
     # add constraints
-    if !is(A, nothing) && !is(b, nothing)
+    if !isempty(A) && !isempty(b)
         add_constrs!(model, A, '<', b)
     end
     
-    if !is(Aeq, nothing) && !is(beq, nothing)
+    if !isempty(Aeq) && !isempty(beq)
         add_constrs!(model, Aeq, '=', beq)
     end
     update_model!(model)

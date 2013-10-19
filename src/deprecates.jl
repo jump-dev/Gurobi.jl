@@ -3,9 +3,9 @@
 function qp_model(env::Env, name::ASCIIString, 
     H::Union(Vector{Float64}, Matrix{Float64}, SparseMatrixCSC{Float64}, Float64), 
     f::Vector{Float64}, 
-    A::Union(ConstrMat, Nothing), 
+    A::Union(CoeffMat, Nothing), 
     b::Union(Vector{Float64}, Nothing), 
-    Aeq::Union(ConstrMat, Nothing), 
+    Aeq::Union(CoeffMat, Nothing), 
     beq::Union(Vector{Float64}, Nothing), 
     lb::Bounds, ub::Bounds)
 

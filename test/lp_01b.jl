@@ -19,7 +19,7 @@ println("method = $method")
 model = Gurobi.Model(env, "lp_02", :maximize)
 
 # add variables
-add_cvars!(model, [1., 1.], [45., 5.], nothing)
+add_cvars!(model, [1., 1.], [45., 5.], Inf)
 update_model!(model)
 
 # add constraints

@@ -5,12 +5,37 @@
 typealias GChars Union(Cchar, Char)
 typealias IVec Vector{Cint}
 typealias FVec Vector{Float64}
+typealias CVec Vector{Cchar}
+
+typealias GCharOrVec Union(Cchar, Char, Vector{Cchar}, Vector{Char})
+
+typealias Bounds{T<:Real} Union(T, Vector{T})
+typealias CoeffMat Union(Matrix{Float64}, SparseMatrixCSC{Float64})
 
 cchar(c::Cchar) = c
 cchar(c::Char) = convert(Cchar, c)
 
 ivec{I<:Integer}(v::Vector{I}) = convert(IVec, v)
 fvec{T<:Real}(v::Vector{T}) = convert(FVec, v)
+
+# cvecx(v, n) and fvecx(v, n)
+# converts v into a vector of Cchar or Float64 of length n,
+# where v can be either a scalar or a vector of length n.
+
+_chklen(v, n::Integer) = (length(v) == n || error("Inconsistent argument dimensions."))
+
+cvecx(c::GChars, n::Integer) = fill(cchar(c), n)
+cvecx(c::Vector{Cchar}, n::Integer) = (_chklen(c, n); c)
+cvecx(c::Vector{Char}, n::Integer) = (_chklen(c, n); convert(Vector{Cchar}, c))
+
+fvecx(v::Real, n::Integer) = fill(float64(v), n)
+fvecx(v::Vector{Float64}, n::Integer) = (_chklen(v, n); v)
+fvecx{T<:Real}(v::Vector{T}, n::Integer) = (_chklen(v, n); convert(Vector{Float64}, v))
+
+# empty vector & matrix (for the purpose of supplying default arguments)
+
+const emptyfvec = Array(Float64, 0)
+const emptyfmat = Array(Float64, 0, 0)
 
 # macro to call a Gurobi C function
 macro grb_ccall(func, args...)

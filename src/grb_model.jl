@@ -6,9 +6,6 @@
 #
 #################################################
 
-typealias Bounds Union(Nothing, Float64, Vector{Float64})
-typealias ConstrMat Union(Matrix{Float64}, SparseMatrixCSC{Float64})
-
 type Model
     env::Env
     ptr_model::Ptr{Void}
