@@ -2,7 +2,6 @@
 # Standardized LP interface
 
 export GurobiSolver,
-    model,
     loadproblem,
     writeproblem,
     getvarLB,
