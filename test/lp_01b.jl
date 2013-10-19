@@ -16,7 +16,7 @@ setparams!(env, Method=2)  # using barrier method
 method = getparam(env, "Method")
 println("method = $method")
 
-model = Gurobi.Model(env, "lp_02", :maximize)
+model = Gurobi.Model(env, "lp_01", :maximize)
 
 # add variables
 add_cvars!(model, [1., 1.], [45., 5.], Inf)
@@ -33,7 +33,7 @@ println(model)
 optimize(model)
 
 # show results
-info = get_optim_info(model)
+info = get_optiminfo(model)
 println()
 println(info)
 

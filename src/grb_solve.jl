@@ -55,7 +55,7 @@ const status_symbols = [
     :suboptimal
 ]
 
-get_status_code(model::Model) = get_int_attr(model, "Status")
+get_status_code(model::Model) = get_intattr(model, "Status")
 get_status(model::Model) = status_symbols[get_status_code(model)]::Symbol
 
 @grb_dbl_attr get_runtime      "Runtime"
@@ -66,8 +66,8 @@ get_status(model::Model) = status_symbols[get_status_code(model)]::Symbol
 @grb_int_attr get_barrier_iter_count "BarIterCount"
 @grb_dbl_attr get_node_count   "NodeCount"
 
-get_iter_count(model::Model) = convert(Int, get_dbl_attr(model, "IterCount"))
-get_node_count(model::Model) = convert(Int, get_dbl_attr(model, "NodeCount"))
+get_iter_count(model::Model) = convert(Int, get_dblattr(model, "IterCount"))
+get_node_count(model::Model) = convert(Int, get_dblattr(model, "NodeCount"))
 
 
 type OptimInfo
@@ -80,7 +80,7 @@ type OptimInfo
     node_count::Int
 end
 
-function get_optim_info(model::Model)
+function get_optiminfo(model::Model)
     OptimInfo(
         get_status(model),
         get_runtime(model),
@@ -108,5 +108,5 @@ end
 #
 #################################################
 
-get_solution(model::Model) = get_dbl_attrarray(model, "X", 1, num_vars(model))
+get_solution(model::Model) = get_dblattrarray(model, "X", 1, num_vars(model))
 

@@ -24,6 +24,12 @@ using BinDeps
     set_sense!, update_model!, reset_model!, 
     read_model, write_model,
 
+    # grb_attrs
+    model_name, model_sense, model_type,
+    num_vars, num_constrs, num_sos, num_qconstrs,
+    num_cnzs, num_qnzs, num_qcnzs,
+    is_qp, is_qcp, is_mip,
+
     # grb_vars
     GRB_CONTINUOUS, GRB_BINARY, GRB_INTEGER,
     add_var!, add_vars!, add_cvar!, add_cvars!,
@@ -41,7 +47,7 @@ using BinDeps
 
     # grb_solve
     optimize, computeIIS, get_solution,
-    get_status, OptimInfo, get_optim_info, get_objval
+    get_status, OptimInfo, get_optiminfo, get_objval
     
 
     ### include source files

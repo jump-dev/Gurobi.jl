@@ -83,7 +83,7 @@ function setsense(m::GurobiSolver,sense)
   end
 end
 function getsense(m::GurobiSolver)
-  v = get_int_attr(m.inner, "ModelSense")
+  v = get_intattr(m.inner, "ModelSense")
   if v == -1 
     return :Max 
   else
@@ -120,10 +120,10 @@ function getconstrsolution(m::GurobiSolver)
   error("GurobiSolver: Not implemented (need to do Ax manually?)")
 end
 
-getreducedcosts(m::GurobiSolver) = get_dbl_attrarray(m.inner, "RC", 1, num_vars(m.inner))
-getconstrduals(m::GurobiSolver)  = get_dbl_attrarray(m.inner, "Pi", 1, num_constrs(m.inner))
+getreducedcosts(m::GurobiSolver) = get_dblattrarray(m.inner, "RC", 1, num_vars(m.inner))
+getconstrduals(m::GurobiSolver)  = get_dblattrarray(m.inner, "Pi", 1, num_constrs(m.inner))
 
 getrawsolver(m::GurobiSolver) = m.inner
 
 setvartype(m::GurobiSolver, vartype) =
-    set_char_attrarray!(m.inner, "VType", 1, length(vartype), vartype)
+    set_charattrarray!(m.inner, "VType", 1, length(vartype), vartype)

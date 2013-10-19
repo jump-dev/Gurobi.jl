@@ -33,7 +33,7 @@ println(model)
 optimize(model)
 
 # show results
-info = get_optim_info(model)
+info = get_optiminfo(model)
 println()
 println(info)
 
