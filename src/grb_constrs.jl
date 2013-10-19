@@ -1,10 +1,8 @@
-# Add constraints
+## Add Linear constraints
 
-add_constr!(model::Model, inds::Vector, coeffs::Vector{Float64}, rel::Char, rhs::Float64) =
-    add_constr!(model, convert(Vector{Cint},inds), coeffs, rel, rhs)
+# add single constraint
 
-function add_constr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, rel::Char, rhs::Float64)
-    inds = inds - 1
+function add_constr!(model::Model, inds::IVec, coeffs::FVec, rel::Cchar, rhs::Float64)
     if !isempty(inds)
         ret = @grb_ccall(addconstr, Cint, (
             Ptr{Void},    # model
@@ -15,7 +13,7 @@ function add_constr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, 
             Float64,      # rhs
             Ptr{Uint8}    # name
             ), 
-            model, length(inds), inds, coeffs, rel, rhs, C_NULL)
+            model, length(inds), inds - 1, coeffs, rel, rhs, C_NULL)
         if ret != 0
             throw(GurobiError(model.env, ret))
         end
@@ -23,23 +21,22 @@ function add_constr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, 
     nothing 
 end
 
-function add_constr!(model::Model, coeffs::Vector{Float64}, rel::Char, rhs::Float64)
-    inds = convert(Vector{Cint}, find(coeffs)) 
+function add_constr!(model::Model, inds::Vector, coeffs::Vector, rel::GChars, rhs::Real)
+    add_constr!(model, ivec(inds), fvec(coeffs), cchar(rel), float64(rhs))
+end
+
+function add_constr!(model::Model, coeffs::Vector, rel::GChars, rhs::Real)
+    inds = find(coeffs)
     vals = coeffs[inds]
     add_constr!(model, inds, vals, rel, rhs)
 end
 
-# add_constrs!
+# add multiple constraints
 
-function add_constrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, coeffs::Vector{Float64}, 
-    senses::Vector{Cchar}, rhs::Vector{Float64})
-        
+function add_constrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec, rel::CVec, rhs::FVec)        
     m = length(cbegins)
-    nnz = length(inds)
-    
-    if !(m == length(senses) == length(rhs) && nnz == length(coeffs))
-        throw(ArgumentError("Incompatible dimensions."))
-    end 
+    nnz = length(inds)    
+    (m == length(rel) == length(rhs) && nnz == length(coeffs)) || error("Inconsistent argument dimensions.")
         
     if m > 0 && nnz > 0
         ret = @grb_ccall(addconstrs, Cint, (
@@ -54,7 +51,7 @@ function add_constrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, c
             Ptr{Uint8}    # names
             ), 
             model, m, nnz, cbegins - 1, inds - 1, coeffs, 
-            senses, rhs, C_NULL)
+            rel, rhs, C_NULL)
         
         if ret != 0
             throw(GurobiError(model.env, ret))
@@ -63,45 +60,32 @@ function add_constrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, c
     nothing
 end
 
-function add_constrs!(
-    model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, coeffs::Vector{Float64}, 
-    rel::Char, rhs::Vector{Float64})
-    add_constrs!(model, cbegins, inds, coeffs, fill(convert(Cchar, rel), length(cbegins)), rhs)
+function add_constrs!(model::Model, cbeg::Vector, inds::Vector, coeffs::Vector, rel::GCharOrVec, rhs::Vector)
+    add_constrs!(model, ivec(cbeg), ivec(inds), fvec(coeffs), cvecx(rel, length(cbeg)), fvec(rhs))
 end
 
-function _add_constrs_t!(model::Model, At::SparseMatrixCSC{Float64}, rel::Char, b::Vector{Float64})    
-    cbeg = convert(Vector{Cint}, At.colptr[1:At.n])
-    cind = convert(Vector{Cint}, At.rowval)
-    add_constrs!(model, cbeg, cind, At.nzval, rel, b)
+function add_constrs_t!(model::Model, At::SparseMatrixCSC{Float64}, rel::GCharOrVec, b::Vector)
+    n, m = size(At)
+    (m == length(b) && n == num_vars(model)) || error("Incompatible argument dimensions.")
+    add_constrs!(model, At.colptr[1:At.n], At.rowval, At.nzval, rel, b)
 end
 
-function add_constrs!(model::Model, A::Matrix{Float64}, rel::Char, b::Vector{Float64})
-    n::Int = num_vars(model)
-    m::Int = size(A, 1)
-    if !(m == length(b) && n == size(A, 2))
-        throw(ArgumentError("Incompatible dimensions."))
-    end 
-    
-    At = sparse(transpose(A))  # each column of At now is a constraint
-    _add_constrs_t!(model, At, rel, b) 
+function add_constrs_t!(model::Model, At::Matrix{Float64}, rel::GCharOrVec, b::Vector)
+    n, m = size(At)
+    (m == length(b) && n == num_vars(model)) || error("Incompatible argument dimensions.")
+    add_constrs_t!(model, sparse(At), rel, b)
 end
 
-function add_constrs!(model::Model, A::SparseMatrixCSC{Float64}, rel::Char, b::Vector{Float64})
-    n::Int = num_vars(model)
-    m::Int = size(A, 1)
-    if !(m == length(b) && n == size(A, 2))
-        throw(ArgumentError("Incompatible dimensions."))
-    end 
-    
-    At = transpose(A)  # each column of At now is a constraint
-    _add_constrs_t!(model, At, rel, b)
+function add_constrs!(model::Model, A::CoeffMat, rel::GCharOrVec, b::Vector{Float64})
+    m, n = size(A)
+    (m == length(b) && n == num_vars(model)) || error("Incompatible argument dimensions.")
+    add_constrs_t!(model, transpose(A), rel, b)
 end
 
 
-# add_rangeconstr! & add_rangeconstrs!
+# add single range constraint
 
-function add_rangeconstr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float64}, lower::Float64, upper::Float64)
-   inds = inds - 1 # Zero-based indexing
+function add_rangeconstr!(model::Model, inds::IVec, coeffs::FVec, lb::Float64, ub::Float64)
    if !isempty(inds)
         ret = @grb_ccall(addrangeconstr, Cint, (
             Ptr{Void},    # model
@@ -112,7 +96,7 @@ function add_rangeconstr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float
             Float64,      # upper
             Ptr{Uint8}    # name
             ),
-            model, length(inds), inds, coeffs, lower, upper, C_NULL)
+            model, length(inds), inds - 1, coeffs, lb, ub, C_NULL)
         if ret != 0
             throw(GurobiError(model.env, ret))
         end
@@ -120,14 +104,23 @@ function add_rangeconstr!(model::Model, inds::Vector{Cint}, coeffs::Vector{Float
     nothing
 end
 
-function add_rangeconstrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cint}, coeffs::Vector{Float64}, lower::Vector{Float64}, upper::Vector{Float64})
-        
+function add_rangeconstr!(model::Model, inds::Vector, coeffs::Vector, lb::Real, ub::Real)
+    add_rangeconstr!(model, ivec(inds), fvec(coeffs), float64(lb), float64(ub))
+end
+
+function add_rangeconstr!(model::Model, coeffs::Vector, lb::Real, ub::Real)
+    inds = find(coeffs)
+    vals = coeffs[inds]
+    add_rangeconstr!(model, inds, vals, lb, ub)
+end
+
+
+# add multiple range constraints
+
+function add_rangeconstrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec, lb::FVec, ub::FVec)
     m = length(cbegins)
-    nnz = length(inds)
-    
-    if !(m == length(lower) == length(upper) && nnz == length(coeffs))
-        throw(ArgumentError("Incompatible dimensions."))
-    end 
+    nnz = length(inds)    
+    (m == length(lb) == length(ub) && nnz == length(coeffs)) || error("Incompatible argument dimensions.")
         
     if m > 0 && nnz > 0
         ret = @grb_ccall(addrangeconstrs, Cint, (
@@ -141,8 +134,7 @@ function add_rangeconstrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cin
             Ptr{Float64}, # upper
             Ptr{Uint8}    # names
             ), 
-            model, m, nnz, cbegins - 1, inds - 1, coeffs, 
-            lower, upper, C_NULL)
+            model, m, nnz, cbegins - 1, inds - 1, coeffs, lb, ub, C_NULL)
         
         if ret != 0
             throw(GurobiError(model.env, ret))
@@ -151,35 +143,22 @@ function add_rangeconstrs!(model::Model, cbegins::Vector{Cint}, inds::Vector{Cin
     nothing
 end
 
-
-function _add_rangeconstrs_t!(model::Model, At::SparseMatrixCSC{Float64}, lower::Vector{Float64}, upper::Vector{Float64})
-    cbeg = convert(Vector{Cint}, At.colptr[1:At.n])
-    cind = convert(Vector{Cint}, At.rowval)
-    add_rangeconstrs!(model, cbeg, cind, At.nzval, lower, upper)
+function add_rangeconstrs!(model::Model, cbeg::Vector, inds::Vector, coeffs::Vector, lb::Vector, ub::Vector)
+    add_rangeconstrs!(model, ivec(cbeg), ivec(inds), fvec(coeffs), fvec(lb), fvec(ub))
 end
 
-
-function add_rangeconstrs!(model::Model, A::Matrix, lower::Vector{Float64}, upper::Vector{Float64})
-    A = convert(Matrix{Float64},A)
-    n::Int = num_vars(model)
-    m::Int = size(A, 1)
-    if !(m == length(upper) && n == size(A, 2))
-        throw(ArgumentError("Incompatible dimensions."))
-    end 
-    
-    At = sparse(transpose(A))  # each column of At now is a constraint
-    _add_rangeconstrs_t!(model, At, lower, upper)
+function add_rangeconstrs_t!(model::Model, At::SparseMatrixCSC{Float64}, lb::Vector, ub::Vector)
+    add_rangeconstrs!(model, At.colptr[1:At.n], At.rowval, At.nzval, lb, ub)
 end
 
-function add_rangeconstrs!(model::Model, A::SparseMatrixCSC, lower::Vector{Float64}, upper::Vector{Float64})
-    A = convert(SparseMatrixCSC{Float64,Cint},A)
-    n::Int = num_vars(model)
-    m::Int = size(A, 1)
-    if !(m == length(upper) && n == size(A, 2))
-        throw(ArgumentError("Incompatible dimensions."))
-    end 
+function add_rangeconstrs_t!(model::Model, At::Matrix{Float64}, lb::Vector, ub::Vector)
+    add_rangeconstrs!(model, sparse(At), lb, ub)
+end
+
+function add_rangeconstrs!(model::Model, A::CoeffMat, lb::Vector, ub::Vector)
+    m, n = size(A)
+    (m == length(lb) == length(ub) && n == num_vars(model)) || error("Incompatible argument dimensions.")
     
-    At = transpose(A)  # each column of At now is a constraint
-    _add_rangeconstrs_t!(model, At, lower, upper)
+    add_rangeconstrs_t!(model, transpose(A), lb, ub)
 end
 

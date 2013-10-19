@@ -30,7 +30,8 @@ using BinDeps
     add_bvar!, add_bvars!, add_ivar!, add_ivars!,
 
     # grb_constrs
-    add_constr!, add_constrs!, add_rangeconstr!, add_rangeconstrs!,
+    add_constr!, add_constrs!, add_constrs_t!, 
+    add_rangeconstr!, add_rangeconstrs!, add_rangeconstrs_t!,
 
     # grb_quad
     add_qpterms!, add_qconstr!,

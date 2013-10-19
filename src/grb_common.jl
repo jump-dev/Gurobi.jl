@@ -15,6 +15,8 @@ typealias CoeffMat Union(Matrix{Float64}, SparseMatrixCSC{Float64})
 cchar(c::Cchar) = c
 cchar(c::Char) = convert(Cchar, c)
 
+ivec(v::IVec) = v
+fvec(v::FVec) = v
 ivec{I<:Integer}(v::Vector{I}) = convert(IVec, v)
 fvec{T<:Real}(v::Vector{T}) = convert(FVec, v)
 
