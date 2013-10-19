@@ -1,4 +1,3 @@
-@Base.deprecate gurobi_model Gurobi.Model
 
 # TODO : to be deprecated in favor of Gurobi.Model
 function qp_model(env::Env, name::ASCIIString, 
@@ -10,7 +9,7 @@ function qp_model(env::Env, name::ASCIIString,
     beq::Union(Vector{Float64}, Nothing), 
     lb::Bounds, ub::Bounds)
 
-    Base.warn_once("qp_model is to be deprecated in favor of Gurobi.Model with keyword arguments.")
+    Base.warn_once("qp_model is to be deprecated in favor of gurobi_model with keyword arguments.")
     
     # create model
     model = Model(env, name)

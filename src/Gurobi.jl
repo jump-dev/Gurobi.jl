@@ -17,7 +17,7 @@ using BinDeps
     export add_constr!, add_constrs!, add_qpterms!, add_qconstr!
     export add_rangeconstr!, add_rangeconstrs!
     
-    export qp_model
+    export gurobi_model, qp_model
     export optimize, computeIIS
     
     export get_status, OptimInfo, get_optim_info, get_objval
@@ -50,7 +50,14 @@ using BinDeps
 
     include("grb_env.jl")
     include("grb_params.jl")
+
     include("grb_model.jl")
+    include("grb_vars.jl")
+    include("grb_attrs.jl")
+    include("grb_constrs.jl")
+    include("grb_quad.jl")
+    include("grb_highlevel.jl")
+
     include("grb_solve.jl")
     include("grb_callbacks.jl")
 

@@ -16,8 +16,10 @@ using Gurobi
 
 env = Gurobi.Env()
 
-model = Gurobi.Model(env, "lp_02", [1000., 350.]; 
+model = gurobi_model(env; 
+	name="lp_02", 
 	sense=:maximize, 
+	f = [1000., 350.],
 	A = [-1. 1.5; 12. 8.; 1000. 300.], 
 	b = [0., 1000., 70000.], 
 	lb = [0., 30.])
