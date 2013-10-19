@@ -86,9 +86,9 @@ This function constructs a model that represents the following problem:
 ```
 objective:  (1/2) x' H x + f' x
 
-s.t.            A x <= b
-              Aeq x <= beq
-            lb <= x <= ub
+      s.t.   A x <= b
+           Aeq x <= beq
+         lb <= x <= ub
 ```
 
 The caller *must* specify ``f`` using a non-empty vector, while other keyword arguments are optional. When ``H`` is omitted, this reduces to an LP problem. When ``lb`` is omitted, the variables are not lower bounded, and when ``ub`` is omitted, the variables are not upper bounded. 
@@ -137,18 +137,30 @@ add_constr!(model, coeffs, rel, rhs)
 # add constraints using CSR format
 add_constrs!(model, cbegin, inds, coeffs, rel, rhs)
 
-# add constraints using matrix
+# add constraints using a matrix: A x (rel) rhs
 add_constrs!(model, A, rel, rhs)  # here A can be dense or sparse
+
+# add constraints using a transposed matrix: At' x (rel) rhs
+# this is usually more efficient than add_constrs!
+add_constrs_t!(model, At, rel, rhs)  # here At can be dense or sparse
 
 # add a range constraint
 add_rangeconstr!(model, inds, coeffs, lb, ub)
 
+# add range constraints using CSR format
+add_rangeconstrs!(model, cbegin, inds, coeffs, lb, ub)
 
+# add range constraints using a matrix:  lb <= A x <= ub
+add_rangeconstrs!(model, A, lb, ub)  # here A can be dense or sparse
 
+# add range constraints using a transposed matrix: lb <= At' x <= ub
+# this is usually more efficient than add_rangeconstrs!
+add_rangeconstrs_t!(model, At, lb, ub)  # here At can be dense or sparse
 ```
 
+#### Use Other Packages
 
-
+The *Gurobi.jl* package also works with other packages, including [MathProgBase.jl](https://github.com/JuliaOpt/MathProgBase.jl) and [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl), as a backend provider. 
 
 
 
@@ -175,7 +187,6 @@ env = Gurobi.Env()
 ... optional codes to set parameters to env ...
 ```
 
-
 ##### Example 1.1: High-level Linear Programming API
 
 Using the ``gurobi_model`` function:
@@ -201,23 +212,9 @@ objv = get_objval(model)
 println("objv = $(objv)")
 ```
 
-
-
-
-
-
-
 ##### Example 1.2: Low-level Linear Programming API
 
-
-
-Julia code:
 ```julia
-using Gurobi
-
- # creates an environment, which captures the solver setting 
-env = Gurobi.Env()
-
  # creates an empty model ("lp_01" is the model name)
 model = Gurobi.Model(env, "lp_01", :maximize)
 
@@ -240,140 +237,60 @@ println(model)
 
  # perform optimization
 optimize(model)
-
- # show results
-sol = get_solution(model)
-println("soln = $(sol)")
-
-objv = get_objval(model)
-println("objv = $(objv)")
 ```
 
 You may also add variables and constraints in batch, as:
 
 ```julia
-
  # add mutliple variables in batch
- # add_cvar!(model, obj_coefs, lower_bound, upper_bound)
-add_cvars!(model, [1., 1.], [45., 5.], nothing)
+add_cvars!(model, [1., 1.], [45., 5.], Inf)
 
  # add multiple constraints in batch 
- # add_constrs!(model, rowbegin, cind, coeffs, sense, rhs)
- # add_constrs!(model, Cint[1, 3], Cint[1, 2, 1, 2], 
- #    [50., 24., 30., 33.], '<', [2400., 2100.])
+A = [50. 24.; 30. 33.]
+b = [2400., 2100.]
+add_constrs!(model, A, '<', b)
 ```
 
-In ``add_constrs``, the left hand side matrix should be input in the form of compressed sparse rows. Specifically, the begining index of the i-th row is given by ``rowbegin[i]``. In the example above, we have
+##### Example 1.3: Linear programming (MATLAB-like style)
 
-```julia
-rowbegin = Cint[1, 3]
-cind = Cint[1, 2, 1, 2] 
-coeffs = [50., 24., 30., 33.]
-```
-
-Here, ``Cint[1, 3]`` implies the range ``1:2`` is for the first row. Therefore, the first row have nonzeros at positions ``[1, 2]`` and their values are ``[50., 24.]``. Likewise, the second row have nonzeros at ``[1, 2]`` and their values are ``[30., 33.]``.
-
-#### Example 3: Linear programming (MATLAB-like style)
-
-You may also specify the entire problem in one function call, using the 
-solver-independent **[MathProgBase]** package. See that package
-for more information.
-
-[MathProgBase]: https://github.com/mlubin/MathProgBase.jl
-
-Problem formulation:
-```
-maximize 1000 x + 350 y
-
-s.t. x >= 30, y >= 0
-     -1. x + 1.5 y <= 0
-     12. x + 8.  y <= 1000
-     1000 x + 300 y <= 70000
-```
+You may also specify and solve the entire problem in one function call, using the 
+solver-independent [MathProgBase](https://github.com/JuliaOpt/MathProgBase.jl) package. 
 
 Julia code:
 ```julia
 using MathProgBase
 
-f = [1000., 350.]
-A = [-1. 1.5; 12. 8.; 1000. 300.]
-b = [0., 1000., 70000.]
-lb = [0., 30.]
+f = [1., 1.]
+A = [50. 24.; 30. 33.]
+b = [2400., 2100.]
+lb = [5., 45.]
  
-# linprog always minimizes, so we flip the objective
-solution = linprog(-f,A,'<',b,lb,Inf, LPSolver(:Gurobi))
+solution = linprog(f, A, '<', b, lb, Inf, LPSolver(:Gurobi))
 ```
 
-#### Example 4: Linear programming with JuMP (Algebraic model)
+##### Example 1.4: Linear programming with JuMP (Algebraic model)
 
-Using **[JuMP]**, we can specify linear programming problems using a more
+Using [JuMP](https://github.com/IainNZ/JuMP.jl), we can specify linear programming problems using a more
 natural algebraic approach.
 
-[JuMP]: https://github.com/IainNZ/JuMP.jl
-
-Problem formulation:
-```
-maximize 1000 x + 350 y
-
-s.t. x >= 30, y >= 0
-     -1. x + 1.5 y <= 0
-     12. x + 8.  y <= 1000
-     1000 x + 300 y <= 70000
-```
-
-Julia code:
 ```julia
 using JuMP
 
-m = Model(:Max,lpsolver=LPSolver(:Gurobi))
+m = Model(:Min, lpsolver=LPSolver(:Gurobi))
 
-@defVar(m, x >= 30)
-@defVar(m, y >= 0)
+@defVar(m, x >= 5)
+@defVar(m, y >= 45)
 
-@setObjective(m, 1000x + 350y)
-@addConstraint(m, -x + 1.5y <= 0)
-@addConstraint(m, 12x + 8y <= 1000)
-@addConstraint(m, 1000x + 300y <= 70000)
+@setObjective(m, x + y)
+@addConstraint(m, 50x + 24y <= 2400)
+@addConstraint(m, 30x + 33y <= 2100)
 
 status = solve(m)
 println("Optimal objective: ",getObjectiveValue(m), 
 	". x = ", getValue(x), " y = ", getValue(y))
 ```
 
-
-#### Example 5: Low-level Quadratic programming  
-
-To construct a QP model using the low-level interface, you have to add QP terms to a model using ``add_qpterms``
-
-Problem formulation:
-```
-minimize 2 x^2 + y^2 + xy + x + y
-
-s.t.  x, y >= 0
-      x + y = 1
-```
-
-Julia code:
-```julia
-env = Gurobi.Env()
-
-model = Gurobi.Model(env, "qp_02")
-
-add_cvars!(model, [1., 1.], 0., Inf)
-update_model!(model)
-
- # add quadratic terms: 2 x^2, x * y, y^2
- # add_qpterms!(model, rowinds, colinds, coeffs)
-add_qpterms!(model, [1, 1, 2], [1, 2, 2], [2., 1., 1.])
-add_constr!(model, [1., 1.], '=', 1.)
-update_model!(model)
-
-optimize(model)
-```
-
-#### Example 5: Quadratic programming
-
-The function ``gurobi_model`` can be used to construct a QP model, as below.
+### Quadratic programming Examples
 
 Problem formulation:
 ```
@@ -383,12 +300,14 @@ s.t.  x + 2 y + 3 z >= 4
       x +   y       >= 1
 ```
 
-Julia code:
+##### Example 2.1: High-level Quadratic Programming API
+
+using the function ``gurobi_model``:
 ```julia
 env = Gurobi.Env()
 
 model = gurobi_model(env; 
-        name = "qp_02", 
+        name = "qp_01", 
         H = [2. 1. 0.; 1. 2. 1.; 0. 1. 2.], 
         f = [0., 0., 0.], 
         A = -[1. 2. 3.; 1. 1. 0.], 
@@ -396,7 +315,28 @@ model = gurobi_model(env;
 optimize(model)
 ```
 
-#### Example 6: Mixed Integer Programming
+##### Example 2.2: Low-level Quadratic Programming API
+
+```julia
+model = Gurobi.Model(env, "qp_01")
+
+add_cvars!(model, [1., 1.], 0., Inf)
+update_model!(model)
+
+ # add quadratic terms: x^2, x * y, y^2
+ # add_qpterms!(model, rowinds, colinds, coeffs)
+add_qpterms!(model, [1, 1, 2], [1, 2, 2], [1., 1., 1.])
+
+ # add linear constraints
+add_constr!(model, [1., 2., 3.], '>', 4.)
+add_constr!(model, [1., 1., 0.], '>', 1.)
+update_model!(model)
+
+optimize(model)
+```
+
+
+### Mixed Integer Programming
 
 This package also supports mixed integer programming.
 
@@ -410,6 +350,8 @@ s.t.  x + y + z <= 10
       y is integer: 0 <= y <= 10
       z is binary
 ```
+
+##### Example 3.1: Low-level MIP API
 
 Julia code:
 ```julia
@@ -436,7 +378,7 @@ optimize(model)
 
 Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer or binary variables in batch.
 
-The same model can be more easily expressed by using JuMP:
+##### Example 3.2: MIP using JuMP with Gurobi
 
 ```julia
 using JuMP
@@ -454,7 +396,7 @@ m = Model(:Max, mipsolver=MIPSolver(:Gurobi))
 solve(m)
 ```
 
-#### Example 7: Quadratic constraints
+### Quadratic constraints
 
 The ``add_qconstr!`` function may be used to add quadratic constraints to a model.
 
