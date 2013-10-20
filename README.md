@@ -162,6 +162,15 @@ add_rangeconstrs_t!(model, At, lb, ub)  # here At can be dense or sparse
 
 The *Gurobi.jl* package also works with other packages, including [MathProgBase.jl](https://github.com/JuliaOpt/MathProgBase.jl) and [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl), as a backend provider. 
 
+#### Modify Problem
+
+It is not uncommon in practice that one would like to adjust the objective coefficients and solve the problem again. This package provides a function ``set_objcoeffs!`` for this purpose:
+```julia
+set_objcoeffs!(model, new_coeffs)
+ # ... one can also call add_constr! and friends to add additional constraints ...
+update_model!(model)   # changes take effect after this
+optimize(model)
+```
 
 
 ## Examples

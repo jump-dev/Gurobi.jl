@@ -42,7 +42,7 @@ end
 # Note: in attrarray API, the start argument is one-based (following Julia convention)
 
 function get_intattrarray!(r::Array{Cint}, model::Model, name::ASCIIString, start::Integer)
-    ret = @grb_ccall(getdblattrarray, Cint, 
+    ret = @grb_ccall(getintattrarray, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Cint, Cint, Ptr{Cint}), 
         model, name, start - 1, length(r), r)
     if ret != 0
@@ -52,7 +52,7 @@ function get_intattrarray!(r::Array{Cint}, model::Model, name::ASCIIString, star
 end
 
 function get_intattrarray(model::Model, name::ASCIIString, start::Integer, len::Integer)
-    get_dblattrarray!(Array(Cint, len), model, name, start)
+    get_intattrarray!(Array(Cint, len), model, name, start)
 end
 
 function get_dblattrarray!(r::Array{Float64}, model::Model, name::ASCIIString, start::Integer)
@@ -70,7 +70,7 @@ function get_dblattrarray(model::Model, name::ASCIIString, start::Integer, len::
 end
 
 function get_charattrarray!(r::Array{Cchar}, model::Model, name::ASCIIString, start::Integer)
-    ret = @grb_ccall(getdblattrarray, Cint, 
+    ret = @grb_ccall(getcharattrarray, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Cint, Cint, Ptr{Cchar}), 
         model, name, start - 1, length(r), r)
     if ret != 0
@@ -80,12 +80,12 @@ function get_charattrarray!(r::Array{Cchar}, model::Model, name::ASCIIString, st
 end
 
 function get_charattrarray(model::Model, name::ASCIIString, start::Integer, len::Integer)
-    get_dblattrarray!(Array(Cchar, len), model, name, start)
+    get_charattrarray!(Array(Cchar, len), model, name, start)
 end
 
 # setters
 
-function set_int_attr!(model::Model, name::ASCIIString, v::Integer)
+function set_intattr!(model::Model, name::ASCIIString, v::Integer)
     ret = @grb_ccall(setintattr, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Cint), model, name, v)
     if ret != 0
@@ -94,7 +94,7 @@ function set_int_attr!(model::Model, name::ASCIIString, v::Integer)
     nothing
 end
 
-function set_dbl_attr!(model::Model, name::ASCIIString, v::Real)
+function set_dblattr!(model::Model, name::ASCIIString, v::Real)
     ret = @grb_ccall(setdblattr, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Float64), model, name, v)
     if ret != 0
@@ -103,7 +103,7 @@ function set_dbl_attr!(model::Model, name::ASCIIString, v::Real)
     nothing
 end
 
-function set_str_attr!(model::Model, name::ASCIIString, v::ASCIIString)
+function set_strattr!(model::Model, name::ASCIIString, v::ASCIIString)
     ret = @grb_ccall(setstrattr, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Ptr{Uint8}), model, name, v)
     if ret != 0
@@ -116,7 +116,7 @@ end
 
 function set_intattrarray!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector)
     values = convert(Vector{Cchar},values)
-    ret = @grb_ccall(setcharattrarray, Cint, 
+    ret = @grb_ccall(setintattrarray, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Cint, Cint, Ptr{Cint}), model, name, start-1, len, ivec(values))
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -126,7 +126,7 @@ end
 
 function set_dblattrarray!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector)
     values = convert(Vector{Cchar},values)
-    ret = @grb_ccall(setcharattrarray, Cint, 
+    ret = @grb_ccall(setdblattrarray, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Cint, Cint, Ptr{Float64}), model, name, start-1, len, fvec(values))
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -203,7 +203,20 @@ function set_sense!(model::Model, sense::Symbol)
         sense == :minimize ? 1 : 
         throw(ArgumentError("Invalid model sense."))
     
-    set_int_attr!(model, "ModelSense", v)
+    set_intattr!(model, "ModelSense", v)
+end
+
+# variable related attributes
+
+lowerbounds(model::Model) = get_dblattrarray(model, "LB", 1, num_vars(model))
+upperbounds(model::Model) = get_dblattrarray(model, "UB", 1, num_vars(model))
+objcoeffs(model::Model) = get_dblattrarray(model, "Obj", 1, num_vars(model))
+
+# note: this takes effect only after update_model! is called:
+function set_objcoeffs!(model::Model, c::Vector)
+    n = num_vars(model)
+    length(c) == n || error("Inconsistent argument dimensions.")
+    set_dblattrarray!(model, "Obj", 1, n, c)
 end
 
 

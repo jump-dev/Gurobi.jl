@@ -30,6 +30,8 @@ using BinDeps
     num_cnzs, num_qnzs, num_qcnzs,
     is_qp, is_qcp, is_mip,
 
+    lowerbounds, upperbounds, objcoeffs, set_objcoeffs!,
+
     # grb_vars
     GRB_CONTINUOUS, GRB_BINARY, GRB_INTEGER,
     add_var!, add_vars!, add_cvar!, add_cvars!,
