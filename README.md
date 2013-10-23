@@ -56,11 +56,10 @@ setparam!(env, "Method", 2)   # choose to use Barrier method
 setparams!(env; IterationLimit=100, Method=1) # set the maximum iterations and choose to use Simplex method
 ```
 
-These parameters may be used directly with the Gurobi ``LPSolver`` and ``MIPSolver``
-objects from MathProgBase. For example:
+These parameters may be used directly with the ``GurobiSolver`` object used by MathProgBase. For example:
 ```julia
-solver = LPSolver(:Gurobi, Method=2)
-solver = LPSolver(:Gurobi, IterationLimit=100.)
+solver = GurobiSolver(Method=2)
+solver = GurobiSolver(Method=1, IterationLimit=100.)
 ```
 
 #### High-level API
@@ -274,7 +273,7 @@ A = [50. 24.; 30. 33.]
 b = [2400., 2100.]
 lb = [5., 45.]
  
-solution = linprog(f, A, '<', b, lb, Inf, LPSolver(:Gurobi))
+solution = linprog(f, A, '<', b, lb, Inf, GurobiSolver())
 ```
 
 ##### Example 1.4: Linear programming with JuMP (Algebraic model)
@@ -285,7 +284,7 @@ natural algebraic approach.
 ```julia
 using JuMP
 
-m = Model(:Min, lpsolver=LPSolver(:Gurobi))
+m = Model(:Min, lpsolver=GurobiSolver())
 
 @defVar(m, x >= 5)
 @defVar(m, y >= 45)
@@ -392,7 +391,7 @@ Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer 
 ```julia
 using JuMP
 
-m = Model(:Max, mipsolver=MIPSolver(:Gurobi))
+m = Model(:Max, mipsolver=GurobiSolver())
 
 @defVar(m, 0 <= x <= 5)
 @defVar(m, 0 <= y <= 10, Int)
