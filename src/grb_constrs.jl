@@ -152,7 +152,7 @@ function add_rangeconstrs_t!(model::Model, At::SparseMatrixCSC{Float64}, lb::Vec
 end
 
 function add_rangeconstrs_t!(model::Model, At::Matrix{Float64}, lb::Vector, ub::Vector)
-    add_rangeconstrs!(model, sparse(At), lb, ub)
+    add_rangeconstrs_t!(model, sparse(At), lb, ub)
 end
 
 function add_rangeconstrs!(model::Model, A::CoeffMat, lb::Vector, ub::Vector)

@@ -1,79 +1,56 @@
-# GurobiSolverInterface
+# GurobiMathProgInterface
 # Standardized LP interface
 
-export GurobiSolver,
-    loadproblem,
-    writeproblem,
-    getvarLB,
-    setvarLB,
-    getvarLB,
-    setvarLB,
-    getconstrLB,
-    setconstrLB,
-    getconstrUB,
-    setconstrUB,
-    getobj,
-    setobj,
-    addvar,
-    addconstr,
-    updatemodel,
-    setsense,
-    getsense,
-    numvar,
-    numconstr,
-    optimize,
-    status,
-    getobjval,
-    getobjbound,
-    getsolution,
-    getconstrsolution,
-    getreducedcosts,
-    getconstrduals,
-    getrawsolver,
-    setvartype
+export GurobiSolver
 
-type GurobiSolver <: LinprogSolver
+type GurobiMathProgModel <: AbstractMathProgModel
 	inner::Model
 end
 
-# Not complete
-function model(;options...)
-	#if length(options) != 0; warn("Options not yet supported"); end
+immutable GurobiSolver <: AbstractMathProgSolver
+    options
+end
+GurobiSolver(;kwargs...) = GurobiSolver(kwargs)
+
+function GurobiMathProgModel(;options...)
 	env = Env()
 	for (name,value) in options
 		setparam!(env, string(name), value)
 	end
-	m = GurobiSolver(Model(env,""))
+	m = GurobiMathProgModel(Model(env,""))
 	return m
 end
 
-# Creates new env? doesn't seem right
-function loadproblem(m::GurobiSolver, filename::String)
-  m.inner = read_model(Env(), filename)
-end
+model(s::GurobiSolver) = GurobiMathProgModel(;s.options...)
 
-function loadproblem(m::GurobiSolver, A, collb, colub, obj, rowlb, rowub)
+# Creates new env? doesn't seem right
+#function loadproblem!(m::GurobiMathProgModel, filename::String)
+#  m.inner = read_model(Env(), filename)
+#end
+
+function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
   reset_model!(m.inner)
   add_cvars!(m.inner, float(obj), float(collb), float(colub))
   update_model!(m.inner)
-  add_rangeconstrs!(m.inner, A, float(rowlb), float(rowub))
+  add_rangeconstrs!(m.inner, float(A), float(rowlb), float(rowub))
   update_model!(m.inner)
+  setsense!(m,sense)
 end
 
-function writeproblem(m::GurobiSolver, filename::String)
+function writeproblem(m::GurobiMathProgModel, filename::String)
   write_model(m.inner, filename)
 end
 
 
 ######
-# Incomplete implementation of LinprogSolver
+# Incomplete implementation of AbstractMathProgModel
 ######
 
-function updatemodel(m::GurobiSolver)
+function updatemodel!(m::GurobiMathProgModel)
   update_model!(m.inner)
 end
 
-function setsense(m::GurobiSolver,sense)
+function setsense!(m::GurobiMathProgModel,sense)
   if sense == :Min
     set_sense!(m.inner, :minimize)
   elseif sense == :Max
@@ -82,7 +59,7 @@ function setsense(m::GurobiSolver,sense)
     error("Unrecognized objective sense $sense")
   end
 end
-function getsense(m::GurobiSolver)
+function getsense(m::GurobiMathProgModel)
   v = get_intattr(m.inner, "ModelSense")
   if v == -1 
     return :Max 
@@ -91,12 +68,12 @@ function getsense(m::GurobiSolver)
   end
 end
 
-numvar(m::GurobiSolver)    = num_vars(m.inner)
-numconstr(m::GurobiSolver) = num_constrs(m.inner)
+numvar(m::GurobiMathProgModel)    = num_vars(m.inner)
+numconstr(m::GurobiMathProgModel) = num_constrs(m.inner)
 
-optimize(m::GurobiSolver)  = optimize(m.inner)
+optimize!(m::GurobiMathProgModel)  = optimize(m.inner)
 
-function status(m::GurobiSolver)
+function status(m::GurobiMathProgModel)
   s = get_status(m.inner)
   if s == :optimal
     return :Optimal
@@ -111,19 +88,19 @@ function status(m::GurobiSolver)
   end
 end
 
-getobjval(m::GurobiSolver)   = get_objval(m.inner)
-getobjbound(m::GurobiSolver) = get_objbound(m.inner)
-getsolution(m::GurobiSolver) = get_solution(m.inner)
+getobjval(m::GurobiMathProgModel)   = get_objval(m.inner)
+getobjbound(m::GurobiMathProgModel) = get_objbound(m.inner)
+getsolution(m::GurobiMathProgModel) = get_solution(m.inner)
 
 # TODO
-function getconstrsolution(m::GurobiSolver)
-  error("GurobiSolver: Not implemented (need to do Ax manually?)")
+function getconstrsolution(m::GurobiMathProgModel)
+  error("GurobiMathProgModel: Not implemented (need to do Ax manually?)")
 end
 
-getreducedcosts(m::GurobiSolver) = get_dblattrarray(m.inner, "RC", 1, num_vars(m.inner))
-getconstrduals(m::GurobiSolver)  = get_dblattrarray(m.inner, "Pi", 1, num_constrs(m.inner))
+getreducedcosts(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "RC", 1, num_vars(m.inner))
+getconstrduals(m::GurobiMathProgModel)  = get_dblattrarray(m.inner, "Pi", 1, num_constrs(m.inner))
 
-getrawsolver(m::GurobiSolver) = m.inner
+getrawsolver(m::GurobiMathProgModel) = m.inner
 
-setvartype(m::GurobiSolver, vartype) =
+setvartype!(m::GurobiMathProgModel, vartype) =
     set_charattrarray!(m.inner, "VType", 1, length(vartype), vartype)

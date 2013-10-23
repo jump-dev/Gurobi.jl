@@ -5,7 +5,8 @@ tests = ["lp_01a",
          "mip_01", 
          "qp_01",
          "qp_02",
-         "qcqp_01"]
+         "qcqp_01",
+         "mathprog"]
 
 for t in tests
     fp = joinpath("test", "$(t).jl")

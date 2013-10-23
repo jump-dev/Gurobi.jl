@@ -8,8 +8,8 @@ using BinDeps
     import Base.convert, Base.show, Base.copy
 
     # Standard LP interface
-    # require(joinpath(Pkg.dir("MathProgBase"),"src","LinprogSolverInterface.jl"))
-    # importall LinprogSolverInterface
+    require(joinpath(Pkg.dir("MathProgBase"),"src","MathProgSolverInterface.jl"))
+    importall MathProgSolverInterface
 
     ### exports
     export 
@@ -68,7 +68,7 @@ using BinDeps
     include("grb_solve.jl")
     include("grb_callbacks.jl")
 
-    # include("GurobiSolverInterface.jl")
+    include("GurobiSolverInterface.jl")
 
     include("deprecates.jl")
 end
