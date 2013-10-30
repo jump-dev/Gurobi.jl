@@ -46,7 +46,8 @@ const emptyfmat = Array(Float64, 0, 0)
 macro grb_ccall(func, args...)
     f = "GRB$(func)"
     quote
-        ccall(($f,libgurobi), $(args...))
+        @unix_only ccall(($f,libgurobi), $(args...))
+        @windows_only ccall(($f,libgurobi), stdcall, $(args...))
     end
 end
 
