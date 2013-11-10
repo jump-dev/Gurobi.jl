@@ -271,4 +271,13 @@ function getvartype(m::GurobiMathProgModel)
         end
     end
     return ret
-end  
+end
+
+function setwarmstart!(m::GurobiMathProgModel, v)
+    for j = 1:length(v)
+        if v[j] == NaN
+            v[j] = 1e101  # GRB_UNDEFINED
+        end
+    end
+    set_dblattrarray!(m.inner, "Start", 1, num_vars(m.inner), v)
+end
