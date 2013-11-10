@@ -74,10 +74,10 @@ getvarUB(m::GurobiMathProgModel)     = get_dblattrarray (m.inner, "UB", 1, num_v
 setvarUB!(m::GurobiMathProgModel, u) = set_dblattrarray!(m.inner, "UB", 1, num_vars(m.inner), u)
 
 function getconstrLB(m::GurobiMathProgModel)
-    sense = get_charattrarray(m.inner, "Sense", 1, num_constr(m.inner))
-    ret   = get_dblattrarray(m.inner, "RHS", 1, num_constr(m.inner))
-    for i = 1:num_constr(m.inner)
-        if sense == '>' || sense == '='
+    sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
+    ret   = get_dblattrarray(m.inner, "RHS", 1, num_constrs(m.inner))
+    for i = 1:num_constrs(m.inner)
+        if sense[i] == '>' || sense[i] == '='
             # Do nothing
         else
             # LEQ constraint, so LB is -Inf
@@ -87,22 +87,36 @@ function getconstrLB(m::GurobiMathProgModel)
      return ret
 end
 function setconstrLB!(m::GurobiMathProgModel, lb)
-    sense = get_charattrarray(m.inner, "Sense", 1, num_constr(m.inner))
-    for i = 1:num_constr(m.inner)
-        if sense == '>' || sense == '='
+    sense_changed = false  
+    sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
+    rhs   = get_dblattrarray(m.inner, "RHS", 1, num_constrs(m.inner))
+    for i = 1:num_constrs(m.inner)
+        if sense[i] == '>' || sense[i] == '='
             # Do nothing
-        elseif sense == '<' && lb[i] != -Inf
+        elseif sense[i] == '<' && lb[i] != -Inf
             # LEQ constraint with non-NegInf LB implies a range
-            error("Tried to set LB != -Inf on a LEQ constraint (index $i)")
+            # Might be an equality change though
+            if isapprox(lb[i], rhs[i])
+              # Seems to be equality
+              sense[i] = '='
+              sense_changed = true
+            else
+              # Guess not
+              error("Tried to set LB != -Inf on a LEQ constraint (index $i)")
+            end
         end
     end
-    set_dblattrarray!(m.inner, "RHS", 1, num_constr(m.inner), lb)
+    if sense_changed
+      set_charattrarray!(m.inner, "Sense", 1, num_constrs(m.inner), sense)
+    end
+    set_dblattrarray!(m.inner, "RHS", 1, num_constrs(m.inner), lb)
+    updatemodel!(m)
 end
 function getconstrUB(m::GurobiMathProgModel)
-    sense = get_charattrarray(m.inner, "Sense", 1, num_constr(m.inner))
-    ret   = get_dblattrarray(m.inner, "RHS", 1, num_constr(m.inner))
-    for i = 1:num_constr(m.inner)
-        if sense == '<' || sense == '='
+    sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
+    ret   = get_dblattrarray(m.inner, "RHS", 1, num_constrs(m.inner))
+    for i = 1:num_constrs(m.inner)
+        if sense[i] == '<' || sense[i] == '='
             # Do nothing
         else
             # GEQ constraint, so UB is +Inf
@@ -112,16 +126,30 @@ function getconstrUB(m::GurobiMathProgModel)
     return ret
 end
 function setconstrUB!(m::GurobiMathProgModel, ub)
-    sense = get_charattrarray(m.inner, "Sense", 1, num_constr(m.inner))
-    for i = 1:num_constr(m.inner)
-        if sense == '<' || sense == '='
+    sense_changed = false
+    sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
+    rhs   = get_dblattrarray(m.inner, "RHS", 1, num_constrs(m.inner))
+    for i = 1:num_constrs(m.inner)
+        if sense[i] == '<' || sense[i] == '='
             # Do nothing
-        elseif sense == '>' && ub[i] != -Inf
+        elseif sense[i] == '>' && ub[i] != -Inf
             # GEQ constraint with non-Inf UB implies a range
-            error("Tried to set UB != +Inf on a GEQ constraint (index $i)")
+            # Might be an equality change though
+            if isapprox(ub[i], rhs[i])
+              # Seems to be equality
+              sense[i] = '='
+              sense_changed = true
+            else
+              # Guess not
+              error("Tried to set UB != +Inf on a GEQ constraint (index $i)")
+            end
         end
     end
-    set_dblattrarray!(m.inner, "RHS", 1, num_constr(m.inner), ub)
+    if sense_changed
+      set_charattrarray!(m.inner, "Sense", 1, num_constrs(m.inner), sense)
+    end
+    set_dblattrarray!(m.inner, "RHS", 1, num_constrs(m.inner), ub)
+    updatemodel!(m)
 end
 
 getobj(m::GurobiMathProgModel)     = get_dblattrarray (m.inner, "Obj", 1, num_vars(m.inner)   )
@@ -132,14 +160,14 @@ function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
         updatemodel!(m)
         m.last_op_type = :Var
     end
-    add_var!(m.inner, length(constridx), constridx, float(constrcoef), objcoef, l, u, GRB_CONTINUOUS)
+    add_var!(m.inner, length(constridx), constridx, float(constrcoef), float(objcoef), float(l), float(u), GRB_CONTINUOUS)
 end
 function addvar!(m::GurobiMathProgModel, l, u, objcoef)
     if m.last_op_type == :Con
         updatemodel!(m)
         m.last_op_type = :Var
     end
-    add_var!(m.inner, 0, Integer[], Float64[], objcoef, l, u, GRB_CONTINUOUS)
+    add_var!(m.inner, 0, Integer[], Float64[], float(objcoef), float(l), float(u), GRB_CONTINUOUS)
 end
 function addconstr!(m::GurobiMathProgModel, varidx, coef, lb, ub)
     if m.last_op_type == :Var
@@ -204,9 +232,24 @@ getobjval(m::GurobiMathProgModel)   = get_objval(m.inner)
 getobjbound(m::GurobiMathProgModel) = get_objbound(m.inner)
 getsolution(m::GurobiMathProgModel) = get_solution(m.inner)
 
-# TODO
 function getconstrsolution(m::GurobiMathProgModel)
-  error("GurobiMathProgModel: Not implemented (need to do Ax manually?)")
+    sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
+    rhs   = get_dblattrarray( m.inner, "RHS",   1, num_constrs(m.inner))
+    slack = get_dblattrarray( m.inner, "Slack", 1, num_constrs(m.inner))
+    ret   = zeros(num_constrs(m.inner))
+    for i = 1:num_constrs(m.inner)
+        if sense[i] == '='
+            # Must be equal to RHS if feasible
+            ret[i] = rhs[i]
+        elseif sense[i] == '<'
+            # <= RHS
+            ret[i] = rhs[i] - slack[i]
+        elseif sense[i] == '>'
+            # >= RHS
+            ret[i] = rhs[i] + slack[i]
+        end
+    end
+    return ret
 end
 
 getreducedcosts(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "RC", 1, num_vars(m.inner))
@@ -216,7 +259,7 @@ getrawsolver(m::GurobiMathProgModel) = m.inner
 
 setvartype!(m::GurobiMathProgModel, vartype) =
     set_charattrarray!(m.inner, "VType", 1, length(vartype), vartype)
-function getvartype(m::GurobiMathProgModel) =
+function getvartype(m::GurobiMathProgModel)
     ret = get_charattrarray(m.inner, "VType", 1, num_vars(m.inner))
     for j = 1:num_vars(m.inner)
         if ret[j] == 'B'

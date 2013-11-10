@@ -11,5 +11,5 @@ tests = ["lp_01a",
 for t in tests
     fp = joinpath("test", "$(t).jl")
     println("running $(fp) ...")
-    include(fp)
+    evalfile(fp)
 end         

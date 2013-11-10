@@ -76,7 +76,7 @@ function get_charattrarray!(r::Array{Cchar}, model::Model, name::ASCIIString, st
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    r    
+    char(r)
 end
 
 function get_charattrarray(model::Model, name::ASCIIString, start::Integer, len::Integer)
@@ -115,7 +115,7 @@ end
 # reminder: start is one-based
 
 function set_intattrarray!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector)
-    values = convert(Vector{Cchar},values)
+    values = convert(Vector{Cint},values)
     ret = @grb_ccall(setintattrarray, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Cint, Cint, Ptr{Cint}), model, name, start-1, len, ivec(values))
     if ret != 0
@@ -125,7 +125,7 @@ function set_intattrarray!(model::Model, name::ASCIIString, start::Integer, len:
 end
 
 function set_dblattrarray!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector)
-    values = convert(Vector{Cchar},values)
+    values = convert(Vector{Float64},values)
     ret = @grb_ccall(setdblattrarray, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Cint, Cint, Ptr{Float64}), model, name, start-1, len, fvec(values))
     if ret != 0
