@@ -7,6 +7,25 @@ const GRB_BINARY     = convert(Cchar, 'B')
 const GRB_INTEGER    = convert(Cchar, 'I')
 
 # add_var!
+function add_var!(model::Model, numnz:Integer, vind::Vector, vval::Vector{Float64}, obj::Float64, lb::Float64, ub::Float64, vtype::Cchar)
+    ret = @grb_ccall(addvar, Cint, (
+        Ptr{Void},    # model
+        Cint,         # numnz
+        Ptr{Cint},    # vind
+        Ptr{Float64}, # vval
+        Float64,      # obj
+        Float64,      # lb
+        Float64,      # ub
+        Uint8,        # vtype
+        Ptr{Uint8}    # name
+        ), 
+        model, numnz, ivec(vind), vval, obj, lb, ub, vtype, C_NULL)
+        
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
 
 function add_var!(model::Model, vtype::Cchar, c::Float64, lb::Float64, ub::Float64)    
     ret = @grb_ccall(addvar, Cint, (
