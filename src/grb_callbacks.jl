@@ -18,13 +18,14 @@ end
 function set_callback_func!(model::Model, callback::Function)
     
     grbcallback = cfunction(gurobi_callback_wrapper, Cint, (Ptr{Void}, Ptr{Void}, Cint, Ptr{Void}))
-    ret = @grb_ccall(setcallbackfunc, Cint, (Ptr{Void}, Ptr{Void}, Any), model.ptr_model, grbcallback, (callback,model))
+    usrdata = (callback,model)
+    ret = @grb_ccall(setcallbackfunc, Cint, (Ptr{Void}, Ptr{Void}, Any), model.ptr_model, grbcallback, usrdata)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
     # we need to keep a reference to the callback function
     # so that it isn't garbage collected
-    model.callback = callback
+    model.callback = usrdata
     nothing
 end
 

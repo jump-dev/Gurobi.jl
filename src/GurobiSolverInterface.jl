@@ -7,13 +7,16 @@ type GurobiMathProgModel <: AbstractMathProgModel
     inner::Model
     last_op_type::Symbol  # To support arbitrary order of addVar/addCon
                           # Two possibilities :Var :Con
+    lazycb
+    cutcb
+    heuristiccb
 end
 function GurobiMathProgModel(;options...)
    env = Env()
    for (name,value) in options
        setparam!(env, string(name), value)
    end
-   m = GurobiMathProgModel(Model(env,""), :Con)
+   m = GurobiMathProgModel(Model(env,""), :Con, nothing, nothing, nothing)
    return m
 end
 
@@ -211,7 +214,13 @@ end
 numvar(m::GurobiMathProgModel)    = num_vars(m.inner)
 numconstr(m::GurobiMathProgModel) = num_constrs(m.inner)
 
-optimize!(m::GurobiMathProgModel) = optimize(m.inner)
+function optimize!(m::GurobiMathProgModel)
+    # set callbacks if present
+    if m.lazycb != nothing || m.cutcb != nothing || m.heuristiccb != nothing
+        setmathprogcallback!(m)
+    end
+    optimize(m.inner)
+end
 
 function status(m::GurobiMathProgModel)
   s = get_status(m.inner)
@@ -281,3 +290,136 @@ function setwarmstart!(m::GurobiMathProgModel, v)
     end
     set_dblattrarray!(m.inner, "Start", 1, num_vars(m.inner), v)
 end
+
+
+# Callbacks
+
+
+setlazycallback!(m::GurobiMathProgModel,f) = (m.lazycb = f)
+setcutcallback!(m::GurobiMathProgModel,f) = (m.cutcb = f)
+setheuristiccallback!(m::GurobiMathProgModel,f) = (m.heuristiccb = f)
+
+type GurobiCallbackData <: MathProgCallbackData
+    cbdata::CallbackData
+    state::Symbol
+    where::Cint
+#    model::GurobiMathProgModel # not needed?
+end
+
+function cbgetmipsolution(d::GurobiCallbackData)
+    @assert d.state == :MIPSol
+    return cbget_mipsol_sol(d.cbdata, d.where)
+end
+
+function cbgetlpsolution(d::GurobiCallbackData)
+    @assert d.state == :MIPNode
+    return cbget_mipnode_rel(d.cbdata, d.where)
+end
+
+
+# TODO: macro for these getters?
+function cbgetobj(d::GurobiCallbackData)
+    if d.state == :MIPNode
+        return cbget_mipnode_objbst(d.cbdata, d.where)
+    elseif d.state == :MIPSol
+        return cbdet_mipsol_objbst(d.cbdata, d.where)
+    else
+        error("Unrecognized callback state $(d.state)")
+    end
+end
+
+function cbgetbestbound(d::GurobiCallbackData)
+    if d.state == :MIPNode
+        return cbget_mipnode_objbnd(d.cbdata, d.where)
+    elseif d.state == :MIPSol
+        return cbdet_mipsol_objbnd(d.cbdata, d.where)
+    else
+        error("Unrecognized callback state $(d.state)")
+    end
+end
+
+function cbgetexplorednodes(d::GurobiCallbackData)
+    if d.state == :MIPNode
+        return cbget_mipnode_nodcnt(d.cbdata, d.where)
+    elseif d.state == :MIPSol
+        return cbdet_mipsol_nodcnt(d.cbdata, d.where)
+    else
+        error("Unrecognized callback state $(d.state)")
+    end
+end
+        
+# returns :MIPNode :MIPSol :Other
+cbgetstate(d::GurobiCallbackData) = d.state
+
+function cbaddsolution!(d::GurobiCallbackData,x)
+    # Gurobi doesn't support adding solutions on MIPSol.
+    # TODO: support this anyway
+    @assert d.state == :MIPNode
+    cbsolution(d.state, x)
+end
+
+const sensemap = [:(==) => '=', :(<=) => '<', :(>=) => '>']
+function cbaddcut!(d::GurobiCallbackData,varidx,varcoef,sense,rhs)
+    @assert d.state == :MIPNode
+    cbcut(d.cbdata, convert(Vector{Cint}, varidx), float(varcoef), sensemap[sense], float(rhs))
+end
+
+function cbaddlazy!(d::GurobiCallbackData,varidx,varcoef,sense,rhs)
+    @assert d.state == :MIPNode || d.state == :MIPSol
+    cblazy(d.cbdata, convert(Vector{Cint}, varidx), float(varcoef), sensemap[sense], float(rhs))
+end
+   
+
+# breaking abstraction, define our low-level callback to eliminatate
+# a level of indirection
+
+function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, userdata::Ptr{Void})
+
+    model = unsafe_pointer_to_objref(userdata)::GurobiMathProgModel
+    grbrawcb = CallbackData(cbdata,model.inner)
+    if where == CB_MIPSol
+        state = :MIPSol
+        grbcb = GurobiCallbackData(grbrawcb, state, where)
+        if model.lazycb != nothing
+            ret = model.lazycb(grbcb)
+            if ret == :Exit
+                return convert(Cint,10011) # gurobi callback error
+            end
+        end
+    elseif where == CB_MIPNODE
+        state = :MIPNode
+        grbcb = GurobiCallbackData(grbrawcb, state, where)
+        if model.cutcb != nothing
+            model.cutcb(grbcb)
+            if ret == :Exit
+                return convert(Cint,10011) # gurobi callback error
+            end
+        end
+        if model.heuristiccb != nothing
+            model.heuristiccb(grbcb)
+            if ret == :Exit
+                return convert(Cint,10011) # gurobi callback error
+            end
+        end
+    end
+    callback(CallbackData(cbdata,model.inner), where)
+    return convert(Cint,0)
+end
+
+# User callback function should be of the form:
+# callback(cbdata::MathProgCallbackData)
+# return :Exit to indicate an error
+
+function setmathprogcallback!(model::GurobiMathProgModel)
+    
+    grbcallback = cfunction(mastercallback, Cint, (Ptr{Void}, Ptr{Void}, Cint, Ptr{Void}))
+    ret = @grb_ccall(setcallbackfunc, Cint, (Ptr{Void}, Ptr{Void}, Any), model.ptr_model, grbcallback, model)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
+
+
+
