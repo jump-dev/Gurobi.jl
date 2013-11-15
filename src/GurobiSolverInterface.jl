@@ -377,7 +377,7 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
 
     model = unsafe_pointer_to_objref(userdata)::GurobiMathProgModel
     grbrawcb = CallbackData(cbdata,model.inner)
-    if where == CB_MIPSol
+    if where == CB_MIPSOL
         state = :MIPSol
         grbcb = GurobiCallbackData(grbrawcb, state, where)
         if model.lazycb != nothing
@@ -402,7 +402,6 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
             end
         end
     end
-    callback(CallbackData(cbdata,model.inner), where)
     return convert(Cint,0)
 end
 
@@ -413,7 +412,7 @@ end
 function setmathprogcallback!(model::GurobiMathProgModel)
     
     grbcallback = cfunction(mastercallback, Cint, (Ptr{Void}, Ptr{Void}, Cint, Ptr{Void}))
-    ret = @grb_ccall(setcallbackfunc, Cint, (Ptr{Void}, Ptr{Void}, Any), model.ptr_model, grbcallback, model)
+    ret = @grb_ccall(setcallbackfunc, Cint, (Ptr{Void}, Ptr{Void}, Any), model.inner.ptr_model, grbcallback, model)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
