@@ -275,7 +275,7 @@ end
 
 function setwarmstart!(m::GurobiMathProgModel, v)
     for j = 1:length(v)
-        if v[j] == NaN
+        if isnan(v[j])
             v[j] = 1e101  # GRB_UNDEFINED
         end
     end
