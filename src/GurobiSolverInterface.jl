@@ -390,13 +390,13 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
         state = :MIPNode
         grbcb = GurobiCallbackData(grbrawcb, state, where)
         if model.cutcb != nothing
-            model.cutcb(grbcb)
+            ret = model.cutcb(grbcb)
             if ret == :Exit
                 return convert(Cint,10011) # gurobi callback error
             end
         end
         if model.heuristiccb != nothing
-            model.heuristiccb(grbcb)
+            ret = model.heuristiccb(grbcb)
             if ret == :Exit
                 return convert(Cint,10011) # gurobi callback error
             end
