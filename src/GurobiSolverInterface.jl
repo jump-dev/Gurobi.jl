@@ -311,9 +311,19 @@ function cbgetmipsolution(d::GurobiCallbackData)
     return cbget_mipsol_sol(d.cbdata, d.where)
 end
 
+function cbgetmipsolution(d::GurobiCallbackData,output)
+    @assert d.state == :MIPSol
+    return cbget_mipsol_sol(d.cbdata, d.where, output)
+end
+
 function cbgetlpsolution(d::GurobiCallbackData)
     @assert d.state == :MIPNode
     return cbget_mipnode_rel(d.cbdata, d.where)
+end
+
+function cbgetlpsolution(d::GurobiCallbackData, output)
+    @assert d.state == :MIPNode
+    return cbget_mipnode_rel(d.cbdata, d.where, output)
 end
 
 
