@@ -368,15 +368,14 @@ function cbaddsolution!(d::GurobiCallbackData,x)
     cbsolution(d.state, x)
 end
 
-const sensemap = [:(==) => '=', :(<=) => '<', :(>=) => '>']
 function cbaddcut!(d::GurobiCallbackData,varidx,varcoef,sense,rhs)
     @assert d.state == :MIPNode
-    cbcut(d.cbdata, convert(Vector{Cint}, varidx), float(varcoef), sensemap[sense], float(rhs))
+    cbcut(d.cbdata, convert(Vector{Cint}, varidx), float(varcoef), sense, float(rhs))
 end
 
 function cbaddlazy!(d::GurobiCallbackData,varidx,varcoef,sense,rhs)
     @assert d.state == :MIPNode || d.state == :MIPSol
-    cblazy(d.cbdata, convert(Vector{Cint}, varidx), float(varcoef), sensemap[sense], float(rhs))
+    cblazy(d.cbdata, convert(Vector{Cint}, varidx), float(varcoef), sense, float(rhs))
 end
    
 
