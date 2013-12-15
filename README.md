@@ -284,12 +284,12 @@ natural algebraic approach.
 ```julia
 using JuMP
 
-m = Model(:Min, lpsolver=GurobiSolver())
+m = Model(solver=GurobiSolver())
 
 @defVar(m, x >= 5)
 @defVar(m, y >= 45)
 
-@setObjective(m, x + y)
+@setObjective(m, Min, x + y)
 @addConstraint(m, 50x + 24y <= 2400)
 @addConstraint(m, 30x + 33y <= 2100)
 
@@ -391,13 +391,13 @@ Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer 
 ```julia
 using JuMP
 
-m = Model(:Max, mipsolver=GurobiSolver())
+m = Model(solver=GurobiSolver())
 
 @defVar(m, 0 <= x <= 5)
 @defVar(m, 0 <= y <= 10, Int)
 @defVar(m, z, Bin)
 
-@setObjective(m, x + 2y + 5z)
+@setObjective(m, Max, x + 2y + 5z)
 @addConstraint(m, x + y + z <= 10)
 @addConstraint(m, x + 2y + z <= 15)
 
