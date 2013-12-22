@@ -228,7 +228,7 @@ function status(m::GurobiMathProgModel)
     return :Optimal
   elseif s == :infeasible
     return :Infeasible
-  elseif s == :inf_or_unbd
+  elseif s == :unbounded || s == :inf_or_unbd
     return :Unbounded
   elseif s == :iteration_limit || s == :node_limit || s == :time_limit || s == :solution_limit
     return :UserLimit
@@ -263,6 +263,9 @@ end
 
 getreducedcosts(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "RC", 1, num_vars(m.inner))
 getconstrduals(m::GurobiMathProgModel)  = get_dblattrarray(m.inner, "Pi", 1, num_constrs(m.inner))
+
+getinfeasibilityray(m::GurobiMathProgModel) = -get_dblattrarray(m.inner, "FarkasDual", 1, num_constrs(m.inner)) # note sign is flipped
+getunboundedray(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "UnbdRay", 1, num_vars(m.inner)) 
 
 getrawsolver(m::GurobiMathProgModel) = m.inner
 

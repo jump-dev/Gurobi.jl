@@ -44,7 +44,7 @@ const status_symbols = [
     :optimal,
     :infeasible,
     :inf_or_unbd,
-    :bounded,
+    :unbounded,
     :cutoff,
     :iteration_limit,
     :node_limit,

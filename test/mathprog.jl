@@ -1,7 +1,7 @@
 using Gurobi
 
 include(joinpath(Pkg.dir("MathProgBase"),"test","linprog.jl"))
-linprogtest(GurobiSolver())
+linprogtest(GurobiSolver(InfUnbdInfo=1))
 
 include(joinpath(Pkg.dir("MathProgBase"),"test","linproginterface.jl"))
 linprogsolvertest(GurobiSolver())
