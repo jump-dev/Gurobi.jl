@@ -110,6 +110,16 @@ function add_diag_qpterms!(model, hv::Real)  # all diagonal elements are H
     add_qpterms!(model, q, q, fill(float64(hv), n))
 end
 
+function delq!(model::Model)
+    ret = @grb_ccall(delq, Cint, (
+        Ptr{Void},    # model
+        ), 
+        model)
+        
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end 
+end
 
 # add_qconstr!
 

@@ -8,3 +8,7 @@ linprogsolvertest(GurobiSolver())
 
 include(joinpath(Pkg.dir("MathProgBase"),"test","mixintprog.jl"))
 mixintprogtest(GurobiSolver())
+
+
+include(joinpath(Pkg.dir("MathProgBase"),"test","quadprog.jl"))
+quadprogtest(GurobiSolver())

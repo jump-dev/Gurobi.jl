@@ -432,5 +432,23 @@ function setmathprogcallback!(model::GurobiMathProgModel)
 end
 
 
+# QCQP
 
+function setquadobj!(m::GurobiMathProgModel, rowidx, colidx, quadval)
+    delq!(m.inner)
+    scaledvals = similar(quadval)
+    for i in 1:length(rowidx)
+        if rowidx[i] == colidx[i]
+            # rescale from matrix format to "terms" format
+            scaledvals[i] = quadval[i]/2
+        else
+            scaledvals[i] = quadval[i]
+        end
+    end
+    add_qpterms!(m.inner, rowidx, colidx, scaledvals)
+end
+
+function addquadconstr!(m::GurobiMathProgModel, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
+    add_qconstr!(m.inner, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
+end
 
