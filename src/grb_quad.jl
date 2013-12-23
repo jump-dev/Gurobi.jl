@@ -121,6 +121,29 @@ function delq!(model::Model)
     end 
 end
 
+function getq(model::Model)
+    nz = get_intattr(model, "NumQNZs")
+    rowidx = Array(Cint, nz)
+    colidx = Array(Cint, nz)
+    val = Array(Float64, nz)
+    nzout = Array(Cint,1)
+    
+    ret = @grb_ccall(getq, Cint, (
+        Ptr{Void},  # model
+        Ptr{Cint},  # numqnzP
+        Ptr{Cint},  # qrow
+        Ptr{Cint},  # qcol
+        Ptr{Float64}# qval
+        ),
+        model,nzout,rowidx,colidx,val)
+    
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+
+    return rowidx, colidx, val
+end
+
 # add_qconstr!
 
 function add_qconstr!(model::Model, lind::IVec, lval::FVec, qr::IVec, qc::IVec, qv::FVec, rel::Cchar, rhs::Float64)

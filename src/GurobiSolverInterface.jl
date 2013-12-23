@@ -436,6 +436,7 @@ end
 
 function setquadobj!(m::GurobiMathProgModel, rowidx, colidx, quadval)
     delq!(m.inner)
+    update_model!(m.inner)
     scaledvals = similar(quadval)
     for i in 1:length(rowidx)
         if rowidx[i] == colidx[i]
@@ -446,6 +447,7 @@ function setquadobj!(m::GurobiMathProgModel, rowidx, colidx, quadval)
         end
     end
     add_qpterms!(m.inner, rowidx, colidx, scaledvals)
+    update_model!(m.inner)
 end
 
 function addquadconstr!(m::GurobiMathProgModel, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
