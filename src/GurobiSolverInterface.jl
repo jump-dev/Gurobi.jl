@@ -439,7 +439,12 @@ function setquadobj!(m::GurobiMathProgModel, rowidx, colidx, quadval)
     update_model!(m.inner)
     scaledvals = similar(quadval)
     for i in 1:length(rowidx)
+      if rowidx[i] == colidx[i]
+        # rescale from matrix format to "terms" format
+        scaledvals[i] = quadval[i] / 2
+      else
         scaledvals[i] = quadval[i]
+      end
     end
     add_qpterms!(m.inner, rowidx, colidx, scaledvals)
     update_model!(m.inner)
