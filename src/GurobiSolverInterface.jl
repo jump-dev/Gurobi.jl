@@ -452,5 +452,6 @@ end
 
 function addquadconstr!(m::GurobiMathProgModel, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
     add_qconstr!(m.inner, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
+    update_model!(m.inner)
 end
 
