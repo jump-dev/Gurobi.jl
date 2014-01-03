@@ -400,6 +400,13 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
         end
     elseif where == CB_MIPNODE
         state = :MIPNode
+        # skip callback if node is reported to be cut off or infeasible --
+        # nothing to do.
+        # TODO: users may want this information
+        status = cbget_mipnode_status(grbrawcb, where)
+        if status != 2
+            return convert(Cint,0)
+        end
         grbcb = GurobiCallbackData(grbrawcb, state, where)
         if model.cutcb != nothing
             ret = model.cutcb(grbcb)
