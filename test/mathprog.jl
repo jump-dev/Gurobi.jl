@@ -12,3 +12,4 @@ mixintprogtest(GurobiSolver())
 
 include(joinpath(Pkg.dir("MathProgBase"),"test","quadprog.jl"))
 quadprogtest(GurobiSolver())
+socptest(GurobiSolver())
