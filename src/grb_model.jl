@@ -101,15 +101,17 @@ end
 
 # read / write file
 
-function read_model(env::Env, filename::ASCIIString)
+function read_model(model::Model, filename::ASCIIString)
+    @assert is_valid(model.env)
     a = Array(Ptr{Void}, 1)
     ret = @grb_ccall(readmodel, Cint, 
         (Ptr{Void}, Ptr{Uint8}, Ptr{Ptr{Void}}), 
-        env, filename, a)
+        model.env, filename, a)
     if ret != 0
-        throw(GurobiError(env, ret))
+        throw(GurobiError(model.env, ret))
     end
-    Model(env, a[1])
+    model.ptr_model = a[1]
+    nothing
 end
 
 function write_model(model::Model, filename::ASCIIString)

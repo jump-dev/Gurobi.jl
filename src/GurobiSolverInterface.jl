@@ -27,8 +27,7 @@ end
 GurobiSolver(;kwargs...) = GurobiSolver(kwargs)
 model(s::GurobiSolver) = GurobiMathProgModel(;s.options...)
 
-# Unimplemented
-# function loadproblem!(m, filename)
+loadproblem!(m::GurobiMathProgModel, filename::String) = read_model(m.inner, filename)
 
 function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
   reset_model!(m.inner)
@@ -192,6 +191,8 @@ function addconstr!(m::GurobiMathProgModel, varidx, coef, lb, ub)
     end
 end
 updatemodel!(m::GurobiMathProgModel) = update_model!(m.inner)
+
+getconstrmatrix(m::GurobiMathProgModel) = get_constrmatrix(m.inner)
 
 function setsense!(m::GurobiMathProgModel, sense)
   if sense == :Min
