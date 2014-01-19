@@ -1,7 +1,6 @@
 module Gurobi
    
-using BinDeps
-@BinDeps.load_dependencies
+include("../deps/deps.jl")
 
     ### imports
 

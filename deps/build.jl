@@ -8,3 +8,5 @@ if haskey(ENV, "GUROBI_HOME")
     @unix_only provides(Binaries, joinpath(ENV["GUROBI_HOME"],"lib"), libgurobi)
 end
 @windows_only provides(Binaries, joinpath(ENV["GUROBI_HOME"],"bin"), libgurobi)
+
+@BinDeps.install [:libgurobi => :libgurobi]
