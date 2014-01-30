@@ -95,16 +95,21 @@ function setconstrLB!(m::GurobiMathProgModel, lb)
     for i = 1:num_constrs(m.inner)
         if sense[i] == '>' || sense[i] == '='
             # Do nothing
-        elseif sense[i] == '<' && lb[i] != -Inf
-            # LEQ constraint with non-NegInf LB implies a range
-            # Might be an equality change though
-            if isapprox(lb[i], rhs[i])
-              # Seems to be equality
-              sense[i] = '='
-              sense_changed = true
+        elseif sense[i] == '<'
+            if lb[i] != -Inf
+                # LEQ constraint with non-NegInf LB implies a range
+                # Might be an equality change though
+                if isapprox(lb[i], rhs[i])
+                  # Seems to be equality
+                  sense[i] = '='
+                  sense_changed = true
+                else
+                  # Guess not
+                  error("Tried to set LB != -Inf on a LEQ constraint (index $i)")
+                end
             else
-              # Guess not
-              error("Tried to set LB != -Inf on a LEQ constraint (index $i)")
+                # don't change this RHS
+                lb[i] = rhs[i]
             end
         end
     end
@@ -134,16 +139,21 @@ function setconstrUB!(m::GurobiMathProgModel, ub)
     for i = 1:num_constrs(m.inner)
         if sense[i] == '<' || sense[i] == '='
             # Do nothing
-        elseif sense[i] == '>' && ub[i] != -Inf
-            # GEQ constraint with non-Inf UB implies a range
-            # Might be an equality change though
-            if isapprox(ub[i], rhs[i])
-              # Seems to be equality
-              sense[i] = '='
-              sense_changed = true
+        elseif sense[i] == '>'
+            if ub[i] != Inf
+                # GEQ constraint with non-Inf UB implies a range
+                # Might be an equality change though
+                if isapprox(ub[i], rhs[i])
+                  # Seems to be equality
+                  sense[i] = '='
+                  sense_changed = true
+                else
+                  # Guess not
+                  error("Tried to set UB != +Inf on a GEQ constraint (index $i)")
+                end
             else
-              # Guess not
-              error("Tried to set UB != +Inf on a GEQ constraint (index $i)")
+                # don't change this RHS
+                ub[i] = rhs[i]
             end
         end
     end
