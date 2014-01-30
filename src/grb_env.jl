@@ -9,7 +9,11 @@ type Env
         ret = @grb_ccall(loadenv, Cint, (Ptr{Ptr{Void}}, Ptr{Uint8}), 
             a, C_NULL)
         if ret != 0
-            error("Failed to create environment (error code = $ret).")
+            if ret == 10009
+                error("Invalid Gurobi license")
+            else
+                error("Failed to create environment (error $ret).")
+            end
         end
         env = new(a[1])
         # finalizer(env, free_env)  ## temporary disable: which tends to sometimes caused warnings

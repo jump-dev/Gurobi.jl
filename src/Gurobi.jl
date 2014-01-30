@@ -1,6 +1,10 @@
 module Gurobi
-   
-include("../deps/deps.jl")
+
+if isfile(joinpath(Pkg.dir("Gurobi"),"deps","deps.jl"))
+    include("../deps/deps.jl")
+else
+    error("Gurobi not properly installed. Please run Pkg.build(\"Gurobi\")")
+end
 
     ### imports
 

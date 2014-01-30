@@ -242,6 +242,8 @@ function status(m::GurobiMathProgModel)
     return :Unbounded
   elseif s == :iteration_limit || s == :node_limit || s == :time_limit || s == :solution_limit
     return :UserLimit
+  elseif s == :suboptimal
+    return :Suboptimal # not very useful status
   else
     error("Internal library error")
   end
