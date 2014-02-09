@@ -197,3 +197,24 @@ function get_constrmatrix(model::Model)
     end
     return sparse(I, J, V, m, n)
 end
+
+const GRB_SOS_TYPE1 = convert(Cint, 1)
+const GRB_SOS_TYPE2 = convert(Cint, 2)
+
+function add_sos!(model::Model, sostype::Symbol, idx::Vector{Int}, weight::Vector{Cdouble})
+    ((nelem = length(idx)) == length(weight)) || error("Index and weight vectors of unequal length")
+    (sostype == :SOS1) ? (typ = GRB_SOS_TYPE1) : ( (sostype == :SOS2) ? (typ = GRB_SOS_TYPE2) : error("Invalid SOS constraint type") )
+    ret = @grb_ccall(addsos, Cint, (
+                     Ptr{Void}, 
+                     Cint,
+                     Cint,
+                     Ptr{Cint},
+                     Ptr{Cint},
+                     Ptr{Cint},
+                     Ptr{Cdouble}
+                     ), 
+                     model, convert(Cint, 1), convert(Cint, nelem), Cint[typ], Cint[0, nelem-1], convert(Vector{Cint}, idx-1), weight)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+end
