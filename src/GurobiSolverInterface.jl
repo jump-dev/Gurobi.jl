@@ -316,6 +316,8 @@ function setwarmstart!(m::GurobiMathProgModel, v)
     set_dblattrarray!(m.inner, "Start", 1, num_vars(m.inner), v)
 end
 
+addsos1!(m::GurobiMathProgModel, idx, weight) = add_sos!(m.inner, :SOS1, idx, weight)
+addsos2!(m::GurobiMathProgModel, idx, weight) = add_sos!(m.inner, :SOS2, idx, weight)
 
 # Callbacks
 
