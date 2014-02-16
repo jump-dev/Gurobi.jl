@@ -328,6 +328,7 @@ type GurobiCallbackData <: MathProgCallbackData
     cbdata::CallbackData
     state::Symbol
     where::Cint
+    sol::Vector{Float64}  # Used for heuristic callbacks
 #    model::GurobiMathProgModel # not needed?
 end
 
@@ -386,13 +387,6 @@ end
 # returns :MIPNode :MIPSol :Other
 cbgetstate(d::GurobiCallbackData) = d.state
 
-function cbaddsolution!(d::GurobiCallbackData,x)
-    # Gurobi doesn't support adding solutions on MIPSol.
-    # TODO: support this anyway
-    @assert d.state == :MIPNode
-    cbsolution(d.state, x)
-end
-
 function cbaddcut!(d::GurobiCallbackData,varidx,varcoef,sense,rhs)
     @assert d.state == :MIPNode
     cbcut(d.cbdata, convert(Vector{Cint}, varidx), float(varcoef), sense, float(rhs))
@@ -402,7 +396,17 @@ function cbaddlazy!(d::GurobiCallbackData,varidx,varcoef,sense,rhs)
     @assert d.state == :MIPNode || d.state == :MIPSol
     cblazy(d.cbdata, convert(Vector{Cint}, varidx), float(varcoef), sense, float(rhs))
 end
-   
+
+function cbaddsolution!(d::GurobiCallbackData)
+    # Gurobi doesn't support adding solutions on MIPSol.
+    # TODO: support this anyway
+    @assert d.state == :MIPNode
+    cbsolution(d.cbdata, d.sol)
+end
+
+function cbsetsolutionvalue!(d::GurobiCallbackData,varidx,value)
+    d.sol[varidx] = value
+end
 
 # breaking abstraction, define our low-level callback to eliminatate
 # a level of indirection
@@ -413,7 +417,7 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
     grbrawcb = CallbackData(cbdata,model.inner)
     if where == CB_MIPSOL
         state = :MIPSol
-        grbcb = GurobiCallbackData(grbrawcb, state, where)
+        grbcb = GurobiCallbackData(grbrawcb, state, where, [0.0])
         if model.lazycb != nothing
             ret = model.lazycb(grbcb)
             if ret == :Exit
@@ -429,7 +433,7 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
         if status != 2
             return convert(Cint,0)
         end
-        grbcb = GurobiCallbackData(grbrawcb, state, where)
+        grbcb = GurobiCallbackData(grbrawcb, state, where, [0.0])
         if model.cutcb != nothing
             ret = model.cutcb(grbcb)
             if ret == :Exit
@@ -437,6 +441,7 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
             end
         end
         if model.heuristiccb != nothing
+            grbcb.sol = fill(1e101, numvar(model))  # GRB_UNDEFINED
             ret = model.heuristiccb(grbcb)
             if ret == :Exit
                 return convert(Cint,10011) # gurobi callback error
