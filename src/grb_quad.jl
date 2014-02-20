@@ -31,7 +31,7 @@ function add_qpterms!(model, H::SparseMatrixCSC{Float64}) # H must be symmetric
     n = num_vars(model)
     (H.m == n && H.n == n) || error("H must be an n-by-n symmetric matrix.")
     
-    nnz_h = nnz(H)
+    nnz_h = nfilled(H)
     qr = Array(Cint, nnz_h)
     qc = Array(Cint, nnz_h)
     qv = Array(Float64, nnz_h)

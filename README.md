@@ -278,7 +278,7 @@ solution = linprog(f, A, '<', b, lb, Inf, GurobiSolver())
 
 ##### Example 1.4: Linear programming with JuMP (Algebraic model)
 
-Using [JuMP](https://github.com/IainNZ/JuMP.jl), we can specify linear programming problems using a more
+Using [JuMP](https://github.com/JuliaOpt/JuMP.jl), we can specify linear programming problems using a more
 natural algebraic approach.
 
 ```julia
