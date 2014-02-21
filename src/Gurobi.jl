@@ -43,7 +43,7 @@ end
     # grb_constrs
     add_constr!, add_constrs!, add_constrs_t!, 
     add_rangeconstr!, add_rangeconstrs!, add_rangeconstrs_t!,
-    get_constrmatrix,
+    get_constrmatrix, add_sos!,
 
     # grb_quad
     add_qpterms!, add_qconstr!,
