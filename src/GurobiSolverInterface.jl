@@ -255,7 +255,7 @@ function status(m::GurobiMathProgModel)
   elseif s == :suboptimal
     return :Suboptimal # not very useful status
   else
-    error("Internal library error")
+    error("Unrecognized solution status: $s")
   end
 end
 
@@ -357,7 +357,7 @@ function cbgetobj(d::GurobiCallbackData)
     if d.state == :MIPNode
         return cbget_mipnode_objbst(d.cbdata, d.where)
     elseif d.state == :MIPSol
-        return cbdet_mipsol_objbst(d.cbdata, d.where)
+        return cbget_mipsol_objbst(d.cbdata, d.where)
     else
         error("Unrecognized callback state $(d.state)")
     end
