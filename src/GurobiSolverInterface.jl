@@ -402,6 +402,10 @@ function cbaddsolution!(d::GurobiCallbackData)
     # TODO: support this anyway
     @assert d.state == :MIPNode
     cbsolution(d.cbdata, d.sol)
+    # "Wipe" solution back to GRB_UNDEFINIED
+    for i in 1:length(d.sol)
+        d.sol[i] = 1e101  # GRB_UNDEFINED
+    end
 end
 
 function cbsetsolutionvalue!(d::GurobiCallbackData,varidx,value)
