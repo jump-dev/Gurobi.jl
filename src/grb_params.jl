@@ -6,7 +6,7 @@
 #    grep GRB_INT_PAR gurobi_c.h | awk '{ printf("%s,\n", $3) }'
 #
 
-const GRB_INT_PARAMS = Set{ASCIIString}(
+const GRB_INT_PARAMS =[ 
     "BarIterLimit",
     "SolutionLimit",
     "Method",
@@ -77,14 +77,14 @@ const GRB_INT_PARAMS = Set{ASCIIString}(
     "TuneTrials",
     "TuneOutput",
     "TuneJobs",
-    "PreMIQPMethod")
+    "PreMIQPMethod"]
 
 # This list was obtained through AWK (with Gurobi 5.6)
 # command:
 #
 #    grep GRB_DBL_PAR gurobi_c.h | awk '{ printf("%s,\n", $3) }'
 #
-const GRB_DBL_PARAMS = Set{ASCIIString}(
+const GRB_DBL_PARAMS = [
     "Cutoff",
     "IterationLimit",
     "NodeLimit",
@@ -108,20 +108,20 @@ const GRB_DBL_PARAMS = Set{ASCIIString}(
     "FeasRelaxBigM",
     "PreSOS1BigM",
     "PreSOS2BigM",
-    "TuneTimeLimit")
+    "TuneTimeLimit"]
 
 # This list was obtained through AWK (with Gurobi 5.6)
 # command:
 #
 #    grep GRB_STR_PAR gurobi_c.h | awk '{ printf("%s,\n", $3) }'
 #
-const GRB_STR_PARAMS = Set{ASCIIString}(
+const GRB_STR_PARAMS = [
     "NodefileDir",
     "ServerPool",
     "ServerPassword",
     "LogFile",
     "ResultFile",
-    "Dummy")
+    "Dummy"]
 
 
 #################################################
