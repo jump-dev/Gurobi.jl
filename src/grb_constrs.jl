@@ -14,7 +14,7 @@ function add_constr!(model::Model, inds::IVec, coeffs::FVec, rel::Cchar, rhs::Fl
             Float64,      # rhs
             Ptr{Uint8}    # name
             ), 
-            model, length(inds), inds - 1, coeffs, rel, rhs, C_NULL)
+            model, length(inds), inds .- 1, coeffs, rel, rhs, C_NULL)
         if ret != 0
             throw(GurobiError(model.env, ret))
         end
@@ -51,7 +51,7 @@ function add_constrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec, rel
             Ptr{Float64}, # rhs
             Ptr{Uint8}    # names
             ), 
-            model, m, nnz, cbegins - 1, inds - 1, coeffs, 
+            model, m, nnz, cbegins .- 1, inds .- 1, coeffs, 
             rel, rhs, C_NULL)
         
         if ret != 0
@@ -97,7 +97,7 @@ function add_rangeconstr!(model::Model, inds::IVec, coeffs::FVec, lb::Float64, u
             Float64,      # upper
             Ptr{Uint8}    # name
             ),
-            model, length(inds), inds - 1, coeffs, lb, ub, C_NULL)
+            model, length(inds), inds .- 1, coeffs, lb, ub, C_NULL)
         if ret != 0
             throw(GurobiError(model.env, ret))
         end
@@ -135,7 +135,7 @@ function add_rangeconstrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec
             Ptr{Float64}, # upper
             Ptr{Uint8}    # names
             ), 
-            model, m, nnz, cbegins - 1, inds - 1, coeffs, lb, ub, C_NULL)
+            model, m, nnz, cbegins .- 1, inds .- 1, coeffs, lb, ub, C_NULL)
         
         if ret != 0
             throw(GurobiError(model.env, ret))
@@ -213,7 +213,7 @@ function add_sos!(model::Model, sostype::Symbol, idx::Vector{Int}, weight::Vecto
                      Ptr{Cint},
                      Ptr{Cdouble}
                      ), 
-                     model, convert(Cint, 1), convert(Cint, nelem), Cint[typ], Cint[0, nelem-1], convert(Vector{Cint}, idx-1), weight)
+                     model, convert(Cint, 1), convert(Cint, nelem), Cint[typ], Cint[0, nelem-1], convert(Vector{Cint}, idx.-1), weight)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
