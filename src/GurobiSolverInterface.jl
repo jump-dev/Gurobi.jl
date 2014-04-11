@@ -248,8 +248,10 @@ function status(m::GurobiMathProgModel)
     return :Optimal
   elseif s == :infeasible
     return :Infeasible
-  elseif s == :unbounded || s == :inf_or_unbd
+  elseif s == :unbounded
     return :Unbounded
+  elseif s == :inf_or_unbd
+    return :InfeasibleOrUnbounded
   elseif s == :iteration_limit || s == :node_limit || s == :time_limit || s == :solution_limit
     return :UserLimit
   elseif s == :numeric
