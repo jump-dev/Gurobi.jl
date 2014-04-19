@@ -123,3 +123,11 @@ function write_model(model::Model, filename::ASCIIString)
     nothing
 end
 
+function tune_model(model::Model)
+    ret = @grb_ccall(tunemodel, Cint, (Ptr{Void},), model.ptr_model)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
