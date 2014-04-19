@@ -9,7 +9,7 @@ tests = ["lp_01a",
          "mathprog"]
 
 for t in tests
-    fp = joinpath("test", "$(t).jl")
+    fp = "$(t).jl"
     println("running $(fp) ...")
     evalfile(fp)
-end         
+end 
