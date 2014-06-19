@@ -213,7 +213,7 @@ function add_sos!(model::Model, sostype::Symbol, idx::Vector{Int}, weight::Vecto
                      Ptr{Cint},
                      Ptr{Cdouble}
                      ), 
-                     model, convert(Cint, 1), convert(Cint, nelem), Cint[typ], Cint[0, nelem-1], convert(Vector{Cint}, idx-1), weight)
+                     model, convert(Cint, 1), convert(Cint, nelem), Cint[typ], Cint[0], convert(Vector{Cint}, idx-1), weight)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
