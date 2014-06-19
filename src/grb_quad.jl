@@ -13,7 +13,7 @@ function add_qpterms!(model::Model, qr::IVec, qc::IVec, qv::FVec)
             Ptr{Cint},    # qcol
             Ptr{Float64}, # qval
             ), 
-            model, nnz, qr-1, qc-1, qv)
+            model, nnz, qr.-1, qc.-1, qv)
             
         if ret != 0
             throw(GurobiError(model.env, ret))
@@ -31,7 +31,7 @@ function add_qpterms!(model, H::SparseMatrixCSC{Float64}) # H must be symmetric
     n = num_vars(model)
     (H.m == n && H.n == n) || error("H must be an n-by-n symmetric matrix.")
     
-    nnz_h = length(H.nzval) # nfilled(H) for 0.3
+    nnz_h = nnz(H)
     qr = Array(Cint, nnz_h)
     qc = Array(Cint, nnz_h)
     qv = Array(Float64, nnz_h)
@@ -167,7 +167,7 @@ function add_qconstr!(model::Model, lind::IVec, lval::FVec, qr::IVec, qc::IVec, 
             Float64,      # rhs
             Ptr{Uint8}    # name
             ), 
-            model, lnnz, lind-1, lval, qnnz, qr-1, qc-1, qv, rel, rhs, C_NULL)
+            model, lnnz, lind.-1, lval, qnnz, qr.-1, qc.-1, qv, rel, rhs, C_NULL)
             
         if ret != 0
             throw(GurobiError(model.env, ret))

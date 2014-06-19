@@ -248,10 +248,15 @@ function status(m::GurobiMathProgModel)
     return :Optimal
   elseif s == :infeasible
     return :Infeasible
-  elseif s == :unbounded || s == :inf_or_unbd
+  elseif s == :unbounded
     return :Unbounded
+  elseif s == :inf_or_unbd
+    Base.warn_once("Gurobi reported infeasible or unbounded. Set InfUnbdInfo=1 for more specific status.")
+    return :InfeasibleOrUnbounded
   elseif s == :iteration_limit || s == :node_limit || s == :time_limit || s == :solution_limit
     return :UserLimit
+  elseif s == :numeric
+    return :Numeric
   elseif s == :suboptimal
     return :Suboptimal # not very useful status
   else
