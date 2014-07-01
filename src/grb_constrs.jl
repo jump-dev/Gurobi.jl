@@ -218,3 +218,17 @@ function add_sos!(model::Model, sostype::Symbol, idx::Vector{Int}, weight::Vecto
         throw(GurobiError(model.env, ret))
     end
 end
+
+del_constrs!{T<:Real}(model::Model, idx::T) = del_constrs!(model, Cint[idx])
+del_constrs!{T<:Real}(model::Model, idx::Vector{T}) = del_constrs!(model, convert(Vector{Cint},idx))
+function del_constrs!(model::Model, idx::Vector{Cint})
+    numdel = length(idx)
+    ret = @grb_ccall(delconstrs, Cint, (
+                     Ptr{Void},
+                     Cint,
+                     Ptr{Cint}),
+                     model, convert(Cint,numdel), idx.-1)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+end
