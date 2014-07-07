@@ -294,6 +294,8 @@ getconstrduals(m::GurobiMathProgModel)  = get_dblattrarray(m.inner, "Pi", 1, num
 getinfeasibilityray(m::GurobiMathProgModel) = -get_dblattrarray(m.inner, "FarkasDual", 1, num_constrs(m.inner)) # note sign is flipped
 getunboundedray(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "UnbdRay", 1, num_vars(m.inner)) 
 
+getbasis(m::GurobiMathProgModel) = get_basis(m.inner)
+
 getrawsolver(m::GurobiMathProgModel) = m.inner
 
 setvartype!(m::GurobiMathProgModel, vartype) =
