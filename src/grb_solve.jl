@@ -110,3 +110,25 @@ end
 
 get_solution(model::Model) = get_dblattrarray(model, "X", 1, num_vars(model))
 
+function get_basis(model::Model)
+    cbasis = Array(Cint, num_vars(model))
+    get_intattrarray!(cbasis, model, "VBasis", 1)
+    for it in 1:length(cbasis)
+        if cbasis[it] == -2
+            cbasis[it] = 1
+        elseif cbasis[it] == -3
+            error("Variable is superbasic (does this ever happen in practice?)")
+        end
+    end
+    
+    rbasis = Array(Cint, num_constrs(model))
+    get_intattrarray!(rbasis, model, "CBasis", 1)
+    rsense = Array(Cchar, num_constrs(model))
+    get_charattrarray!(rsense, model, "Sense", 1)
+    for it in 1:length(rbasis)
+        if (rbasis[it] == -1) && (rsense[it] == convert(Cchar,'<'))
+            rbasis[it] = 1
+        end
+    end
+    return cbasis, rbasis
+end
