@@ -110,11 +110,11 @@ end
 
 get_solution(model::Model) = get_dblattrarray(model, "X", 1, num_vars(model))
 
-const varmap = Dict([         -3, -2, -1,     0],
-                    [:superbasic,:ub,:lb,:basic])
+const varmap = Dict([         -3,              -2,              -1,     0],
+                    [:Superbasic,:NonbasicAtUpper,:NonbasicAtLower,:Basic])
 
 const conmap = Dict([     0,       -1],
-                    [:basic,:nonbasic])
+                    [:Basic,:Nonbasic])
 
 function get_basis(model::Model)
     cval = Array(Cint, num_vars(model))
@@ -133,9 +133,9 @@ function get_basis(model::Model)
         rbasis[it] = conmap[rval[it]]
         if rbasis[it] == :nonbasic
             if rsense[it] == convert(Cchar,'<')
-                rbasis[it] = :ub
+                rbasis[it] = :NonbasicAtUpper
             else
-                rbasis[it] = :lb
+                rbasis[it] = :NonbasicAtLower
             end
         end
     end
