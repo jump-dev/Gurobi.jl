@@ -131,7 +131,7 @@ function get_basis(model::Model)
     get_charattrarray!(rsense, model, "Sense", 1)
     for it in 1:length(rval)
         rbasis[it] = conmap[rval[it]]
-        if rbasis[it] == :nonbasic
+        if rbasis[it] == :Nonbasic
             if rsense[it] == convert(Cchar,'<')
                 rbasis[it] = :NonbasicAtUpper
             else
