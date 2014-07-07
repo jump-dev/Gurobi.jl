@@ -110,24 +110,33 @@ end
 
 get_solution(model::Model) = get_dblattrarray(model, "X", 1, num_vars(model))
 
+const varmap = Dict([         -3, -2, -1,     0],
+                    [:superbasic,:ub,:lb,:basic])
+
+const conmap = Dict([     0,       -1],
+                    [:basic,:nonbasic])
+
 function get_basis(model::Model)
-    cbasis = Array(Cint, num_vars(model))
-    get_intattrarray!(cbasis, model, "VBasis", 1)
-    for it in 1:length(cbasis)
-        if cbasis[it] == -2
-            cbasis[it] = 1
-        elseif cbasis[it] == -3
-            error("Variable is superbasic (does this ever happen in practice?)")
-        end
+    cval = Array(Cint, num_vars(model))
+    cbasis = Array(Symbol, num_vars(model))
+    get_intattrarray!(cval, model, "VBasis", 1)
+    for it in 1:length(cval)
+        cbasis[it] = varmap[cval[it]]
     end
     
-    rbasis = Array(Cint, num_constrs(model))
-    get_intattrarray!(rbasis, model, "CBasis", 1)
+    rval = Array(Cint, num_constrs(model))
+    rbasis = Array(Symbol, num_constrs(model))
+    get_intattrarray!(rval, model, "CBasis", 1)
     rsense = Array(Cchar, num_constrs(model))
     get_charattrarray!(rsense, model, "Sense", 1)
-    for it in 1:length(rbasis)
-        if (rbasis[it] == -1) && (rsense[it] == convert(Cchar,'<'))
-            rbasis[it] = 1
+    for it in 1:length(rval)
+        rbasis[it] = conmap[rval[it]]
+        if rbasis[it] == :nonbasic
+            if rsense[it] == convert(Cchar,'<')
+                rbasis[it] = :ub
+            else
+                rbasis[it] = :lb
+            end
         end
     end
     return cbasis, rbasis
