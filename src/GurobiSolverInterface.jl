@@ -13,6 +13,7 @@ type GurobiMathProgModel <: AbstractMathProgModel
 end
 function GurobiMathProgModel(;options...)
    env = Env()
+   setparam!(env, "InfUnbdInfo", 1)
    for (name,value) in options
        setparam!(env, string(name), value)
    end
