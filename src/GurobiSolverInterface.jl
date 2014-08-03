@@ -461,6 +461,12 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
                 return convert(Cint,10011) # gurobi callback error
             end
         end
+        if model.lazycb != nothing
+            ret = model.lazycb(grbcb)
+            if ret == :Exit
+                return convert(Cint,10011) # gurobi callback error
+            end
+        end
     end
     return convert(Cint,0)
 end
