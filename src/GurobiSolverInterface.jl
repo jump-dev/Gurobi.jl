@@ -299,20 +299,30 @@ getbasis(m::GurobiMathProgModel) = get_basis(m.inner)
 
 getrawsolver(m::GurobiMathProgModel) = m.inner
 
-setvartype!(m::GurobiMathProgModel, vartype) =
-    set_charattrarray!(m.inner, "VType", 1, length(vartype), vartype)
+const var_type_map = [
+  'C' => :Cont,
+  'B' => :Bin,
+  'I' => :Int,
+  'S' => :SemiCont,
+  'N' => :SemiInt
+]
+
+const rev_var_type_map = [
+  :Cont => 'C',
+  :Bin => 'B',
+  :Int => 'I',
+  :SemiCont => 'S',
+  :SemiInt => 'N'
+]
+
+function setvartype!(m::GurobiMathProgModel, vartype::Vector{Symbol})
+    nvartype = map(x->rev_var_type_map[x], vartype)
+    set_charattrarray!(m.inner, "VType", 1, length(nvartype), nvartype)
+end
+
 function getvartype(m::GurobiMathProgModel)
     ret = get_charattrarray(m.inner, "VType", 1, num_vars(m.inner))
-    for j = 1:num_vars(m.inner)
-        if ret[j] == 'B'
-            ret[j] = 'I'
-        elseif ret[j] == 'S'
-            error("Semi-continuous variables not supported by MathProgBase")
-        elseif ret[j] == 'N'
-            error("Semi-integer variables not supported by MathProgBase")
-        end
-    end
-    return ret
+    map(x->var_type_map[x], ret)
 end
 
 function setwarmstart!(m::GurobiMathProgModel, v)
@@ -368,7 +378,11 @@ function cbgetobj(d::GurobiCallbackData)
     if d.state == :MIPNode
         return cbget_mipnode_objbst(d.cbdata, d.where)
     elseif d.state == :MIPSol
-        return cbget_mipsol_objbst(d.cbdata, d.where)
+        error("Gurobi does not implement cbgetobj when state == MIPSol")
+        # https://groups.google.com/forum/#!topic/gurobi/Az_X6Ag-y6k
+        # https://github.com/JuliaOpt/MathProgBase.jl/issues/23
+        # A complex workaround is possible but hasn't been implemented.
+        # return cbget_mipsol_objbst(d.cbdata, d.where)
     else
         error("Unrecognized callback state $(d.state)")
     end
