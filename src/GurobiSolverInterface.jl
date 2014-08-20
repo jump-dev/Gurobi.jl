@@ -368,7 +368,11 @@ function cbgetobj(d::GurobiCallbackData)
     if d.state == :MIPNode
         return cbget_mipnode_objbst(d.cbdata, d.where)
     elseif d.state == :MIPSol
-        return cbget_mipsol_objbst(d.cbdata, d.where)
+        error("Gurobi does not implement cbgetobj when state == MIPSol")
+        # https://groups.google.com/forum/#!topic/gurobi/Az_X6Ag-y6k
+        # https://github.com/JuliaOpt/MathProgBase.jl/issues/23
+        # A complex workaround is possible but hasn't been implemented.
+        # return cbget_mipsol_objbst(d.cbdata, d.where)
     else
         error("Unrecognized callback state $(d.state)")
     end
