@@ -11,14 +11,20 @@ type Model
     ptr_model::Ptr{Void}
     callback::Any
     
-    function Model(env::Env, p::Ptr{Void})
+    function Model(env::Env, p::Ptr{Void}; finalize_env::Bool=false)
         model = new(env, p, nothing)
-        finalizer(model, free_model)
+        if finalize_env
+            finalizer(model, m -> (free_model(m); free_env(m.env)))
+        else
+            finalizer(model, free_model)
+        end
         model
     end
 end
 
-function Model(env::Env, name::ASCIIString)
+# If environment is tied to this model, the, we can safely finalize
+# both at the same time, working around the Julia GC.
+function Model(env::Env, name::ASCIIString; finalize_env::Bool=false)
 
     @assert is_valid(env)
     
@@ -42,7 +48,7 @@ function Model(env::Env, name::ASCIIString)
         throw(GurobiError(env, ret))
     end
     
-    Model(env, a[1])
+    Model(env, a[1]; finalize_env=finalize_env)
 end
 
 

@@ -17,7 +17,7 @@ function GurobiMathProgModel(;options...)
    for (name,value) in options
        setparam!(env, string(name), value)
    end
-   m = GurobiMathProgModel(Model(env,""), :Con, nothing, nothing, nothing)
+   m = GurobiMathProgModel(Model(env,""; finalize_env=true), :Con, nothing, nothing, nothing)
    return m
 end
 
