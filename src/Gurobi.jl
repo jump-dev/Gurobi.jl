@@ -24,7 +24,7 @@ end
 
     # grb_model
     set_sense!, update_model!, reset_model!, 
-    read_model, write_model, tune_model,
+    read_model, write_model, tune_model, presolve_model,
 
     # grb_attrs
     model_name, model_sense, model_type,

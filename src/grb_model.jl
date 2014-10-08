@@ -131,3 +131,14 @@ function tune_model(model::Model)
     nothing
 end
 
+# Presolve the model but don't solve. For some reason this is not
+# documented for the C interface, but is for all the other interfaces.
+# Source: https://twitter.com/iaindunning/status/519620465992556544
+function presolve_model(model::Model)
+    ret = @grb_ccall(presolvemodel, Ptr{Void}, (Ptr{Void},), model.ptr_model)
+    if ret == C_NULL
+        # Presumably failed to return a model
+        error("presolve_model did not return a model")
+    end
+    return Model(model.env, ret)
+end
