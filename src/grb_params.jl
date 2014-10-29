@@ -173,6 +173,16 @@ function set_int_param!(env::Env, name::ASCIIString, v::Integer)
     end
 end
 
+function set_int_param!(env::Env, name::ASCIIString, v::Real)
+    # User may have tried to use Inf or 1e100 or something of that
+    # nature to set this parameter, but as it is Int it will fail.
+    if v >= 2000000000  # GRB_MAXINT
+        set_int_param!(env, name, 2000000000)
+    else
+        error("The parameter $name must be an integer")
+    end
+end
+
 function set_dbl_param!(env::Env, name::ASCIIString, v::Real)
     ret = @grb_ccall(setdblparam, Cint, (Ptr{Void}, Ptr{Cchar}, Float64), 
         env, name, v)
