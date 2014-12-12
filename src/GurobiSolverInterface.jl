@@ -519,7 +519,10 @@ function setquadobj!(m::GurobiMathProgModel, rowidx, colidx, quadval)
 end
 
 function addquadconstr!(m::GurobiMathProgModel, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
+    if m.last_op_type == :Var
+        updatemodel!(m)
+        m.last_op_type = :Con
+    end
     add_qconstr!(m.inner, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
-    update_model!(m.inner)
 end
 
