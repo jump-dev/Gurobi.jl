@@ -224,7 +224,9 @@ function getsense(m::GurobiMathProgModel)
 end
 
 numvar(m::GurobiMathProgModel)    = num_vars(m.inner)
-numconstr(m::GurobiMathProgModel) = num_constrs(m.inner)
+numconstr(m::GurobiMathProgModel) = num_constrs(m.inner) + num_qconstrs(m.inner)
+numlinconstr(m::GurobiMathProgModel) = num_constrs(m.inner)
+numquadconstr(m::GurobiMathProgModel) = num_qconstrs(m.inner)
 
 function optimize!(m::GurobiMathProgModel)
     # set callbacks if present
@@ -291,6 +293,7 @@ end
 
 getreducedcosts(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "RC", 1, num_vars(m.inner))
 getconstrduals(m::GurobiMathProgModel)  = get_dblattrarray(m.inner, "Pi", 1, num_constrs(m.inner))
+getquadconstrduals(m::GurobiMathProgModel)  = get_dblattrarray(m.inner, "QCPi", 1, num_qconstrs(m.inner))
 
 getinfeasibilityray(m::GurobiMathProgModel) = -get_dblattrarray(m.inner, "FarkasDual", 1, num_constrs(m.inner)) # note sign is flipped
 getunboundedray(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "UnbdRay", 1, num_vars(m.inner)) 
