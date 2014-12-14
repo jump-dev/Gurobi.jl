@@ -302,21 +302,21 @@ getbasis(m::GurobiMathProgModel) = get_basis(m.inner)
 
 getrawsolver(m::GurobiMathProgModel) = m.inner
 
-const var_type_map = [
+const var_type_map = Compat.@compat Dict(
   'C' => :Cont,
   'B' => :Bin,
   'I' => :Int,
   'S' => :SemiCont,
   'N' => :SemiInt
-]
+)
 
-const rev_var_type_map = [
+const rev_var_type_map = Compat.@compat Dict(
   :Cont => 'C',
   :Bin => 'B',
   :Int => 'I',
   :SemiCont => 'S',
   :SemiInt => 'N'
-]
+)
 
 function setvartype!(m::GurobiMathProgModel, vartype::Vector{Symbol})
     nvartype = map(x->rev_var_type_map[x], vartype)

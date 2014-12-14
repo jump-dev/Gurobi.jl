@@ -19,9 +19,9 @@ ivec(v::IVec) = v
 fvec(v::FVec) = v
 cvec(v::CVec) = v
 
-ivec{I<:Integer}(v::Vector{I}) = convert(IVec, v)
-fvec{T<:Real}(v::Vector{T}) = convert(FVec, v)
-cvec(v::Vector{Char}) = convert(CVec, v)
+ivec(v::Vector) = convert(IVec, v)
+fvec(v::Vector) = convert(FVec, v)
+cvec(v::Vector) = convert(CVec, v)
 
 # cvecx(v, n) and fvecx(v, n)
 # converts v into a vector of Cchar or Float64 of length n,
@@ -65,7 +65,4 @@ end
 # version need not be export
 # one can write Gurobi.version to get the version numbers
 const version = getlibversion()
-
-
-
 

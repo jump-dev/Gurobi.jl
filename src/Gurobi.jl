@@ -12,6 +12,7 @@ end
 
     # Standard LP interface
     importall MathProgBase.SolverInterface
+    import Compat
 
     ### exports
     export 
