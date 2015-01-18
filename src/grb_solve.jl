@@ -110,11 +110,16 @@ end
 
 get_solution(model::Model) = get_dblattrarray(model, "X", 1, num_vars(model))
 
-const varmap = Dict([         -3,              -2,              -1,     0],
-                    [:Superbasic,:NonbasicAtUpper,:NonbasicAtLower,:Basic])
+const varmap = Compat.@compat Dict(
+    -3 => :Superbasic,
+    -2 => :NonbasicAtUpper,
+    -1 => :NonbasicAtLower,
+     0 => :Basic
+)
 
-const conmap = Dict([     0,       -1],
-                    [:Basic,:Nonbasic])
+const conmap = Compat.@compat Dict(
+     0 => :Basic,
+    -1 => :Nonbasic)
 
 function get_basis(model::Model)
     cval = Array(Cint, num_vars(model))

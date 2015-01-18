@@ -302,21 +302,21 @@ getbasis(m::GurobiMathProgModel) = get_basis(m.inner)
 
 getrawsolver(m::GurobiMathProgModel) = m.inner
 
-const var_type_map = [
+const var_type_map = Compat.@compat Dict(
   'C' => :Cont,
   'B' => :Bin,
   'I' => :Int,
   'S' => :SemiCont,
   'N' => :SemiInt
-]
+)
 
-const rev_var_type_map = [
+const rev_var_type_map = Compat.@compat Dict(
   :Cont => 'C',
   :Bin => 'B',
   :Int => 'I',
   :SemiCont => 'S',
   :SemiInt => 'N'
-]
+)
 
 function setvartype!(m::GurobiMathProgModel, vartype::Vector{Symbol})
     nvartype = map(x->rev_var_type_map[x], vartype)
@@ -523,7 +523,10 @@ function setquadobj!(m::GurobiMathProgModel, rowidx, colidx, quadval)
 end
 
 function addquadconstr!(m::GurobiMathProgModel, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
+    if m.last_op_type == :Var
+        updatemodel!(m)
+        m.last_op_type = :Con
+    end
     add_qconstr!(m.inner, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
-    update_model!(m.inner)
 end
 
