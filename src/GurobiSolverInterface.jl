@@ -291,9 +291,29 @@ function getconstrsolution(m::GurobiMathProgModel)
     return ret
 end
 
-getreducedcosts(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "RC", 1, num_vars(m.inner))
-getconstrduals(m::GurobiMathProgModel)  = get_dblattrarray(m.inner, "Pi", 1, num_constrs(m.inner))
-getquadconstrduals(m::GurobiMathProgModel)  = get_dblattrarray(m.inner, "QCPi", 1, num_qconstrs(m.inner))
+function getreducedcosts(m::GurobiMathProgModel)
+    if is_qcp(m.inner) && get_int_param(m.inner.env, "QCPDual") == 0
+        return fill(NaN, num_vars(m.inner))
+    else
+        return get_dblattrarray(m.inner, "RC", 1, num_vars(m.inner))
+    end
+end
+
+function getconstrduals(m::GurobiMathProgModel)
+    if is_qcp(m.inner) && get_int_param(m.inner.env, "QCPDual") == 0
+        return fill(NaN, num_constrs(m.inner))
+    else
+        return get_dblattrarray(m.inner, "Pi", 1, num_constrs(m.inner))
+    end
+end
+
+function getquadconstrduals(m::GurobiMathProgModel)
+    if is_qcp(m.inner) && get_int_param(m.inner.env, "QCPDual") == 0
+        return fill(NaN, num_qconstrs(m.inner))
+    else
+        return get_dblattrarray(m.inner, "QCPi", 1, num_qconstrs(m.inner))
+    end
+end
 
 getinfeasibilityray(m::GurobiMathProgModel) = -get_dblattrarray(m.inner, "FarkasDual", 1, num_constrs(m.inner)) # note sign is flipped
 getunboundedray(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "UnbdRay", 1, num_vars(m.inner)) 
