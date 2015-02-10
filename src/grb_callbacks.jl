@@ -61,10 +61,10 @@ end
 
 
 function cbget{T}(::Type{T},cbdata::CallbackData, where::Cint, what::Integer)
-    
+
     out = Array(T,1)
     ret = @grb_ccall(cbget, Cint, (Ptr{Void}, Cint, Cint, Ptr{T}),
-        cbdata.cbdata, where, what, out)
+        cbdata.cbdata, where, convert(Cint,what), out)
     if ret != 0
         throw(GurobiError(cbdata.model.env, ret))
     end

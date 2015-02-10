@@ -10,6 +10,7 @@ type GurobiMathProgModel <: AbstractMathProgModel
     lazycb
     cutcb
     heuristiccb
+    infocb
 end
 function GurobiMathProgModel(;options...)
    env = Env()
@@ -17,7 +18,7 @@ function GurobiMathProgModel(;options...)
    for (name,value) in options
        setparam!(env, string(name), value)
    end
-   m = GurobiMathProgModel(Model(env,""; finalize_env=true), :Con, nothing, nothing, nothing)
+   m = GurobiMathProgModel(Model(env,""; finalize_env=true), :Con, nothing, nothing, nothing, nothing)
    return m
 end
 
@@ -230,7 +231,7 @@ numquadconstr(m::GurobiMathProgModel) = num_qconstrs(m.inner)
 
 function optimize!(m::GurobiMathProgModel)
     # set callbacks if present
-    if m.lazycb != nothing || m.cutcb != nothing || m.heuristiccb != nothing
+    if m.lazycb != nothing || m.cutcb != nothing || m.heuristiccb != nothing || m.infocb != nothing
         setmathprogcallback!(m)
     end
     if m.lazycb != nothing
@@ -366,6 +367,7 @@ addsos2!(m::GurobiMathProgModel, idx, weight) = add_sos!(m.inner, :SOS2, idx, we
 setlazycallback!(m::GurobiMathProgModel,f) = (m.lazycb = f)
 setcutcallback!(m::GurobiMathProgModel,f) = (m.cutcb = f)
 setheuristiccallback!(m::GurobiMathProgModel,f) = (m.heuristiccb = f)
+setinfocallback!(m::GurobiMathProgModel,f) = (m.infocb = f)
 
 type GurobiCallbackData <: MathProgCallbackData
     cbdata::CallbackData
@@ -400,6 +402,8 @@ end
 function cbgetobj(d::GurobiCallbackData)
     if d.state == :MIPNode
         return cbget_mipnode_objbst(d.cbdata, d.where)
+    elseif d.state == :MIPInfo
+        return cbget_mip_objbst(d.cbdata, d.where)
     elseif d.state == :MIPSol
         error("Gurobi does not implement cbgetobj when state == MIPSol")
         # https://groups.google.com/forum/#!topic/gurobi/Az_X6Ag-y6k
@@ -415,7 +419,9 @@ function cbgetbestbound(d::GurobiCallbackData)
     if d.state == :MIPNode
         return cbget_mipnode_objbnd(d.cbdata, d.where)
     elseif d.state == :MIPSol
-        return cbdet_mipsol_objbnd(d.cbdata, d.where)
+        return cbget_mipsol_objbnd(d.cbdata, d.where)
+    elseif d.state == :MIPInfo
+        return cbget_mip_objbnd(d.cbdata, d.where)
     else
         error("Unrecognized callback state $(d.state)")
     end
@@ -425,12 +431,14 @@ function cbgetexplorednodes(d::GurobiCallbackData)
     if d.state == :MIPNode
         return cbget_mipnode_nodcnt(d.cbdata, d.where)
     elseif d.state == :MIPSol
-        return cbdet_mipsol_nodcnt(d.cbdata, d.where)
+        return cbget_mipsol_nodcnt(d.cbdata, d.where)
+    elseif d.state == :MIPInfo
+        return cbget_mip_nodcnt(d.cbdata, d.where)
     else
         error("Unrecognized callback state $(d.state)")
     end
 end
-        
+
 # returns :MIPNode :MIPSol :Other
 cbgetstate(d::GurobiCallbackData) = d.state
 
@@ -500,6 +508,15 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
         end
         if model.lazycb != nothing
             ret = model.lazycb(grbcb)
+            if ret == :Exit
+                return convert(Cint,10011) # gurobi callback error
+            end
+        end
+    elseif where == CB_MIP
+        state = :MIPInfo
+        grbcb = GurobiCallbackData(grbrawcb, state, where, [0.0])
+        if model.infocb != nothing
+            ret = model.infocb(grbcb)
             if ret == :Exit
                 return convert(Cint,10011) # gurobi callback error
             end
