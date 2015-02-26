@@ -22,10 +22,16 @@ for a in aliases
     @osx_only push!(paths_to_try, string("lib$a.so"))
 end
 
+found = false
 for l in paths_to_try
     d = dlopen_e(l)
     if d != C_NULL
+        found = true
         write_depsfile(l)
         break
     end
+end
+
+if !found
+    error("Unable to locate Gurobi installation. Note that this must be downloaded separately from gurobi.com")
 end
