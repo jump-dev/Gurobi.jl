@@ -148,3 +148,13 @@ function presolve_model(model::Model)
     end
     return Model(model.env, ret)
 end
+
+function fixed_model(model::Model)
+    @assert model.ptr_model != C_NULL
+    fixed::Ptr{Void} = C_NULL
+    fixed = @grb_ccall(fixedmodel, Ptr{Void}, (Ptr{Void},), model.ptr_model)
+    if fixed == C_NULL
+        error("Unable to create fixed model")
+    end
+    Model(model.env, fixed)
+end
