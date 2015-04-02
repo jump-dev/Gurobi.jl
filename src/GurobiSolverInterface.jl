@@ -235,13 +235,7 @@ function optimize!(m::GurobiMathProgModel)
         setmathprogcallback!(m)
     end
     if m.lazycb != nothing
-      modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m.inner)
-      @assert modenv != C_NULL
-      ret = @grb_ccall(setintparam, Cint, (Ptr{Void}, Ptr{Cchar}, Cint), 
-        modenv, "LazyConstraints", 1)
-      if ret != 0
-          throw(GurobiError(env, ret))        
-      end
+      setparam!(m.inner, "LazyConstraints", 1)
     end
     optimize(m.inner)
 end
