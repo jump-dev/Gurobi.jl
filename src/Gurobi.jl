@@ -60,9 +60,9 @@ end
 
     include("grb_common.jl")
     include("grb_env.jl")
-    include("grb_params.jl")
 
     include("grb_model.jl")
+    include("grb_params.jl")
     include("grb_vars.jl")
     include("grb_attrs.jl")
     include("grb_constrs.jl")

@@ -189,9 +189,84 @@ function set_str_param!(env::Env, name::ASCIIString, v::ASCIIString)
     end
 end
 
+# for existing models
+
+function get_int_param(m::Model, name::ASCIIString)
+
+    modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
+    @assert modenv != C_NULL
+    a = Array(Cint, 1)
+    ret = @grb_ccall(getintparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cint}),
+        modenv, name, a)
+    if ret != 0
+        throw(GurobiError(Env(modenv), ret))
+    end
+    convert(Int, a[1])
+end
+
+function get_dbl_param(m::Model, name::ASCIIString)
+
+    modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
+    @assert modenv != C_NULL
+    a = Array(Float64, 1)
+    ret = @grb_ccall(getdblparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Float64}),
+        modenv, name, a)
+    if ret != 0
+        throw(GurobiError(Env(modenv), ret))
+    end
+    a[1]::Float64
+end
+
+function get_str_param(m::Model, name::ASCIIString)
+
+    modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
+    @assert modenv != C_NULL
+    buf = Array(Cchar, GRB_MAX_STRLEN)
+    ret = @grb_ccall(getstrparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cchar}),
+        modenv, name, buf)
+    if ret != 0
+        throw(GurobiError(Env(modenv), ret))
+    end
+    bytestring(pointer(buf))
+end
+
+
+function set_int_param!(m::Model, name::ASCIIString, v::Integer)
+
+    modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
+    @assert modenv != C_NULL
+    ret = @grb_ccall(setintparam, Cint, (Ptr{Void}, Ptr{Cchar}, Cint),
+        modenv, name, v)
+    if ret != 0
+        throw(GurobiError(Env(modenv), ret))
+    end
+end
+
+function set_dbl_param!(m::Model, name::ASCIIString, v::Real)
+
+    modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
+    @assert modenv != C_NULL
+    ret = @grb_ccall(setdblparam, Cint, (Ptr{Void}, Ptr{Cchar}, Float64),
+        modenv, name, v)
+    if ret != 0
+        throw(GurobiError(Env(modenv), ret))
+    end
+end
+
+function set_str_param!(m::Model, name::ASCIIString, v::ASCIIString)
+
+    modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
+    @assert modenv != C_NULL
+    ret = @grb_ccall(setstrparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cchar}),
+        modenv, name, v)
+    if ret != 0
+        throw(GurobiError(Env(modenv), ret))
+    end
+end
+
 # higher level functions
 
-function getparam(env::Env, name::ASCIIString)
+function getparam(env::Union(Env,Model), name::ASCIIString)
     if name in GRB_INT_PARAMS
         return get_int_param(env, name)
     elseif name in GRB_DBL_PARAMS
@@ -203,7 +278,7 @@ function getparam(env::Env, name::ASCIIString)
     end
 end
 
-function setparam!(env::Env, name::ASCIIString, v)
+function setparam!(env::Union(Env,Model), name::ASCIIString, v)
     if name in GRB_INT_PARAMS
         set_int_param!(env, name, v)
     elseif name in GRB_DBL_PARAMS
@@ -215,7 +290,7 @@ function setparam!(env::Env, name::ASCIIString, v)
     end
 end
 
-function setparams!(env::Env; args...)
+function setparams!(env::Union(Env,Model); args...)
     for (name, v) in args
         setparam!(env, string(name), v)
     end
