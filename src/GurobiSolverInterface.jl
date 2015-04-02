@@ -567,3 +567,4 @@ function addquadconstr!(m::GurobiMathProgModel, linearidx, linearval, quadrowidx
     add_qconstr!(m.inner, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
 end
 
+getsolvetime(m::GurobiMathProgModel) = get_runtime(m.inner)
