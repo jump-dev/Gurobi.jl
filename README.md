@@ -15,6 +15,8 @@ This package is a wrapper of the Gurobi solver (through its C interface). Curren
 * Second order cone programming (SOCP)
 * Mixed integer second order cone programming (MISOCP)
 
+*The Gurobi wrapper for Julia is community driven and not officially supported by Gurobi. If you are a commercial customer interested in official support for Julia from Gurobi, let them know!*
+
 ## Installation
 
 Here is the procedure to setup this package:
