@@ -67,7 +67,11 @@ end
 #
 #################################################
 
-convert(ty::Type{Ptr{Void}}, model::Model) = model.ptr_model::Ptr{Void}
+if VERSION < v"0.4-"
+    Base.convert(ty::Type{Ptr{Void}}, model::Model) = model.ptr_model::Ptr{Void}
+else
+    Base.unsafe_convert(ty::Type{Ptr{Void}}, model::Model) = model.ptr_model::Ptr{Void}
+end
 
 function free_model(model::Model)
     if model.ptr_model != C_NULL

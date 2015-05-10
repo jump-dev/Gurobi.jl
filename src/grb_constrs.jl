@@ -23,7 +23,7 @@ function add_constr!(model::Model, inds::IVec, coeffs::FVec, rel::Cchar, rhs::Fl
 end
 
 function add_constr!(model::Model, inds::Vector, coeffs::Vector, rel::GChars, rhs::Real)
-    add_constr!(model, ivec(inds), fvec(coeffs), cchar(rel), float64(rhs))
+    add_constr!(model, ivec(inds), fvec(coeffs), cchar(rel), @compat Float64(rhs))
 end
 
 function add_constr!(model::Model, coeffs::Vector, rel::GChars, rhs::Real)
@@ -106,7 +106,7 @@ function add_rangeconstr!(model::Model, inds::IVec, coeffs::FVec, lb::Float64, u
 end
 
 function add_rangeconstr!(model::Model, inds::Vector, coeffs::Vector, lb::Real, ub::Real)
-    add_rangeconstr!(model, ivec(inds), fvec(coeffs), float64(lb), float64(ub))
+    add_rangeconstr!(model, ivec(inds), fvec(coeffs), @compat(Float64(lb)), @compat(Float64(ub)))
 end
 
 function add_rangeconstr!(model::Model, coeffs::Vector, lb::Real, ub::Real)

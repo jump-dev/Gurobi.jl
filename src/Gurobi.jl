@@ -8,11 +8,11 @@ end
 
     ### imports
 
-    import Base.convert, Base.show, Base.copy
+    import Base.show, Base.copy
 
     # Standard LP interface
     importall MathProgBase.SolverInterface
-    import Compat
+    using Compat
 
     ### exports
     export 

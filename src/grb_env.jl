@@ -21,7 +21,11 @@ type Env
     end
 end
 
-convert(ty::Type{Ptr{Void}}, env::Env) = env.ptr_env::Ptr{Void}
+if VERSION < v"0.4-"
+    Base.convert(ty::Type{Ptr{Void}}, env::Env) = env.ptr_env::Ptr{Void}
+else
+    Base.unsafe_convert(ty::Type{Ptr{Void}}, env::Env) = env.ptr_env::Ptr{Void}
+end
 
 function is_valid(env::Env)
     env.ptr_env != C_NULL

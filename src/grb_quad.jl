@@ -179,6 +179,6 @@ end
 function add_qconstr!(model::Model, lind::Vector, lval::Vector, qr::Vector, qc::Vector,
     qv::Vector{Float64}, rel::GChars, rhs::Real)
 
-    add_qconstr!(model, ivec(lind), fvec(lval), ivec(qr), ivec(qc), fvec(qv), cchar(rel), float64(rhs))
+    add_qconstr!(model, ivec(lind), fvec(lval), ivec(qr), ivec(qc), fvec(qv), cchar(rel), @compat Float64(rhs))
 end
 
