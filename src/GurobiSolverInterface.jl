@@ -562,3 +562,4 @@ function addquadconstr!(m::GurobiMathProgModel, linearidx, linearval, quadrowidx
 end
 
 getsolvetime(m::GurobiMathProgModel) = get_runtime(m.inner)
+getnodecount(m::GurobiMathProgModel) = get_node_count(m.inner)
