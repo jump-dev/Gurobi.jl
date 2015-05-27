@@ -16,7 +16,11 @@ paths_to_try = [aliases]
 for a in aliases
     if haskey(ENV, "GUROBI_HOME")
         @unix_only push!(paths_to_try, joinpath(ENV["GUROBI_HOME"],"lib",string("lib",a,".so")))
-        @windows_only push!(paths_to_try, joinpath(ENV["GUROBI_HOME"],"bin",string(a,".",Sys.dlext)))
+        if VERSION < v"0.4-"
+            @windows_only push!(paths_to_try, joinpath(ENV["GUROBI_HOME"],"bin",string(a,".",Sys.dlext)))
+        else
+            @windows_only push!(paths_to_try, joinpath(ENV["GUROBI_HOME"],"bin",string(a,".",Libdl.dlext)))
+        end
     end
     # gurobi uses .so on OS X for some reason
     @osx_only push!(paths_to_try, string("lib$a.so"))
