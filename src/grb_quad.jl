@@ -66,7 +66,7 @@ function add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
     n = num_vars(model)
     size(H) == (n, n) || error("H must be an n-by-n symmetric matrix.")
     
-    nmax = int(n * (n + 1) / 2)
+    nmax = round(Int,n * (n + 1) / 2)
     qr = Array(Cint, nmax)
     qc = Array(Cint, nmax)
     qv = Array(Float64, nmax)

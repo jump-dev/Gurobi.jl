@@ -76,7 +76,7 @@ function get_charattrarray!(r::Array{Cchar}, model::Model, name::ASCIIString, st
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    char(r)
+    @compat map(Char,r)
 end
 
 function get_charattrarray(model::Model, name::ASCIIString, start::Integer, len::Integer)

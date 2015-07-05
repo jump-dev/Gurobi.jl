@@ -33,7 +33,7 @@ cvecx(c::GChars, n::Integer) = fill(cchar(c), n)
 cvecx(c::Vector{Cchar}, n::Integer) = (_chklen(c, n); c)
 cvecx(c::Vector{Char}, n::Integer) = (_chklen(c, n); convert(Vector{Cchar}, c))
 
-fvecx(v::Real, n::Integer) = fill(float64(v), n)
+fvecx(v::Real, n::Integer) = fill(@compat(Float64(v)), n)
 fvecx(v::Vector{Float64}, n::Integer) = (_chklen(v, n); v)
 fvecx{T<:Real}(v::Vector{T}, n::Integer) = (_chklen(v, n); convert(Vector{Float64}, v))
 
