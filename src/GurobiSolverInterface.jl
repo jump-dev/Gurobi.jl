@@ -68,6 +68,8 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
       add_constrs!(m.inner, float(A), senses, b)
   end
 
+  m.lb, m.ub = rowlb, rowub
+
   update_model!(m.inner)
   setsense!(m,sense)
 end
@@ -151,12 +153,15 @@ function addconstr!(m::GurobiMathProgModel, varidx, coef, lb, ub)
 end
 
 function updatemodel!(m::GurobiMathProgModel)
+    update_model!(m.inner)
     if m.changed_constr_bounds
     # update lower/upper bounds on linear constraints (if they're consistent...)
         sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
         rhs   = get_dblattrarray( m.inner, "RHS",   1, num_constrs(m.inner))
         lb, ub = m.lb, m.ub
-        for i = 1:num_constrs(m.inner)
+        @assert (n_rows = num_constrs(m.inner)) == length(lb) == length(ub) ==
+                                                   length(sense) == length(rhs)
+        for i = 1:n_rows
             if -Inf < lb[i] == ub[i] < Inf
                 sense[i] = '='
                 rhs[i]   = lb[i]
@@ -175,8 +180,8 @@ function updatemodel!(m::GurobiMathProgModel)
         set_charattrarray!(m.inner, "Sense", 1, num_constrs(m.inner), sense)
         set_dblattrarray!(m.inner, "RHS", 1, num_constrs(m.inner), rhs)
         m.changed_constr_bounds = false
+        update_model!(m.inner)
     end
-    update_model!(m.inner)
 end
 
 getconstrmatrix(m::GurobiMathProgModel) = get_constrmatrix(m.inner)
