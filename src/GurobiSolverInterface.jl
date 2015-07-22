@@ -7,6 +7,9 @@ type GurobiMathProgModel <: AbstractMathProgModel
     inner::Model
     last_op_type::Symbol  # To support arbitrary order of addVar/addCon
                           # Two possibilities :Var :Con
+    changed_constr_bounds::Bool # have we updated the bounds below?
+    lb::Vector{Float64} # persistent bounds on constraints to maintain
+    ub::Vector{Float64} # abstraction for lb ≤ Ax ≤ ub
     lazycb
     cutcb
     heuristiccb
@@ -18,7 +21,7 @@ function GurobiMathProgModel(;options...)
    for (name,value) in options
        setparam!(env, string(name), value)
    end
-   m = GurobiMathProgModel(Model(env,""; finalize_env=true), :Con, nothing, nothing, nothing, nothing)
+   m = GurobiMathProgModel(Model(env,""; finalize_env=true), :Con, false, Float64[], Float64[], nothing, nothing, nothing, nothing)
    return m
 end
 
@@ -40,7 +43,7 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   posinf = typemax(eltype(rowub))
 
   # check if we have any range constraints
-  # to properly support these, we will need to keep track of the 
+  # to properly support these, we will need to keep track of the
   # slack variables automatically added by gurobi.
   rangeconstrs = any((rowlb .!= rowub) & (rowlb .> neginf) & (rowub .< posinf))
   if rangeconstrs
@@ -64,17 +67,17 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
       end
       add_constrs!(m.inner, float(A), senses, b)
   end
-  
+
   update_model!(m.inner)
   setsense!(m,sense)
 end
 
 writeproblem(m::GurobiMathProgModel, filename::String) = write_model(m.inner, filename)
 
-getvarLB(m::GurobiMathProgModel)     = get_dblattrarray (m.inner, "LB", 1, num_vars(m.inner))
+getvarLB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "LB", 1, num_vars(m.inner))
 setvarLB!(m::GurobiMathProgModel, l) = set_dblattrarray!(m.inner, "LB", 1, num_vars(m.inner), l)
 
-getvarUB(m::GurobiMathProgModel)     = get_dblattrarray (m.inner, "UB", 1, num_vars(m.inner))
+getvarUB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "UB", 1, num_vars(m.inner))
 setvarUB!(m::GurobiMathProgModel, u) = set_dblattrarray!(m.inner, "UB", 1, num_vars(m.inner), u)
 
 function getconstrLB(m::GurobiMathProgModel)
@@ -90,37 +93,7 @@ function getconstrLB(m::GurobiMathProgModel)
      end
      return ret
 end
-function setconstrLB!(m::GurobiMathProgModel, lb)
-    sense_changed = false  
-    sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
-    rhs   = get_dblattrarray(m.inner, "RHS", 1, num_constrs(m.inner))
-    for i = 1:num_constrs(m.inner)
-        if sense[i] == '>' || sense[i] == '='
-            # Do nothing
-        elseif sense[i] == '<'
-            if lb[i] != -Inf
-                # LEQ constraint with non-NegInf LB implies a range
-                # Might be an equality change though
-                if isapprox(lb[i], rhs[i])
-                  # Seems to be equality
-                  sense[i] = '='
-                  sense_changed = true
-                else
-                  # Guess not
-                  error("Tried to set LB != -Inf on a LEQ constraint (index $i)")
-                end
-            else
-                # don't change this RHS
-                lb[i] = rhs[i]
-            end
-        end
-    end
-    if sense_changed
-      set_charattrarray!(m.inner, "Sense", 1, num_constrs(m.inner), sense)
-    end
-    set_dblattrarray!(m.inner, "RHS", 1, num_constrs(m.inner), lb)
-    updatemodel!(m)
-end
+
 function getconstrUB(m::GurobiMathProgModel)
     sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
     ret   = get_dblattrarray(m.inner, "RHS", 1, num_constrs(m.inner))
@@ -134,39 +107,13 @@ function getconstrUB(m::GurobiMathProgModel)
     end
     return ret
 end
-function setconstrUB!(m::GurobiMathProgModel, ub)
-    sense_changed = false
-    sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
-    rhs   = get_dblattrarray(m.inner, "RHS", 1, num_constrs(m.inner))
-    for i = 1:num_constrs(m.inner)
-        if sense[i] == '<' || sense[i] == '='
-            # Do nothing
-        elseif sense[i] == '>'
-            if ub[i] != Inf
-                # GEQ constraint with non-Inf UB implies a range
-                # Might be an equality change though
-                if isapprox(ub[i], rhs[i])
-                  # Seems to be equality
-                  sense[i] = '='
-                  sense_changed = true
-                else
-                  # Guess not
-                  error("Tried to set UB != +Inf on a GEQ constraint (index $i)")
-                end
-            else
-                # don't change this RHS
-                ub[i] = rhs[i]
-            end
-        end
-    end
-    if sense_changed
-      set_charattrarray!(m.inner, "Sense", 1, num_constrs(m.inner), sense)
-    end
-    set_dblattrarray!(m.inner, "RHS", 1, num_constrs(m.inner), ub)
-    updatemodel!(m)
-end
 
-getobj(m::GurobiMathProgModel)     = get_dblattrarray (m.inner, "Obj", 1, num_vars(m.inner)   )
+# setconstrLB!(m::GurobiMathProgModel, lb) = (m.changed_constr_bounds = true; m.last_op_type = :Con; m.lb = copy(lb))
+# setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.last_op_type = :Con; m.ub = copy(ub))
+setconstrLB!(m::GurobiMathProgModel, lb) = (m.changed_constr_bounds = true; m.lb = copy(lb))
+setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.ub = copy(ub))
+
+getobj(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "Obj", 1, num_vars(m.inner)   )
 setobj!(m::GurobiMathProgModel, c) = set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c)
 
 function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
@@ -202,7 +149,35 @@ function addconstr!(m::GurobiMathProgModel, varidx, coef, lb, ub)
         error("Adding range constraints not supported yet.")
     end
 end
-updatemodel!(m::GurobiMathProgModel) = update_model!(m.inner)
+
+function updatemodel!(m::GurobiMathProgModel)
+    if m.changed_constr_bounds
+    # update lower/upper bounds on linear constraints (if they're consistent...)
+        sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
+        rhs   = get_dblattrarray( m.inner, "RHS",   1, num_constrs(m.inner))
+        lb, ub = m.lb, m.ub
+        for i = 1:num_constrs(m.inner)
+            if -Inf < lb[i] == ub[i] < Inf
+                sense[i] = '='
+                rhs[i]   = lb[i]
+            elseif (-Inf < lb[i] && ub[i] < Inf)
+                error("Gurobi.jl does not currently support range constraints")
+            elseif (lb[i] == -Inf && ub[i] < Inf)
+                sense[i] = '<'
+                rhs[i]   = ub[i]
+            elseif (lb[i] > -Inf && ub[i] == Inf)
+                sense[i] = '>'
+                rhs[i]   = lb[i]
+            else
+                error("Internal error.")
+            end
+        end
+        set_charattrarray!(m.inner, "Sense", 1, num_constrs(m.inner), sense)
+        set_dblattrarray!(m.inner, "RHS", 1, num_constrs(m.inner), rhs)
+        m.changed_constr_bounds = false
+    end
+    update_model!(m.inner)
+end
 
 getconstrmatrix(m::GurobiMathProgModel) = get_constrmatrix(m.inner)
 
@@ -217,8 +192,8 @@ function setsense!(m::GurobiMathProgModel, sense)
 end
 function getsense(m::GurobiMathProgModel)
   v = get_intattr(m.inner, "ModelSense")
-  if v == -1 
-    return :Max 
+  if v == -1
+    return :Max
   else
     return :Min
   end
@@ -237,6 +212,7 @@ function optimize!(m::GurobiMathProgModel)
     if m.lazycb != nothing
       setparam!(m.inner, "LazyConstraints", 1)
     end
+    # updatemodel!(m)
     optimize(m.inner)
 end
 
@@ -311,7 +287,7 @@ function getquadconstrduals(m::GurobiMathProgModel)
 end
 
 getinfeasibilityray(m::GurobiMathProgModel) = -get_dblattrarray(m.inner, "FarkasDual", 1, num_constrs(m.inner)) # note sign is flipped
-getunboundedray(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "UnbdRay", 1, num_vars(m.inner)) 
+getunboundedray(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "UnbdRay", 1, num_vars(m.inner))
 
 getbasis(m::GurobiMathProgModel) = get_basis(m.inner)
 
@@ -334,6 +310,8 @@ const rev_var_type_map = Compat.@compat Dict(
 )
 
 function setvartype!(m::GurobiMathProgModel, vartype::Vector{Symbol})
+    # do this to make sure we deal with new columns
+    updatemodel!(m)
     nvartype = map(x->rev_var_type_map[x], vartype)
     set_charattrarray!(m.inner, "VType", 1, length(nvartype), nvartype)
 end
@@ -524,7 +502,7 @@ end
 # return :Exit to indicate an error
 
 function setmathprogcallback!(model::GurobiMathProgModel)
-    
+
     @windows_only WORD_SIZE == 64 || error("Callbacks not currently supported on Win32. Use 64-bit Julia with 64-bit Gurobi.")
     grbcallback = cfunction(mastercallback, Cint, (Ptr{Void}, Ptr{Void}, Cint, Ptr{Void}))
     ret = @grb_ccall(setcallbackfunc, Cint, (Ptr{Void}, Ptr{Void}, Any), model.inner.ptr_model, grbcallback, model)
