@@ -256,12 +256,9 @@ function getconstrsolution(m::GurobiMathProgModel)
         if sense[i] == '='
             # Must be equal to RHS if feasible
             ret[i] = rhs[i]
-        elseif sense[i] == '<'
-            # <= RHS
+        else
+            # Slack variable is non-negative for <= constraints, and non-positive for >= constraints
             ret[i] = rhs[i] - slack[i]
-        elseif sense[i] == '>'
-            # >= RHS
-            ret[i] = rhs[i] + slack[i]
         end
     end
     return ret
