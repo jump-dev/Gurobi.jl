@@ -47,7 +47,7 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   # slack variables automatically added by gurobi.
   rangeconstrs = any((rowlb .!= rowub) & (rowlb .> neginf) & (rowub .< posinf))
   if rangeconstrs
-      warn("Julia Gurobi interface doesn't properly support range (two-sided) constraints. See Gurobi.jl issue #14")
+      warn("Julia Gurobi interface doesn't properly support range (two-sided) constraints. See Gurobi.jl issue #14.\n Recommended workaround is splitting the range constrainti into two separate one-sided constraints, which Gurobi will convert to a range during presolve.")
       add_rangeconstrs!(m.inner, float(A), float(rowlb), float(rowub))
   else
       b = Array(Float64,length(rowlb))
