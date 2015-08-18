@@ -1,10 +1,12 @@
+isdefined(Base, :__precompile__) && __precompile__()
+
 module Gurobi
 
-if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
-    include("../deps/deps.jl")
-else
-    error("Gurobi not properly installed. Please run Pkg.build(\"Gurobi\")")
-end
+    if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
+        include("../deps/deps.jl")
+    else
+        error("Gurobi not properly installed. Please run Pkg.build(\"Gurobi\")")
+    end
 
     ### imports
 
