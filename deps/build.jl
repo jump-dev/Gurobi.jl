@@ -1,3 +1,5 @@
+using Compat
+
 depsfile = joinpath(dirname(@__FILE__),"deps.jl")
 if isfile(depsfile)
     rm(depsfile)
@@ -11,7 +13,7 @@ end
 
 aliases = ["gurobi60","gurobi56","gurobi55","gurobi51"]
 
-paths_to_try = [aliases]
+paths_to_try = copy(aliases)
 
 for a in aliases
     if haskey(ENV, "GUROBI_HOME")
@@ -28,7 +30,7 @@ end
 
 found = false
 for l in paths_to_try
-    d = dlopen_e(l)
+    d = Libdl.dlopen_e(l)
     if d != C_NULL
         found = true
         write_depsfile(l)
