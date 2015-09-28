@@ -10,14 +10,11 @@ type Model
     env::Env
     ptr_model::Ptr{Void}
     callback::Any
+    finalize_env::Bool
     
     function Model(env::Env, p::Ptr{Void}; finalize_env::Bool=false)
-        model = new(env, p, nothing)
-        if finalize_env
-            finalizer(model, m -> (free_model(m); free_env(m.env)))
-        else
-            finalizer(model, free_model)
-        end
+        model = new(env, p, nothing, finalize_env)
+        finalizer(model, m -> (free_model(m); if m.finalize_env; free_env(m.env); end))
         model
     end
 end

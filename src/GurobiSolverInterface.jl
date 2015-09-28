@@ -35,7 +35,12 @@ model(s::GurobiSolver) = GurobiMathProgModel(;s.options...)
 loadproblem!(m::GurobiMathProgModel, filename::AbstractString) = read_model(m.inner, filename)
 
 function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
-  reset_model!(m.inner)
+  # throw away old model
+  env = m.inner.env
+  m.inner.finalize_env = false
+  free_model(m.inner)
+  m.inner = Model(env, "", finalize_env=true)
+
   add_cvars!(m.inner, float(obj), float(collb), float(colub))
   update_model!(m.inner)
 
