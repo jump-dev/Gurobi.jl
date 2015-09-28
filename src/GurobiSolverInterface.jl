@@ -32,7 +32,7 @@ end
 GurobiSolver(;kwargs...) = GurobiSolver(kwargs)
 model(s::GurobiSolver) = GurobiMathProgModel(;s.options...)
 
-loadproblem!(m::GurobiMathProgModel, filename::String) = read_model(m.inner, filename)
+loadproblem!(m::GurobiMathProgModel, filename::AbstractString) = read_model(m.inner, filename)
 
 function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
   reset_model!(m.inner)
@@ -74,7 +74,7 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   setsense!(m,sense)
 end
 
-writeproblem(m::GurobiMathProgModel, filename::String) = write_model(m.inner, filename)
+writeproblem(m::GurobiMathProgModel, filename::AbstractString) = write_model(m.inner, filename)
 
 getvarLB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "LB", 1, num_vars(m.inner))
 setvarLB!(m::GurobiMathProgModel, l) = set_dblattrarray!(m.inner, "LB", 1, num_vars(m.inner), l)

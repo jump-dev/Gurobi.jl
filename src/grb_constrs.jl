@@ -12,7 +12,7 @@ function add_constr!(model::Model, inds::IVec, coeffs::FVec, rel::Cchar, rhs::Fl
             Ptr{Float64}, # cvals
             Cchar,        # sense
             Float64,      # rhs
-            Ptr{Uint8}    # name
+            Ptr{UInt8}    # name
             ), 
             model, length(inds), inds .- 1, coeffs, rel, rhs, C_NULL)
         if ret != 0
@@ -49,7 +49,7 @@ function add_constrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec, rel
             Ptr{Float64}, # cval
             Ptr{Cchar},   # sense
             Ptr{Float64}, # rhs
-            Ptr{Uint8}    # names
+            Ptr{UInt8}    # names
             ), 
             model, m, nnz, cbegins .- 1, inds .- 1, coeffs, 
             rel, rhs, C_NULL)
@@ -95,7 +95,7 @@ function add_rangeconstr!(model::Model, inds::IVec, coeffs::FVec, lb::Float64, u
             Ptr{Float64}, # cvals
             Float64,      # lower
             Float64,      # upper
-            Ptr{Uint8}    # name
+            Ptr{UInt8}    # name
             ),
             model, length(inds), inds .- 1, coeffs, lb, ub, C_NULL)
         if ret != 0
@@ -133,7 +133,7 @@ function add_rangeconstrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec
             Ptr{Float64}, # cval
             Ptr{Float64}, # lower
             Ptr{Float64}, # upper
-            Ptr{Uint8}    # names
+            Ptr{UInt8}    # names
             ), 
             model, m, nnz, cbegins .- 1, inds .- 1, coeffs, lb, ub, C_NULL)
         

@@ -1,12 +1,12 @@
 
 # TODO : to be deprecated in favor of Gurobi.Model
 function qp_model(env::Env, name::ASCIIString, 
-    H::Union(Vector{Float64}, Matrix{Float64}, SparseMatrixCSC{Float64}, Float64), 
-    f::Vector{Float64}, 
-    A::Union(CoeffMat, Nothing), 
-    b::Union(Vector{Float64}, Nothing), 
-    Aeq::Union(CoeffMat, Nothing), 
-    beq::Union(Vector{Float64}, Nothing), 
+    H::@compat(Union{Vector{Float64}, Matrix{Float64}, SparseMatrixCSC{Float64}, Float64}),
+    f::Vector{Float64},
+    A::@compat(Union{CoeffMat, Void}),
+    b::@compat(Union{Vector{Float64}, Void}),
+    Aeq::@compat(Union{CoeffMat, Void}),
+    beq::@compat(Union{Vector{Float64}, Void}),
     lb::Bounds, ub::Bounds)
 
     Base.warn_once("qp_model is to be deprecated in favor of gurobi_model with keyword arguments.")

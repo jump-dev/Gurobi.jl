@@ -6,7 +6,7 @@ type Env
     
     function Env()
         a = Array(Ptr{Void}, 1)
-        ret = @grb_ccall(loadenv, Cint, (Ptr{Ptr{Void}}, Ptr{Uint8}), 
+        ret = @grb_ccall(loadenv, Cint, (Ptr{Ptr{Void}}, Ptr{UInt8}), 
             a, C_NULL)
         if ret != 0
             if ret == 10009
@@ -40,7 +40,7 @@ end
 
 function get_error_msg(env::Env)
     @assert env.ptr_env != C_NULL
-    sz = @grb_ccall(geterrormsg, Ptr{Uint8}, (Ptr{Void},), env.ptr_env)
+    sz = @grb_ccall(geterrormsg, Ptr{UInt8}, (Ptr{Void},), env.ptr_env)
     bytestring(sz)
 end
 

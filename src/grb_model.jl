@@ -32,13 +32,13 @@ function Model(env::Env, name::ASCIIString; finalize_env::Bool=false)
     ret = @grb_ccall(newmodel, Cint, (
         Ptr{Void},  # env
         Ptr{Ptr{Void}},  # pointer to model pointer
-        Ptr{Uint8},  # name
+        Ptr{UInt8},  # name
         Cint,  # numvars
         Ptr{Float64}, # obj coeffs
         Ptr{Float64}, # lbounds
         Ptr{Float64}, # ubounds
-        Ptr{Uint8},   # var types,
-        Ptr{Ptr{Uint8}} # varnames
+        Ptr{UInt8},   # var types,
+        Ptr{Ptr{UInt8}} # varnames
         ), 
         env, a, name, 0, 
         C_NULL, C_NULL, C_NULL, C_NULL, C_NULL
@@ -115,7 +115,7 @@ function read_model(model::Model, filename::ASCIIString)
     @assert is_valid(model.env)
     a = Array(Ptr{Void}, 1)
     ret = @grb_ccall(readmodel, Cint, 
-        (Ptr{Void}, Ptr{Uint8}, Ptr{Ptr{Void}}), 
+        (Ptr{Void}, Ptr{UInt8}, Ptr{Ptr{Void}}), 
         model.env, filename, a)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -125,7 +125,7 @@ function read_model(model::Model, filename::ASCIIString)
 end
 
 function write_model(model::Model, filename::ASCIIString)
-    ret = @grb_ccall(write, Cint, (Ptr{Void}, Ptr{Uint8}), 
+    ret = @grb_ccall(write, Cint, (Ptr{Void}, Ptr{UInt8}), 
         model.ptr_model, filename)
     if ret != 0
         throw(GurobiError(model.env, ret))

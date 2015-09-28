@@ -165,7 +165,7 @@ function add_qconstr!(model::Model, lind::IVec, lval::FVec, qr::IVec, qc::IVec, 
             Ptr{Float64}, # qval
             Cchar,        # sense
             Float64,      # rhs
-            Ptr{Uint8}    # name
+            Ptr{UInt8}    # name
             ), 
             model, lnnz, lind.-1, lval, qnnz, qr.-1, qc.-1, qv, rel, rhs, C_NULL)
             

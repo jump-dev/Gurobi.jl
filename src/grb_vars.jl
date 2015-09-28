@@ -16,8 +16,8 @@ function add_var!(model::Model, numnz::Integer, vind::Vector, vval::Vector{Float
         Float64,      # obj
         Float64,      # lb
         Float64,      # ub
-        Uint8,        # vtype
-        Ptr{Uint8}    # name
+        UInt8,        # vtype
+        Ptr{UInt8}    # name
         ), 
         model, numnz, ivec(vind.-1), vval, obj, lb, ub, vtype, C_NULL)
         
@@ -36,8 +36,8 @@ function add_var!(model::Model, vtype::Cchar, c::Float64, lb::Float64, ub::Float
         Float64,      # obj
         Float64,      # lb
         Float64,      # ub
-        Uint8,        # vtype
-        Ptr{Uint8}    # name
+        UInt8,        # vtype
+        Ptr{UInt8}    # name
         ), 
         model, 0, C_NULL, C_NULL, c, lb, ub, vtype, C_NULL)
         
@@ -83,7 +83,7 @@ function add_vars!(model::Model, vtypes::CVec, c::FVec, lb::FVec, ub::FVec)
         Ptr{Float64}, # lb
         Ptr{Float64}, # ub
         Ptr{Cchar},   # vtypes
-        Ptr{Ptr{Uint8}}, # varnames
+        Ptr{Ptr{UInt8}}, # varnames
         ), 
         model, n, 0, C_NULL, C_NULL, C_NULL, c, lb, ub, vtypes, C_NULL)
         
