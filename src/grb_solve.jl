@@ -110,14 +110,14 @@ end
 
 get_solution(model::Model) = get_dblattrarray(model, "X", 1, num_vars(model))
 
-const varmap = Compat.@compat Dict(
+const varmap = Dict(
     -3 => :Superbasic,
     -2 => :NonbasicAtUpper,
     -1 => :NonbasicAtLower,
      0 => :Basic
 )
 
-const conmap = Compat.@compat Dict(
+const conmap = Dict(
      0 => :Basic,
     -1 => :Nonbasic)
 

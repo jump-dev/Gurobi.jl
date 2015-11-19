@@ -266,7 +266,7 @@ end
 
 # higher level functions
 
-function getparam(env::@compat(Union{Env,Model}), name::ASCIIString)
+function getparam(env::Union{Env,Model}, name::ASCIIString)
     if name in GRB_INT_PARAMS
         return get_int_param(env, name)
     elseif name in GRB_DBL_PARAMS
@@ -278,7 +278,7 @@ function getparam(env::@compat(Union{Env,Model}), name::ASCIIString)
     end
 end
 
-function setparam!(env::@compat(Union{Env,Model}), name::ASCIIString, v)
+function setparam!(env::Union{Env,Model}, name::ASCIIString, v)
     if name in GRB_INT_PARAMS
         set_int_param!(env, name, v)
     elseif name in GRB_DBL_PARAMS
@@ -290,7 +290,7 @@ function setparam!(env::@compat(Union{Env,Model}), name::ASCIIString, v)
     end
 end
 
-function setparams!(env::@compat(Union{Env,Model}); args...)
+function setparams!(env::Union{Env,Model}; args...)
     for (name, v) in args
         setparam!(env, string(name), v)
     end

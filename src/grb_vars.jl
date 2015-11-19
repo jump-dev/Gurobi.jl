@@ -48,7 +48,7 @@ function add_var!(model::Model, vtype::Cchar, c::Float64, lb::Float64, ub::Float
 end
 
 function add_var!(model::Model, vtype::GChars, c::Real, lb::Real, ub::Real)
-    add_var!(model, cchar(vtype), @compat(Float64(c)), @compat(Float64(lb)), @compat(Float64(ub)))
+    add_var!(model, cchar(vtype), Float64(c), Float64(lb), Float64(ub))
 end
 add_var!(model::Model, vtype::GChars, c::Real) = add_var!(model, vtype, c, -Inf, Inf)
 
