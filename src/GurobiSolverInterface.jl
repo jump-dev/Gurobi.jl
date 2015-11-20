@@ -300,7 +300,7 @@ getbasis(m::GurobiMathProgModel) = get_basis(m.inner)
 
 getrawsolver(m::GurobiMathProgModel) = m.inner
 
-const var_type_map = Compat.@compat Dict(
+const var_type_map = Dict(
   'C' => :Cont,
   'B' => :Bin,
   'I' => :Int,
@@ -308,7 +308,7 @@ const var_type_map = Compat.@compat Dict(
   'N' => :SemiInt
 )
 
-const rev_var_type_map = Compat.@compat Dict(
+const rev_var_type_map = Dict(
   :Cont => 'C',
   :Bin => 'B',
   :Int => 'I',

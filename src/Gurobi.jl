@@ -1,4 +1,4 @@
-isdefined(Base, :__precompile__) && __precompile__()
+__precompile__()
 
 module Gurobi
 
@@ -14,7 +14,6 @@ module Gurobi
 
     # Standard LP interface
     importall MathProgBase.SolverInterface
-    using Compat
 
     ### exports
     export 
@@ -51,7 +50,7 @@ module Gurobi
     add_qpterms!, add_qconstr!,
 
     # higher level
-    gurobi_model, qp_model,
+    gurobi_model,
 
     # grb_solve
     optimize, computeIIS, get_solution,
@@ -75,6 +74,4 @@ module Gurobi
     include("grb_callbacks.jl")
 
     include("GurobiSolverInterface.jl")
-
-    include("deprecates.jl")
 end
