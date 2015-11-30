@@ -3,7 +3,7 @@
 
 export GurobiSolver
 
-type GurobiMathProgModel <: AbstractMathProgModel
+type GurobiMathProgModel <: AbstractLinearQuadraticModel
     inner::Model
     last_op_type::Symbol  # To support arbitrary order of addVar/addCon
                           # Two possibilities :Var :Con
@@ -30,7 +30,10 @@ immutable GurobiSolver <: AbstractMathProgSolver
     options
 end
 GurobiSolver(;kwargs...) = GurobiSolver(kwargs)
-model(s::GurobiSolver) = GurobiMathProgModel(;s.options...)
+LinearQuadraticModel(s::GurobiSolver) = GurobiMathProgModel(;s.options...)
+ConicModel(s::GurobiSolver) = LPQPtoConicBridge(LinearQuadraticModel(s))
+
+supportedcones(::GurobiSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC]
 
 loadproblem!(m::GurobiMathProgModel, filename::AbstractString) = read_model(m.inner, filename)
 
