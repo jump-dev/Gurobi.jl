@@ -134,6 +134,8 @@ function tune_model(model::Model)
     nothing
 end
 
+terminate(model::Model) = @grb_ccall(terminate, Void, (Ptr{Void},), model.ptr_model)
+
 # Presolve the model but don't solve. For some reason this is not
 # documented for the C interface, but is for all the other interfaces.
 # Source: https://twitter.com/iaindunning/status/519620465992556544
