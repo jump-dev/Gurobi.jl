@@ -246,6 +246,8 @@ function status(m::GurobiMathProgModel)
     return :Numeric
   elseif s == :suboptimal
     return :Suboptimal # not very useful status
+  elseif s == :interrupted # ended by user?
+    return :UserLimit
   else
     error("Unrecognized solution status: $s")
   end
@@ -462,7 +464,7 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
         if model.lazycb != nothing
             ret = model.lazycb(grbcb)
             if ret == :Exit
-                return convert(Cint,10011) # gurobi callback error
+                terminate(model.inner)
             end
         end
     elseif where == CB_MIPNODE
@@ -478,20 +480,20 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
         if model.cutcb != nothing
             ret = model.cutcb(grbcb)
             if ret == :Exit
-                return convert(Cint,10011) # gurobi callback error
+                terminate(model.inner)
             end
         end
         if model.heuristiccb != nothing
             grbcb.sol = fill(1e101, numvar(model))  # GRB_UNDEFINED
             ret = model.heuristiccb(grbcb)
             if ret == :Exit
-                return convert(Cint,10011) # gurobi callback error
+                terminate(model.inner)
             end
         end
         if model.lazycb != nothing
             ret = model.lazycb(grbcb)
             if ret == :Exit
-                return convert(Cint,10011) # gurobi callback error
+                terminate(model.inner)
             end
         end
     elseif where == CB_MIP
@@ -500,7 +502,7 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
         if model.infocb != nothing
             ret = model.infocb(grbcb)
             if ret == :Exit
-                return convert(Cint,10011) # gurobi callback error
+                terminate(model.inner)
             end
         end
     end
