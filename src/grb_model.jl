@@ -131,11 +131,11 @@ function tune_model(model::Model)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    #####################################################
-    # Apply best parameters setting found with tunemodel 
-    # to the given model
-    ######################################################
-	ret = @grb_ccall(gettuneresult, Cint, (Ptr{Void}, Cint), model.ptr_model, 0)
+    nothing
+end
+
+function get_tune_result!(model::Model,i::Int)
+    ret = @grb_ccall(gettuneresult, Cint, (Ptr{Void}, Cint), model.ptr_model, i)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
