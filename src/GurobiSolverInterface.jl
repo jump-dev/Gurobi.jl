@@ -33,7 +33,7 @@ GurobiSolver(;kwargs...) = GurobiSolver(kwargs)
 LinearQuadraticModel(s::GurobiSolver) = GurobiMathProgModel(;s.options...)
 ConicModel(s::GurobiSolver) = LPQPtoConicBridge(LinearQuadraticModel(s))
 
-supportedcones(::GurobiSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC]
+supportedcones(::GurobiSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:SOCRotated]
 
 loadproblem!(m::GurobiMathProgModel, filename::AbstractString) = read_model(m.inner, filename)
 
