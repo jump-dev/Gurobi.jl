@@ -4,22 +4,20 @@
 
 function add_constr!(model::Model, inds::IVec, coeffs::FVec, rel::Cchar, rhs::Float64)
     length(inds) == length(coeffs) || error("Inconsistent argument dimensions.")
-    if !isempty(inds)
-        ret = @grb_ccall(addconstr, Cint, (
-            Ptr{Void},    # model
-            Cint,         # numnz
-            Ptr{Cint},    # cind
-            Ptr{Float64}, # cvals
-            Cchar,        # sense
-            Float64,      # rhs
-            Ptr{UInt8}    # name
-            ), 
-            model, length(inds), inds .- 1, coeffs, rel, rhs, C_NULL)
-        if ret != 0
-            throw(GurobiError(model.env, ret))
-        end
+    ret = @grb_ccall(addconstr, Cint, (
+        Ptr{Void},    # model
+        Cint,         # numnz
+        Ptr{Cint},    # cind
+        Ptr{Float64}, # cvals
+        Cchar,        # sense
+        Float64,      # rhs
+        Ptr{UInt8}    # name
+        ),
+        model, length(inds), inds - 1, coeffs, rel, rhs, C_NULL)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
     end
-    nothing 
+    nothing
 end
 
 function add_constr!(model::Model, inds::Vector, coeffs::Vector, rel::GChars, rhs::Real)
@@ -34,12 +32,12 @@ end
 
 # add multiple constraints
 
-function add_constrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec, rel::CVec, rhs::FVec)        
+function add_constrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec, rel::CVec, rhs::FVec)
     m = length(cbegins)
-    nnz = length(inds)    
+    nnz = length(inds)
     (m == length(rel) == length(rhs) && nnz == length(coeffs)) || error("Inconsistent argument dimensions.")
-        
-    if m > 0 && nnz > 0
+
+    if m > 0
         ret = @grb_ccall(addconstrs, Cint, (
             Ptr{Void},    # model
             Cint,         # num constraints
@@ -50,10 +48,10 @@ function add_constrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec, rel
             Ptr{Cchar},   # sense
             Ptr{Float64}, # rhs
             Ptr{UInt8}    # names
-            ), 
-            model, m, nnz, cbegins .- 1, inds .- 1, coeffs, 
+            ),
+            model, m, nnz, cbegins - 1, inds - 1, coeffs,
             rel, rhs, C_NULL)
-        
+
         if ret != 0
             throw(GurobiError(model.env, ret))
         end
@@ -87,20 +85,18 @@ end
 # add single range constraint
 
 function add_rangeconstr!(model::Model, inds::IVec, coeffs::FVec, lb::Float64, ub::Float64)
-   if !isempty(inds)
-        ret = @grb_ccall(addrangeconstr, Cint, (
-            Ptr{Void},    # model
-            Cint,         # numnz
-            Ptr{Cint},    # cind
-            Ptr{Float64}, # cvals
-            Float64,      # lower
-            Float64,      # upper
-            Ptr{UInt8}    # name
-            ),
-            model, length(inds), inds .- 1, coeffs, lb, ub, C_NULL)
-        if ret != 0
-            throw(GurobiError(model.env, ret))
-        end
+    ret = @grb_ccall(addrangeconstr, Cint, (
+        Ptr{Void},    # model
+        Cint,         # numnz
+        Ptr{Cint},    # cind
+        Ptr{Float64}, # cvals
+        Float64,      # lower
+        Float64,      # upper
+        Ptr{UInt8}    # name
+        ),
+        model, length(inds), inds - 1, coeffs, lb, ub, C_NULL)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
     end
     nothing
 end
@@ -120,10 +116,10 @@ end
 
 function add_rangeconstrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec, lb::FVec, ub::FVec)
     m = length(cbegins)
-    nnz = length(inds)    
+    nnz = length(inds)
     (m == length(lb) == length(ub) && nnz == length(coeffs)) || error("Incompatible argument dimensions.")
-        
-    if m > 0 && nnz > 0
+
+    if m > 0
         ret = @grb_ccall(addrangeconstrs, Cint, (
             Ptr{Void},    # model
             Cint,         # num constraints
@@ -134,9 +130,9 @@ function add_rangeconstrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec
             Ptr{Float64}, # lower
             Ptr{Float64}, # upper
             Ptr{UInt8}    # names
-            ), 
-            model, m, nnz, cbegins .- 1, inds .- 1, coeffs, lb, ub, C_NULL)
-        
+            ),
+            model, m, nnz, cbegins - 1, inds - 1, coeffs, lb, ub, C_NULL)
+
         if ret != 0
             throw(GurobiError(model.env, ret))
         end
@@ -159,7 +155,7 @@ end
 function add_rangeconstrs!(model::Model, A::CoeffMat, lb::Vector, ub::Vector)
     m, n = size(A)
     (m == length(lb) == length(ub) && n == num_vars(model)) || error("Incompatible argument dimensions.")
-    
+
     add_rangeconstrs_t!(model, transpose(A), lb, ub)
 end
 
@@ -205,14 +201,14 @@ function add_sos!(model::Model, sostype::Symbol, idx::Vector{Int}, weight::Vecto
     ((nelem = length(idx)) == length(weight)) || error("Index and weight vectors of unequal length")
     (sostype == :SOS1) ? (typ = GRB_SOS_TYPE1) : ( (sostype == :SOS2) ? (typ = GRB_SOS_TYPE2) : error("Invalid SOS constraint type") )
     ret = @grb_ccall(addsos, Cint, (
-                     Ptr{Void}, 
+                     Ptr{Void},
                      Cint,
                      Cint,
                      Ptr{Cint},
                      Ptr{Cint},
                      Ptr{Cint},
                      Ptr{Cdouble}
-                     ), 
+                     ),
                      model, convert(Cint, 1), convert(Cint, nelem), Cint[typ], Cint[0], convert(Vector{Cint}, idx-1), weight)
     if ret != 0
         throw(GurobiError(model.env, ret))
