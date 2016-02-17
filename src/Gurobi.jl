@@ -16,7 +16,7 @@ module Gurobi
     importall MathProgBase.SolverInterface
 
     ### exports
-    export 
+    export
 
     # grb_env
     free_env,
@@ -42,7 +42,7 @@ module Gurobi
     add_bvar!, add_bvars!, add_ivar!, add_ivars!,
 
     # grb_constrs
-    add_constr!, add_constrs!, add_constrs_t!, 
+    add_constr!, add_constrs!, add_constrs_t!,
     add_rangeconstr!, add_rangeconstrs!, add_rangeconstrs_t!,
     get_constrmatrix, add_sos!,
 
@@ -55,7 +55,7 @@ module Gurobi
     # grb_solve
     optimize, computeIIS, get_solution,
     get_status, OptimInfo, get_optiminfo, get_objval
-    
+
 
     ### include source files
 
@@ -74,4 +74,6 @@ module Gurobi
     include("grb_callbacks.jl")
 
     include("GurobiSolverInterface.jl")
+
+    include("precompile.jl")
 end
