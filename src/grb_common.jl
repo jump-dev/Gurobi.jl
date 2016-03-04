@@ -53,6 +53,29 @@ macro grb_ccall(func, args...)
     end
 end
 
+macro grb_ccall_intercept(model, func, args...)
+    f = "GRB$(func)"
+    quote
+        ccall(:jl_exit_on_sigint, Void, (Cint,), convert(Cint,0))
+        ret = try
+            $(@windows? :(ccall(($f,libgurobi), stdcall, $(args...))) : :(ccall(($f,libgurobi), $(args...))) )
+        catch ex
+            println("Caught exception")
+            if !isinteractive()
+                ccall(:jl_exit_on_sigint, Void, (Cint,), convert(Cint,1))
+            end
+            if isa(ex, InterruptException)
+                terminate(model)
+            end
+            rethrow(ex)
+        end
+        if !isinteractive()
+            ccall(:jl_exit_on_sigint, Void, (Cint,), convert(Cint,1))
+        end
+        ret
+    end
+end
+
 # Gurobi library version
 function getlibversion()
     _major = Cint[0]
