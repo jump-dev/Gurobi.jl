@@ -212,7 +212,7 @@ function getsense(m::GurobiMathProgModel)
   end
 end
 
-numvar(m::GurobiMathProgModel)    = num_vars(m.inner)
+numvar(m::GurobiMathProgModel)    = (updatemodel!(m); num_vars(m.inner))
 numconstr(m::GurobiMathProgModel) = num_constrs(m.inner) + num_qconstrs(m.inner)
 numlinconstr(m::GurobiMathProgModel) = num_constrs(m.inner)
 numquadconstr(m::GurobiMathProgModel) = num_qconstrs(m.inner)
@@ -225,7 +225,7 @@ function optimize!(m::GurobiMathProgModel)
     if m.lazycb != nothing
       setparam!(m.inner, "LazyConstraints", 1)
     end
-    # updatemodel!(m)
+    updatemodel!(m)
     optimize(m.inner)
 end
 
@@ -326,6 +326,7 @@ function setvartype!(m::GurobiMathProgModel, vartype::Vector{Symbol})
     updatemodel!(m)
     nvartype = map(x->rev_var_type_map[x], vartype)
     set_charattrarray!(m.inner, "VType", 1, length(nvartype), nvartype)
+    updatemodel!(m) # otherwise getvartype! will return old values
 end
 
 function getvartype(m::GurobiMathProgModel)
