@@ -19,6 +19,24 @@ type Env
         # finalizer(env, free_env)  ## temporary disable: which tends to sometimes caused warnings
         env
     end
+
+    function Env(cloudhost::ASCIIString, cloudpassword::ASCIIString)
+        a = Array(Ptr{Void}, 1)
+        ret = @grb_ccall(loadclientenv, Cint,
+            (Ptr{Ptr{Void}}, Ptr{UInt8}, Ptr{UInt8}, Cint, Ptr{UInt8},
+                Cint, Cdouble),
+            a, "gurobi.log", cloudhost, -1, cloudpassword, 0, -1)
+        if ret != 0
+            if ret == 10009
+                error("Invalid Gurobi license")
+            else
+                error("Failed to create environment (error $ret).")
+            end
+        end
+        env = new(a[1])
+        # finalizer(env, free_env)  ## temporary disable: which tends to sometimes caused warnings
+        env
+    end
 end
 
 Base.unsafe_convert(ty::Type{Ptr{Void}}, env::Env) = env.ptr_env::Ptr{Void}
