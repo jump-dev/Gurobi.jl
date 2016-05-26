@@ -25,7 +25,7 @@ type Env
         ret = @grb_ccall(loadclientenv, Cint,
             (Ptr{Ptr{Void}}, Ptr{UInt8}, Ptr{UInt8}, Cint, Ptr{UInt8},
                 Cint, Cdouble),
-            a, "gurobi.log", cloudhost, -1, cloudpassword, 0, -1)
+            a, C_NULL, cloudhost, -1, cloudpassword, 0, -1)
         if ret != 0
             if ret == 10009
                 error("Invalid Gurobi license")
