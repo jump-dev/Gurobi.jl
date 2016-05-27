@@ -6,7 +6,8 @@ tests = ["lp_01a",
          "qp_01",
          "qp_02",
          "qcqp_01",
-         "mathprog"]
+         "mathprog",
+         "cloud"]
 
 for t in tests
     fp = "$(t).jl"
