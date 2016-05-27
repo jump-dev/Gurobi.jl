@@ -1,7 +1,7 @@
 # GurobiMathProgInterface
 # Standardized MILP interface
 
-export GurobiSolver, GurobiCloudSolver
+export GurobiSolver
 
 type GurobiMathProgModel <: AbstractLinearQuadraticModel
     inner::Model
@@ -15,8 +15,8 @@ type GurobiMathProgModel <: AbstractLinearQuadraticModel
     heuristiccb
     infocb
 end
-function GurobiMathProgModel(;options...)
-   env = Env()
+function GurobiMathProgModel(;cloudhost="", cloudpassword="", options...)
+   env = Env(cloudhost, cloudpassword)
    setparam!(env, "InfUnbdInfo", 1)
    for (name,value) in options
        setparam!(env, string(name), value)
@@ -24,35 +24,16 @@ function GurobiMathProgModel(;options...)
    m = GurobiMathProgModel(Model(env,""; finalize_env=true), :Con, false, Float64[], Float64[], nothing, nothing, nothing, nothing)
    return m
 end
-
-function GurobiMathProgModel(cloudhost::ASCIIString, password::ASCIIString; options...)
-   env = Env(cloudhost, password)
-   setparam!(env, "InfUnbdInfo", 1)
-   for (name,value) in options
-       setparam!(env, string(name), value)
-   end
-   m = GurobiMathProgModel(Model(env,""; finalize_env=true), :Con, false, Float64[], Float64[], nothing, nothing, nothing, nothing)
-   return m
-end
-
 
 immutable GurobiSolver <: AbstractMathProgSolver
+    cloudhost::ASCIIString
+    cloudpassword::ASCIIString
     options
 end
 
-immutable GurobiCloudSolver <: AbstractMathProgSolver
-    host::ASCIIString
-    password::ASCIIString
-    options
-end
-
-GurobiSolver(;kwargs...) = GurobiSolver(kwargs)
-LinearQuadraticModel(s::GurobiSolver) = GurobiMathProgModel(;s.options...)
+GurobiSolver(;cloudhost="", cloudpassword="", kwargs...) = GurobiSolver(cloudhost, cloudpassword, kwargs)
+LinearQuadraticModel(s::GurobiSolver) = GurobiMathProgModel(;cloudhost=s.cloudhost, cloudpassword=s.cloudpassword, s.options...)
 ConicModel(s::GurobiSolver) = LPQPtoConicBridge(LinearQuadraticModel(s))
-
-GurobiCloudSolver(host, password; kwargs...) = GurobiCloudSolver(host, password, kwargs)
-LinearQuadraticModel(s::GurobiCloudSolver) = GurobiMathProgModel(s.host, s.password; s.options...)
-ConicModel(s::GurobiCloudSolver) = LPQPtoConicBridge(LinearQuadraticModel(s))
 
 supportedcones(::GurobiSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:SOCRotated]
 
