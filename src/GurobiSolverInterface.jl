@@ -220,6 +220,10 @@ numquadconstr(m::GurobiMathProgModel) = num_qconstrs(m.inner)
 function optimize!(m::GurobiMathProgModel)
     # set callbacks if present
     if m.lazycb != nothing || m.cutcb != nothing || m.heuristiccb != nothing || m.infocb != nothing
+        updatemodel!(m)
+        if !is_mip(m.inner)
+            Base.warn_once("Gurobi ignores branch-and-bound callbacks when no discrete elements are present in the model.")
+        end
         setmathprogcallback!(m)
     end
     if m.lazycb != nothing
