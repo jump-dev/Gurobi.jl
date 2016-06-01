@@ -18,7 +18,9 @@ type Env
             if ret == 10009
                 error("Invalid Gurobi license")
             elseif ret == 10022
-                error("Problem communicating with the Gurobi Compute Server")
+                error("""Problem communicating with the Gurobi Compute Server
+                      This might be resolved by setting the following environment variable:
+                      export LD_LIBRARY_PATH=\$\{GUROBI_HOME\}/lib""")
             else
                 error("Failed to create environment (error $ret).")
             end
