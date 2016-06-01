@@ -9,5 +9,5 @@ Gurobi.free_env(env)
 
 @test_throws ErrorException Gurobi.Env("fakehostdoesnotexist", "wrongpassword")
 
-solver = GurobiSolver(cloudhost="csdemo.gurobi.com")
-LinearQuadraticModel(solver)
+include(joinpath(Pkg.dir("MathProgBase"),"test","linproginterface.jl"))
+linprogsolvertest(GurobiSolver(cloudhost="csdemo.gurobi.com"))
