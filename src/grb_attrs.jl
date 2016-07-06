@@ -8,7 +8,7 @@
 
 function get_intattr(model::Model, name::ASCIIString)
     a = Array(Cint, 1)
-    ret = @grb_ccall(getintattr, Cint, 
+    ret = @grb_ccall(getintattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Ptr{Cint}),
         model, name, a);
     if ret != 0
@@ -19,7 +19,7 @@ end
 
 function get_dblattr(model::Model, name::ASCIIString)
     a = Array(Float64, 1)
-    ret = @grb_ccall(getdblattr, Cint, 
+    ret = @grb_ccall(getdblattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Ptr{Float64}),
         model, name, a);
     if ret != 0
@@ -30,8 +30,8 @@ end
 
 function get_strattr(model::Model, name::ASCIIString)
     a = Array(Ptr{UInt8}, 1)
-    ret = @grb_ccall(getstrattr, Cint, 
-        (Ptr{Void}, Ptr{UInt8}, Ptr{Ptr{UInt8}}), 
+    ret = @grb_ccall(getstrattr, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Ptr{Ptr{UInt8}}),
         model, name, a)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -39,16 +39,54 @@ function get_strattr(model::Model, name::ASCIIString)
     bytestring(a[1])
 end
 
+# array element
+
+function get_intattrelement(model::Gurobi.Model, name::ASCIIString, element::Int)
+    a = Array(Cint, 1)
+    ret = @grb_ccall(getintattrelement, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cint}),
+        model, name, element - 1, a
+    )
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    convert(Int, a[1])
+end
+
+function get_dblattrelement(model::Gurobi.Model, name::ASCIIString, element::Int)
+    a = Array(Float64, 1)
+    ret = @grb_ccall(getdblattrelement, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Float64}),
+        model, name, element - 1, a
+    )
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    a[1]::Float64
+end
+
+function get_charattrelement(model::Gurobi.Model, name::ASCIIString, element::Int)
+    a = Array(Cchar, 1)
+    ret = @grb_ccall(getcharattrelement, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cchar}),
+        model, name, element - 1, a
+    )
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    convert(Char, a[1])
+end
+
 # Note: in attrarray API, the start argument is one-based (following Julia convention)
 
 function get_intattrarray!(r::Array{Cint}, model::Model, name::ASCIIString, start::Integer)
-    ret = @grb_ccall(getintattrarray, Cint, 
-        (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Cint}), 
+    ret = @grb_ccall(getintattrarray, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Cint}),
         model, name, start - 1, length(r), r)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    r    
+    r
 end
 
 function get_intattrarray(model::Model, name::ASCIIString, start::Integer, len::Integer)
@@ -56,13 +94,13 @@ function get_intattrarray(model::Model, name::ASCIIString, start::Integer, len::
 end
 
 function get_dblattrarray!(r::Array{Float64}, model::Model, name::ASCIIString, start::Integer)
-    ret = @grb_ccall(getdblattrarray, Cint, 
-        (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Float64}), 
+    ret = @grb_ccall(getdblattrarray, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Float64}),
         model, name, start - 1, length(r), r)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    r    
+    r
 end
 
 function get_dblattrarray(model::Model, name::ASCIIString, start::Integer, len::Integer)
@@ -70,8 +108,8 @@ function get_dblattrarray(model::Model, name::ASCIIString, start::Integer, len::
 end
 
 function get_charattrarray!(r::Array{Cchar}, model::Model, name::ASCIIString, start::Integer)
-    ret = @grb_ccall(getcharattrarray, Cint, 
-        (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Cchar}), 
+    ret = @grb_ccall(getcharattrarray, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Cchar}),
         model, name, start - 1, length(r), r)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -86,7 +124,7 @@ end
 # setters
 
 function set_intattr!(model::Model, name::ASCIIString, v::Integer)
-    ret = @grb_ccall(setintattr, Cint, 
+    ret = @grb_ccall(setintattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint), model, name, v)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -95,7 +133,7 @@ function set_intattr!(model::Model, name::ASCIIString, v::Integer)
 end
 
 function set_dblattr!(model::Model, name::ASCIIString, v::Real)
-    ret = @grb_ccall(setdblattr, Cint, 
+    ret = @grb_ccall(setdblattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Float64), model, name, v)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -104,8 +142,43 @@ function set_dblattr!(model::Model, name::ASCIIString, v::Real)
 end
 
 function set_strattr!(model::Model, name::ASCIIString, v::ASCIIString)
-    ret = @grb_ccall(setstrattr, Cint, 
+    ret = @grb_ccall(setstrattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Ptr{UInt8}), model, name, v)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
+# array element
+
+function set_intattrelement!(model::Gurobi.Model, name::ASCIIString, element::Int, v::Integer)
+    ret = @grb_ccall(setintattrelement, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Cint),
+        model, name, element - 1, v
+    )
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
+function set_dblattrelement!(model::Gurobi.Model, name::ASCIIString, element::Int, v::Real)
+    ret = @grb_ccall(setdblattrelement, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Float64),
+        model, name, element - 1, v
+    )
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
+function set_charattrelement!(model::Gurobi.Model, name::ASCIIString, element::Int, v::Char)
+    ret = @grb_ccall(setcharattrelement, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Cchar),
+        model, name, element - 1, v
+    )
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -116,7 +189,7 @@ end
 
 function set_intattrarray!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector)
     values = convert(Vector{Cint},values)
-    ret = @grb_ccall(setintattrarray, Cint, 
+    ret = @grb_ccall(setintattrarray, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Cint}), model, name, start-1, len, ivec(values))
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -126,7 +199,7 @@ end
 
 function set_dblattrarray!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector)
     values = convert(Vector{Float64},values)
-    ret = @grb_ccall(setdblattrarray, Cint, 
+    ret = @grb_ccall(setdblattrarray, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Float64}), model, name, start-1, len, fvec(values))
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -136,7 +209,7 @@ end
 
 function set_charattrarray!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector)
     values = convert(Vector{Cchar},values)
-    ret = @grb_ccall(setcharattrarray, Cint, 
+    ret = @grb_ccall(setcharattrarray, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Cchar}), model, name, start-1, len, cvec(values))
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -193,16 +266,16 @@ is_mip(model::Model) = get_intattr(model, "IsMIP") != 0
 is_qp(model::Model)  = get_intattr(model, "IsQP") != 0
 is_qcp(model::Model) = get_intattr(model, "IsQCP") != 0
 
-function model_type(model::Model) 
+function model_type(model::Model)
     is_qp(model)  ? (:QP)  :
     is_qcp(model) ? (:QCP) : (:LP)
 end
 
 function set_sense!(model::Model, sense::Symbol)
     v = sense == :maximize ? -1 :
-        sense == :minimize ? 1 : 
+        sense == :minimize ? 1 :
         throw(ArgumentError("Invalid model sense."))
-    
+
     set_intattr!(model, "ModelSense", v)
 end
 
