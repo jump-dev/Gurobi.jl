@@ -15,22 +15,26 @@ type GurobiMathProgModel <: AbstractLinearQuadraticModel
     heuristiccb
     infocb
 end
-function GurobiMathProgModel(;options...)
-   env = Env()
+function GurobiMathProgModel(env=nothing;options...)
+   finalize_env = (env == nothing)
+   if env == nothing
+       env = Env()
+   end
    setparam!(env, "InfUnbdInfo", 1)
    for (name,value) in options
        setparam!(env, string(name), value)
    end
-   m = GurobiMathProgModel(Model(env,""; finalize_env=true), :Con, false, Float64[], Float64[], nothing, nothing, nothing, nothing)
+   m = GurobiMathProgModel(Model(env,""; finalize_env=finalize_env), :Con, false, Float64[], Float64[], nothing, nothing, nothing, nothing)
    return m
 end
 
 
 immutable GurobiSolver <: AbstractMathProgSolver
+    env
     options
 end
-GurobiSolver(;kwargs...) = GurobiSolver(kwargs)
-LinearQuadraticModel(s::GurobiSolver) = GurobiMathProgModel(;s.options...)
+GurobiSolver(env=nothing; kwargs...) = GurobiSolver(env, kwargs)
+LinearQuadraticModel(s::GurobiSolver) = GurobiMathProgModel(s.env; s.options...)
 ConicModel(s::GurobiSolver) = LPQPtoConicBridge(LinearQuadraticModel(s))
 
 supportedcones(::GurobiSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:SOCRotated]
@@ -38,11 +42,12 @@ supportedcones(::GurobiSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:SOCRotated]
 loadproblem!(m::GurobiMathProgModel, filename::AbstractString) = read_model(m.inner, filename)
 
 function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
-  # throw away old model
+  # throw away old model but keep env and finalize_env
   env = m.inner.env
+  finalize_env = m.inner.finalize_env
   m.inner.finalize_env = false
   free_model(m.inner)
-  m.inner = Model(env, "", finalize_env=true)
+  m.inner = Model(env, "", finalize_env=finalize_env)
 
   add_cvars!(m.inner, float(obj), float(collb), float(colub))
   update_model!(m.inner)
