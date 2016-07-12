@@ -14,17 +14,20 @@ type GurobiMathProgModel <: AbstractLinearQuadraticModel
     cutcb
     heuristiccb
     infocb
+    options
 end
 function GurobiMathProgModel(env=nothing;options...)
    finalize_env = (env == nothing)
    if env == nothing
        env = Env()
    end
-   setparam!(env, "InfUnbdInfo", 1)
+   m = GurobiMathProgModel(Model(env,""; finalize_env=finalize_env), :Con, false, Float64[], Float64[], nothing, nothing, nothing, nothing, options)
+   # Set the parameters on the model's copy of env rather than modifying the
+   # global env (ref: http://www.gurobi.com/support/faqs#P)
+   setparam!(m.inner, "InfUnbdInfo", 1)
    for (name,value) in options
-       setparam!(env, string(name), value)
+       setparam!(m.inner, string(name), value)
    end
-   m = GurobiMathProgModel(Model(env,""; finalize_env=finalize_env), :Con, false, Float64[], Float64[], nothing, nothing, nothing, nothing)
    return m
 end
 
@@ -48,6 +51,11 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   m.inner.finalize_env = false
   free_model(m.inner)
   m.inner = Model(env, "", finalize_env=finalize_env)
+  # Re-set options on new model's env
+  setparam!(m.inner, "InfUnbdInfo", 1)
+  for (name,value) in m.options
+    setparam!(m.inner, string(name), value)
+  end
 
   add_cvars!(m.inner, float(obj), float(collb), float(colub))
   update_model!(m.inner)
@@ -284,7 +292,7 @@ function getconstrsolution(m::GurobiMathProgModel)
 end
 
 function getreducedcosts(m::GurobiMathProgModel)
-    if is_qcp(m.inner) && get_int_param(m.inner.env, "QCPDual") == 0
+    if is_qcp(m.inner) && get_int_param(m.inner, "QCPDual") == 0
         return fill(NaN, num_vars(m.inner))
     else
         return get_dblattrarray(m.inner, "RC", 1, num_vars(m.inner))
@@ -292,7 +300,7 @@ function getreducedcosts(m::GurobiMathProgModel)
 end
 
 function getconstrduals(m::GurobiMathProgModel)
-    if is_qcp(m.inner) && get_int_param(m.inner.env, "QCPDual") == 0
+    if is_qcp(m.inner) && get_int_param(m.inner, "QCPDual") == 0
         return fill(NaN, num_constrs(m.inner))
     else
         return get_dblattrarray(m.inner, "Pi", 1, num_constrs(m.inner))
@@ -300,7 +308,7 @@ function getconstrduals(m::GurobiMathProgModel)
 end
 
 function getquadconstrduals(m::GurobiMathProgModel)
-    if is_qcp(m.inner) && get_int_param(m.inner.env, "QCPDual") == 0
+    if is_qcp(m.inner) && get_int_param(m.inner, "QCPDual") == 0
         return fill(NaN, num_qconstrs(m.inner))
     else
         return get_dblattrarray(m.inner, "QCPi", 1, num_qconstrs(m.inner))
