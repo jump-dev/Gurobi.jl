@@ -8,7 +8,8 @@ tests = [
     "qp_02",
     "qcqp_01",
     "mathprog",
-    "test_grb_attrs"
+    "test_grb_attrs",
+    "env",
 ]
 
 for t in tests
