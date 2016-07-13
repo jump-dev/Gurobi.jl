@@ -27,7 +27,7 @@ function GurobiMathProgModel(env=nothing;options...)
 end
 function setparams!(m::GurobiMathProgModel)
     # Helper to set the parameters on the model's copy of env rather than
-    # modifying the # global env (ref: http://www.gurobi.com/support/faqs#P)
+    # modifying the global env (ref: http://www.gurobi.com/support/faqs#P)
 
     # Set `InfUnbdInfo` to 1 by default so infeasibility rays available
     setparam!(m.inner, "InfUnbdInfo", 1)
