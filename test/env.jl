@@ -1,4 +1,4 @@
-using Gurobi, MathProgBase, FactCheck
+using Gurobi, MathProgBase
 
 env = Gurobi.Env()
 
