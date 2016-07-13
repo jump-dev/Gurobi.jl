@@ -22,13 +22,18 @@ function GurobiMathProgModel(env=nothing;options...)
        env = Env()
    end
    m = GurobiMathProgModel(Model(env,""; finalize_env=finalize_env), :Con, false, Float64[], Float64[], nothing, nothing, nothing, nothing, options)
-   # Set the parameters on the model's copy of env rather than modifying the
-   # global env (ref: http://www.gurobi.com/support/faqs#P)
-   setparam!(m.inner, "InfUnbdInfo", 1)
-   for (name,value) in options
-       setparam!(m.inner, string(name), value)
-   end
+   setparams!(m)
    return m
+end
+function setparams!(m::GurobiMathProgModel)
+    # Helper to set the parameters on the model's copy of env rather than
+    # modifying the # global env (ref: http://www.gurobi.com/support/faqs#P)
+
+    # Set `InfUnbdInfo` to 1 by default so infeasibility rays available
+    setparam!(m.inner, "InfUnbdInfo", 1)
+    for (name,value) in m.options
+        setparam!(m.inner, string(name), value)
+    end
 end
 
 
@@ -51,11 +56,8 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   m.inner.finalize_env = false
   free_model(m.inner)
   m.inner = Model(env, "", finalize_env=finalize_env)
-  # Re-set options on new model's env
-  setparam!(m.inner, "InfUnbdInfo", 1)
-  for (name,value) in m.options
-    setparam!(m.inner, string(name), value)
-  end
+  # Re-set options on new model's copy of env
+  setparams!(m)
 
   add_cvars!(m.inner, float(obj), float(collb), float(colub))
   update_model!(m.inner)
