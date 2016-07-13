@@ -436,4 +436,19 @@ optimize(model)
 
 SOCP constraints of the form ``x'x <= y^2`` and ``x'x <= yz`` can be added using this method as well.
 
+### Reusing the same Gurobi environment for multiple solves
+
+When using this package via other packages such as [MathProgBase.jl](https://github.com/JuliaOpt/MathProgBase.jl) and [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl), the default behavior is to obtain a new Gurobi license token every time a model is created and solved. If you are using Gurobi in a setting where the number of concurrent Gurobi uses is limited (e.g. ["Single-Use" or "Floating-Use" licenses](http://www.gurobi.com/products/licensing-pricing/licensing-overview)), you might instead prefer to obtain a single license token that is shared by all models that your program solves. You can do this by passing a Gurobi Environment object as the first parameter to `GurobiSolver`. For example, the follow code snippet solves multiple problems with JuMP using the same license token:
+
+```julia
+using JuMP, Gurobi
+env = Gurobi.Env()
+
+m1 = Model(solver=GurobiSolver(env))
+...
+
+# The solvers can have different options too
+m2 = Model(solver=GurobiSolver(env, OutputFlag=0))
+...
+```
 
