@@ -64,7 +64,7 @@ get_status(model::Model) = status_symbols[get_status_code(model)]::Symbol
 
 @grb_int_attr get_sol_count    "SolCount"
 @grb_int_attr get_barrier_iter_count "BarIterCount"
-@grb_dbl_attr get_node_count   "NodeCount"
+#@grb_dbl_attr get_node_count   "NodeCount"
 
 get_iter_count(model::Model) = convert(Int, get_dblattr(model, "IterCount"))
 get_node_count(model::Model) = convert(Int, get_dblattr(model, "NodeCount"))

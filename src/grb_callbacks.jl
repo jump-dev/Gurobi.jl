@@ -129,7 +129,7 @@ const cbconstants = [
 ("barrier_compl",7006,Float64)]
 
 for (cname,what,T) in cbconstants
-    fname = symbol("cbget_$cname")
+    fname = Symbol("cbget_$cname")
     @eval ($fname)(cbdata::CallbackData, where::Cint) = cbget($T, cbdata, where, $what)
     eval(Expr(:export,fname))
 end

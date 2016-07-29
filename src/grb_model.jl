@@ -21,9 +21,10 @@ end
 
 # If environment is tied to this model, the, we can safely finalize
 # both at the same time, working around the Julia GC.
-function Model(env::Env, name::ASCIIString; finalize_env::Bool=false)
+function Model(env::Env, name::String; finalize_env::Bool=false)
 
     @assert is_valid(env)
+    @assert isascii(name)
     
     a = Array(Ptr{Void}, 1)
     ret = @grb_ccall(newmodel, Cint, (
@@ -49,7 +50,8 @@ function Model(env::Env, name::ASCIIString; finalize_env::Bool=false)
 end
 
 
-function Model(env::Env, name::ASCIIString, sense::Symbol)
+function Model(env::Env, name::String, sense::Symbol)
+    @assert isascii(name)
     model = Model(env, name)
     if sense != :minimize
         set_sense!(model, sense)
@@ -104,7 +106,7 @@ end
 
 # read / write file
 
-function read_model(model::Model, filename::ASCIIString)
+function read_model(model::Model, filename::String)
     @assert is_valid(model.env)
     a = Array(Ptr{Void}, 1)
     ret = @grb_ccall(readmodel, Cint, 
@@ -117,7 +119,7 @@ function read_model(model::Model, filename::ASCIIString)
     nothing
 end
 
-function write_model(model::Model, filename::ASCIIString)
+function write_model(model::Model, filename::String)
     ret = @grb_ccall(write, Cint, (Ptr{Void}, Ptr{UInt8}), 
         model.ptr_model, filename)
     if ret != 0
