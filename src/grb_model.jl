@@ -107,6 +107,7 @@ end
 # read / write file
 
 function read_model(model::Model, filename::String)
+    @assert isascii(filename) # TODO: support non-ascii file names
     @assert is_valid(model.env)
     a = Array(Ptr{Void}, 1)
     ret = @grb_ccall(readmodel, Cint, 
@@ -120,6 +121,7 @@ function read_model(model::Model, filename::String)
 end
 
 function write_model(model::Model, filename::String)
+    @assert isascii(filename) # TODO: support non-ascii file names
     ret = @grb_ccall(write, Cint, (Ptr{Void}, Ptr{UInt8}), 
         model.ptr_model, filename)
     if ret != 0
