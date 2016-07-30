@@ -1,7 +1,7 @@
 # High level model construction
 
 function gurobi_model(env::Env;    # solver environment
-	name::ASCIIString="", 	       # model name
+	name::String="", 	           # model name
     sense::Symbol=:minimize,       # :minimize or :maximize
     H::CoeffMat=emptyfmat,         # quadratic coefficient matrix 
     f::FVec=emptyfvec,             # linear coefficient vector

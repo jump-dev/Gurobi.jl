@@ -134,7 +134,8 @@ const GRB_MAX_STRLEN = 512   # gurobi.c define this value as 512
 
 # lower-level functions
 
-function get_int_param(env::Env, name::ASCIIString)
+function get_int_param(env::Env, name::String)
+    @assert isascii(name)
     a = Array(Cint, 1)
     ret = @grb_ccall(getintparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cint}), 
         env, name, a)
@@ -144,7 +145,8 @@ function get_int_param(env::Env, name::ASCIIString)
     convert(Int, a[1])
 end
 
-function get_dbl_param(env::Env, name::ASCIIString)
+function get_dbl_param(env::Env, name::String)
+    @assert isascii(name)
     a = Array(Float64, 1)
     ret = @grb_ccall(getdblparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Float64}), 
         env, name, a)
@@ -154,7 +156,8 @@ function get_dbl_param(env::Env, name::ASCIIString)
     a[1]::Float64
 end
 
-function get_str_param(env::Env, name::ASCIIString)
+function get_str_param(env::Env, name::String)
+    @assert isascii(name)
     buf = Array(Cchar, GRB_MAX_STRLEN)
     ret = @grb_ccall(getstrparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cchar}), 
         env, name, buf)
@@ -165,7 +168,8 @@ function get_str_param(env::Env, name::ASCIIString)
 end
 
 
-function set_int_param!(env::Env, name::ASCIIString, v::Integer)
+function set_int_param!(env::Env, name::String, v::Integer)
+    @assert isascii(name)
     ret = @grb_ccall(setintparam, Cint, (Ptr{Void}, Ptr{Cchar}, Cint), 
         env, name, v)
     if ret != 0
@@ -173,7 +177,8 @@ function set_int_param!(env::Env, name::ASCIIString, v::Integer)
     end
 end
 
-function set_dbl_param!(env::Env, name::ASCIIString, v::Real)
+function set_dbl_param!(env::Env, name::String, v::Real)
+    @assert isascii(name)
     ret = @grb_ccall(setdblparam, Cint, (Ptr{Void}, Ptr{Cchar}, Float64), 
         env, name, v)
     if ret != 0
@@ -181,7 +186,9 @@ function set_dbl_param!(env::Env, name::ASCIIString, v::Real)
     end
 end
 
-function set_str_param!(env::Env, name::ASCIIString, v::ASCIIString)
+function set_str_param!(env::Env, name::String, v::String)
+    @assert isascii(name)
+    @assert isascii(v)
     ret = @grb_ccall(setstrparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cchar}), 
         env, name, v)
     if ret != 0
@@ -191,8 +198,9 @@ end
 
 # for existing models
 
-function get_int_param(m::Model, name::ASCIIString)
+function get_int_param(m::Model, name::String)
 
+    @assert isascii(name)
     modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
     @assert modenv != C_NULL
     a = Array(Cint, 1)
@@ -204,8 +212,9 @@ function get_int_param(m::Model, name::ASCIIString)
     convert(Int, a[1])
 end
 
-function get_dbl_param(m::Model, name::ASCIIString)
+function get_dbl_param(m::Model, name::String)
 
+    @assert isascii(name)
     modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
     @assert modenv != C_NULL
     a = Array(Float64, 1)
@@ -217,8 +226,9 @@ function get_dbl_param(m::Model, name::ASCIIString)
     a[1]::Float64
 end
 
-function get_str_param(m::Model, name::ASCIIString)
+function get_str_param(m::Model, name::String)
 
+    @assert isascii(name)
     modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
     @assert modenv != C_NULL
     buf = Array(Cchar, GRB_MAX_STRLEN)
@@ -231,8 +241,9 @@ function get_str_param(m::Model, name::ASCIIString)
 end
 
 
-function set_int_param!(m::Model, name::ASCIIString, v::Integer)
+function set_int_param!(m::Model, name::String, v::Integer)
 
+    @assert isascii(name)
     modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
     @assert modenv != C_NULL
     ret = @grb_ccall(setintparam, Cint, (Ptr{Void}, Ptr{Cchar}, Cint),
@@ -242,8 +253,9 @@ function set_int_param!(m::Model, name::ASCIIString, v::Integer)
     end
 end
 
-function set_dbl_param!(m::Model, name::ASCIIString, v::Real)
+function set_dbl_param!(m::Model, name::String, v::Real)
 
+    @assert isascii(name)
     modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
     @assert modenv != C_NULL
     ret = @grb_ccall(setdblparam, Cint, (Ptr{Void}, Ptr{Cchar}, Float64),
@@ -253,8 +265,10 @@ function set_dbl_param!(m::Model, name::ASCIIString, v::Real)
     end
 end
 
-function set_str_param!(m::Model, name::ASCIIString, v::ASCIIString)
+function set_str_param!(m::Model, name::String, v::String)
 
+    @assert isascii(name)
+    @assert isascii(v)
     modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
     @assert modenv != C_NULL
     ret = @grb_ccall(setstrparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cchar}),
@@ -266,7 +280,8 @@ end
 
 # higher level functions
 
-function getparam(env::Union{Env,Model}, name::ASCIIString)
+function getparam(env::Union{Env,Model}, name::String)
+    @assert isascii(name)
     if name in GRB_INT_PARAMS
         return get_int_param(env, name)
     elseif name in GRB_DBL_PARAMS
@@ -278,7 +293,8 @@ function getparam(env::Union{Env,Model}, name::ASCIIString)
     end
 end
 
-function setparam!(env::Union{Env,Model}, name::ASCIIString, v)
+function setparam!(env::Union{Env,Model}, name::String, v)
+    @assert isascii(name)
     if name in GRB_INT_PARAMS
         set_int_param!(env, name, v)
     elseif name in GRB_DBL_PARAMS

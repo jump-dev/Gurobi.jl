@@ -6,7 +6,8 @@
 #
 ############################################
 
-function get_intattr(model::Model, name::ASCIIString)
+function get_intattr(model::Model, name::String)
+    @assert isascii(name)
     a = Array(Cint, 1)
     ret = @grb_ccall(getintattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Ptr{Cint}),
@@ -17,7 +18,8 @@ function get_intattr(model::Model, name::ASCIIString)
     convert(Int, a[1])
 end
 
-function get_dblattr(model::Model, name::ASCIIString)
+function get_dblattr(model::Model, name::String)
+    @assert isascii(name)
     a = Array(Float64, 1)
     ret = @grb_ccall(getdblattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Ptr{Float64}),
@@ -28,7 +30,8 @@ function get_dblattr(model::Model, name::ASCIIString)
     a[1]::Float64
 end
 
-function get_strattr(model::Model, name::ASCIIString)
+function get_strattr(model::Model, name::String)
+    @assert isascii(name)
     a = Array(Ptr{UInt8}, 1)
     ret = @grb_ccall(getstrattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Ptr{Ptr{UInt8}}),
@@ -36,12 +39,13 @@ function get_strattr(model::Model, name::ASCIIString)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    bytestring(a[1])
+    unsafe_string(a[1])
 end
 
 # array element
 
-function get_intattrelement(model::Gurobi.Model, name::ASCIIString, element::Int)
+function get_intattrelement(model::Gurobi.Model, name::String, element::Int)
+    @assert isascii(name)
     a = Array(Cint, 1)
     ret = @grb_ccall(getintattrelement, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cint}),
@@ -53,7 +57,8 @@ function get_intattrelement(model::Gurobi.Model, name::ASCIIString, element::Int
     convert(Int, a[1])
 end
 
-function get_dblattrelement(model::Gurobi.Model, name::ASCIIString, element::Int)
+function get_dblattrelement(model::Gurobi.Model, name::String, element::Int)
+    @assert isascii(name)
     a = Array(Float64, 1)
     ret = @grb_ccall(getdblattrelement, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Float64}),
@@ -65,7 +70,8 @@ function get_dblattrelement(model::Gurobi.Model, name::ASCIIString, element::Int
     a[1]::Float64
 end
 
-function get_charattrelement(model::Gurobi.Model, name::ASCIIString, element::Int)
+function get_charattrelement(model::Gurobi.Model, name::String, element::Int)
+    @assert isascii(name)
     a = Array(Cchar, 1)
     ret = @grb_ccall(getcharattrelement, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cchar}),
@@ -79,7 +85,8 @@ end
 
 # Note: in attrarray API, the start argument is one-based (following Julia convention)
 
-function get_intattrarray!(r::Array{Cint}, model::Model, name::ASCIIString, start::Integer)
+function get_intattrarray!(r::Array{Cint}, model::Model, name::String, start::Integer)
+    @assert isascii(name)
     ret = @grb_ccall(getintattrarray, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Cint}),
         model, name, start - 1, length(r), r)
@@ -89,11 +96,13 @@ function get_intattrarray!(r::Array{Cint}, model::Model, name::ASCIIString, star
     r
 end
 
-function get_intattrarray(model::Model, name::ASCIIString, start::Integer, len::Integer)
+function get_intattrarray(model::Model, name::String, start::Integer, len::Integer)
+    @assert isascii(name)
     get_intattrarray!(Array(Cint, len), model, name, start)
 end
 
-function get_dblattrarray!(r::Array{Float64}, model::Model, name::ASCIIString, start::Integer)
+function get_dblattrarray!(r::Array{Float64}, model::Model, name::String, start::Integer)
+    @assert isascii(name)
     ret = @grb_ccall(getdblattrarray, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Float64}),
         model, name, start - 1, length(r), r)
@@ -103,11 +112,13 @@ function get_dblattrarray!(r::Array{Float64}, model::Model, name::ASCIIString, s
     r
 end
 
-function get_dblattrarray(model::Model, name::ASCIIString, start::Integer, len::Integer)
+function get_dblattrarray(model::Model, name::String, start::Integer, len::Integer)
+    @assert isascii(name)
     get_dblattrarray!(Array(Float64, len), model, name, start)
 end
 
-function get_charattrarray!(r::Array{Cchar}, model::Model, name::ASCIIString, start::Integer)
+function get_charattrarray!(r::Array{Cchar}, model::Model, name::String, start::Integer)
+    @assert isascii(name)
     ret = @grb_ccall(getcharattrarray, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Cchar}),
         model, name, start - 1, length(r), r)
@@ -117,13 +128,15 @@ function get_charattrarray!(r::Array{Cchar}, model::Model, name::ASCIIString, st
     map(Char,r)
 end
 
-function get_charattrarray(model::Model, name::ASCIIString, start::Integer, len::Integer)
+function get_charattrarray(model::Model, name::String, start::Integer, len::Integer)
+    @assert isascii(name)
     get_charattrarray!(Array(Cchar, len), model, name, start)
 end
 
 # setters
 
-function set_intattr!(model::Model, name::ASCIIString, v::Integer)
+function set_intattr!(model::Model, name::String, v::Integer)
+    @assert isascii(name)
     ret = @grb_ccall(setintattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint), model, name, v)
     if ret != 0
@@ -132,7 +145,8 @@ function set_intattr!(model::Model, name::ASCIIString, v::Integer)
     nothing
 end
 
-function set_dblattr!(model::Model, name::ASCIIString, v::Real)
+function set_dblattr!(model::Model, name::String, v::Real)
+    @assert isascii(name)
     ret = @grb_ccall(setdblattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Float64), model, name, v)
     if ret != 0
@@ -141,7 +155,9 @@ function set_dblattr!(model::Model, name::ASCIIString, v::Real)
     nothing
 end
 
-function set_strattr!(model::Model, name::ASCIIString, v::ASCIIString)
+function set_strattr!(model::Model, name::String, v::String)
+    @assert isascii(name)
+    @assert isascii(v)
     ret = @grb_ccall(setstrattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Ptr{UInt8}), model, name, v)
     if ret != 0
@@ -152,7 +168,8 @@ end
 
 # array element
 
-function set_intattrelement!(model::Gurobi.Model, name::ASCIIString, element::Int, v::Integer)
+function set_intattrelement!(model::Gurobi.Model, name::String, element::Int, v::Integer)
+    @assert isascii(name)
     ret = @grb_ccall(setintattrelement, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Cint),
         model, name, element - 1, v
@@ -163,7 +180,8 @@ function set_intattrelement!(model::Gurobi.Model, name::ASCIIString, element::In
     nothing
 end
 
-function set_dblattrelement!(model::Gurobi.Model, name::ASCIIString, element::Int, v::Real)
+function set_dblattrelement!(model::Gurobi.Model, name::String, element::Int, v::Real)
+    @assert isascii(name)
     ret = @grb_ccall(setdblattrelement, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Float64),
         model, name, element - 1, v
@@ -174,7 +192,8 @@ function set_dblattrelement!(model::Gurobi.Model, name::ASCIIString, element::In
     nothing
 end
 
-function set_charattrelement!(model::Gurobi.Model, name::ASCIIString, element::Int, v::Char)
+function set_charattrelement!(model::Gurobi.Model, name::String, element::Int, v::Char)
+    @assert isascii(name)
     ret = @grb_ccall(setcharattrelement, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Cchar),
         model, name, element - 1, v
@@ -187,7 +206,8 @@ end
 
 # reminder: start is one-based
 
-function set_intattrarray!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector)
+function set_intattrarray!(model::Model, name::String, start::Integer, len::Integer, values::Vector)
+    @assert isascii(name)
     values = convert(Vector{Cint},values)
     ret = @grb_ccall(setintattrarray, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Cint}), model, name, start-1, len, ivec(values))
@@ -197,7 +217,8 @@ function set_intattrarray!(model::Model, name::ASCIIString, start::Integer, len:
     nothing
 end
 
-function set_dblattrarray!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector)
+function set_dblattrarray!(model::Model, name::String, start::Integer, len::Integer, values::Vector)
+    @assert isascii(name)
     values = convert(Vector{Float64},values)
     ret = @grb_ccall(setdblattrarray, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Float64}), model, name, start-1, len, fvec(values))
@@ -207,7 +228,8 @@ function set_dblattrarray!(model::Model, name::ASCIIString, start::Integer, len:
     nothing
 end
 
-function set_charattrarray!(model::Model, name::ASCIIString, start::Integer, len::Integer, values::Vector)
+function set_charattrarray!(model::Model, name::String, start::Integer, len::Integer, values::Vector)
+    @assert isascii(name)
     values = convert(Vector{Cchar},values)
     ret = @grb_ccall(setcharattrarray, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Cchar}), model, name, start-1, len, cvec(values))

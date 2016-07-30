@@ -37,14 +37,14 @@ end
 function get_error_msg(env::Env)
     @assert env.ptr_env != C_NULL
     sz = @grb_ccall(geterrormsg, Ptr{UInt8}, (Ptr{Void},), env.ptr_env)
-    bytestring(sz)
+    unsafe_string(sz)
 end
 
 # error
 
 type GurobiError
     code::Int
-    msg::ASCIIString 
+    msg::String
     
     function GurobiError(env::Env, code::Integer)
         new(convert(Int, code), get_error_msg(env))
