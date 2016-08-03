@@ -406,7 +406,7 @@ end
 function cbgetobj(d::GurobiCallbackData)
     if d.state == :MIPNode
         return cbget_mipnode_objbst(d.cbdata, d.where)
-    elseif d.state == :Other
+    elseif d.state == :Intermediate
         return cbget_mip_objbst(d.cbdata, d.where)
     elseif d.state == :MIPSol
         error("Gurobi does not implement cbgetobj when state == MIPSol")
@@ -424,7 +424,7 @@ function cbgetbestbound(d::GurobiCallbackData)
         return cbget_mipnode_objbnd(d.cbdata, d.where)
     elseif d.state == :MIPSol
         return cbget_mipsol_objbnd(d.cbdata, d.where)
-    elseif d.state == :Other
+    elseif d.state == :Intermediate
         return cbget_mip_objbnd(d.cbdata, d.where)
     else
         error("Unrecognized callback state $(d.state)")
@@ -436,14 +436,14 @@ function cbgetexplorednodes(d::GurobiCallbackData)
         return cbget_mipnode_nodcnt(d.cbdata, d.where)
     elseif d.state == :MIPSol
         return cbget_mipsol_nodcnt(d.cbdata, d.where)
-    elseif d.state == :Other
+    elseif d.state == :Intermediate
         return cbget_mip_nodcnt(d.cbdata, d.where)
     else
         error("Unrecognized callback state $(d.state)")
     end
 end
 
-# returns :MIPNode :MIPSol :Other
+# returns :MIPNode :MIPSol :Intermediate
 cbgetstate(d::GurobiCallbackData) = d.state
 
 function cbaddcut!(d::GurobiCallbackData,varidx,varcoef,sense,rhs)
@@ -490,7 +490,7 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
             return convert(Cint,0)
         end
     elseif where == CB_MIP
-        state = :Other
+        state = :Intermediate
     else
         # State with no relevant callbacks
         return convert(Cint,0)
