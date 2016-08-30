@@ -406,7 +406,7 @@ end
 function cbgetobj(d::GurobiCallbackData)
     if d.state == :MIPNode
         return cbget_mipnode_objbst(d.cbdata, d.where)
-    elseif d.state == :MIPInfo
+    elseif d.state == :Intermediate
         return cbget_mip_objbst(d.cbdata, d.where)
     elseif d.state == :MIPSol
         error("Gurobi does not implement cbgetobj when state == MIPSol")
@@ -424,7 +424,7 @@ function cbgetbestbound(d::GurobiCallbackData)
         return cbget_mipnode_objbnd(d.cbdata, d.where)
     elseif d.state == :MIPSol
         return cbget_mipsol_objbnd(d.cbdata, d.where)
-    elseif d.state == :MIPInfo
+    elseif d.state == :Intermediate
         return cbget_mip_objbnd(d.cbdata, d.where)
     else
         error("Unrecognized callback state $(d.state)")
@@ -436,14 +436,14 @@ function cbgetexplorednodes(d::GurobiCallbackData)
         return cbget_mipnode_nodcnt(d.cbdata, d.where)
     elseif d.state == :MIPSol
         return cbget_mipsol_nodcnt(d.cbdata, d.where)
-    elseif d.state == :MIPInfo
+    elseif d.state == :Intermediate
         return cbget_mip_nodcnt(d.cbdata, d.where)
     else
         error("Unrecognized callback state $(d.state)")
     end
 end
 
-# returns :MIPNode :MIPSol :Other
+# returns :MIPNode :MIPSol :Intermediate
 cbgetstate(d::GurobiCallbackData) = d.state
 
 function cbaddcut!(d::GurobiCallbackData,varidx,varcoef,sense,rhs)
@@ -480,13 +480,6 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
     grbrawcb = CallbackData(cbdata,model.inner)
     if where == CB_MIPSOL
         state = :MIPSol
-        grbcb = GurobiCallbackData(grbrawcb, state, where, [0.0])
-        if model.lazycb != nothing
-            ret = model.lazycb(grbcb)
-            if ret == :Exit
-                terminate(model.inner)
-            end
-        end
     elseif where == CB_MIPNODE
         state = :MIPNode
         # skip callback if node is reported to be cut off or infeasible --
@@ -496,36 +489,40 @@ function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, us
         if status != 2
             return convert(Cint,0)
         end
-        grbcb = GurobiCallbackData(grbrawcb, state, where, [0.0])
-        if model.cutcb != nothing
-            ret = model.cutcb(grbcb)
-            if ret == :Exit
-                terminate(model.inner)
-            end
-        end
-        if model.heuristiccb != nothing
-            grbcb.sol = fill(1e101, numvar(model))  # GRB_UNDEFINED
-            ret = model.heuristiccb(grbcb)
-            if ret == :Exit
-                terminate(model.inner)
-            end
-        end
-        if model.lazycb != nothing
-            ret = model.lazycb(grbcb)
-            if ret == :Exit
-                terminate(model.inner)
-            end
-        end
     elseif where == CB_MIP
-        state = :MIPInfo
-        grbcb = GurobiCallbackData(grbrawcb, state, where, [0.0])
-        if model.infocb != nothing
-            ret = model.infocb(grbcb)
-            if ret == :Exit
-                terminate(model.inner)
-            end
+        state = :Intermediate
+    else
+        # State with no relevant callbacks
+        return convert(Cint,0)
+    end
+
+    grbcb = GurobiCallbackData(grbrawcb, state, where, [0.0])
+    if model.infocb != nothing
+        ret = model.infocb(grbcb)
+        if ret == :Exit
+            terminate(model.inner)
         end
     end
+    if model.cutcb != nothing && state == :MIPNode
+        ret = model.cutcb(grbcb)
+        if ret == :Exit
+            terminate(model.inner)
+        end
+    end
+    if model.heuristiccb != nothing && state == :MIPNode
+        grbcb.sol = fill(1e101, numvar(model))  # GRB_UNDEFINED
+        ret = model.heuristiccb(grbcb)
+        if ret == :Exit
+            terminate(model.inner)
+        end
+    end
+    if model.lazycb != nothing && (state == :MIPSol || state == :MIPNode)
+        ret = model.lazycb(grbcb)
+        if ret == :Exit
+            terminate(model.inner)
+        end
+    end
+
     return convert(Cint,0)
 end
 
