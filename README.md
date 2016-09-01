@@ -288,16 +288,16 @@ using JuMP
 
 m = Model(solver=GurobiSolver())
 
-@defVar(m, x >= 5)
-@defVar(m, y >= 45)
+@variable(m, x >= 5)
+@variable(m, y >= 45)
 
-@setObjective(m, Min, x + y)
-@addConstraint(m, 50x + 24y <= 2400)
-@addConstraint(m, 30x + 33y <= 2100)
+@objective(m, Min, x + y)
+@constraint(m, 50x + 24y <= 2400)
+@constraint(m, 30x + 33y <= 2100)
 
 status = solve(m)
-println("Optimal objective: ",getObjectiveValue(m), 
-	". x = ", getValue(x), " y = ", getValue(y))
+println("Optimal objective: ",getobjectivevalue(m), 
+	". x = ", getvalue(x), " y = ", getvalue(y))
 ```
 
 ### Quadratic programming Examples
