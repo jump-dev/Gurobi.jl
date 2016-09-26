@@ -140,7 +140,7 @@ setconstrLB!(m::GurobiMathProgModel, lb) = (m.changed_constr_bounds = true; m.lb
 setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.ub = copy(ub))
 
 getobj(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "Obj", 1, num_vars(m.inner)   )
-setobj!(m::GurobiMathProgModel, c) = (m.obj=c; set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c))
+setobj!(m::GurobiMathProgModel, c) = (m.obj=copy(c); set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c))
 
 function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
     if m.last_op_type == :Con
@@ -181,12 +181,12 @@ end
 function updatemodel!(m::GurobiMathProgModel)
     update_model!(m.inner)
     if m.obj != getobj(m)
-        @show m.obj, getobj(m)
         error("""
             You have encountered a known bug in Gurobi. Any information you query from the model may be incorrect.
             This bug has existed since the first version of Gurobi but is fixed in Gurobi v7.0.
 
             For more information go to https://github.com/JuliaOpt/Gurobi.jl/issues/60.
+            Please leave a comment stating that you encountered this bug! We would like to know how prevalent it is.
         """)
     end
     if m.changed_constr_bounds
