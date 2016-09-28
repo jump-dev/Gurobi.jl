@@ -38,7 +38,7 @@ function setparams!(m::GurobiMathProgModel)
 end
 
 
-immutable GurobiSolver <: AbstractMathProgSolver
+type GurobiSolver <: AbstractMathProgSolver
     env
     options
 end
@@ -47,6 +47,37 @@ LinearQuadraticModel(s::GurobiSolver) = GurobiMathProgModel(s.env; s.options...)
 ConicModel(s::GurobiSolver) = LPQPtoConicBridge(LinearQuadraticModel(s))
 
 supportedcones(::GurobiSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:SOCRotated]
+
+function setparameters!(s::GurobiSolver; mpboptions...)
+    opts = collect(Any,s.options)
+    for (optname, optval) in mpboptions
+        if optname == :TimeLimit
+            push!(opts, (:TimeLimit,optval))
+        elseif optname == :Silent
+            if optval == true
+                push!(opts, (:OutputFlag,0))
+            end
+        else
+            error("Unrecognized parameter $optname")
+        end
+    end
+    s.options = opts
+    return
+end
+
+function setparameters!(m::GurobiMathProgModel; mpboptions...)
+    for (optname, optval) in mpboptions
+        if optname == :TimeLimit
+            setparam!(m.inner, "TimeLimit", optval)
+        elseif optname == :Silent
+            if optval == true
+                setparam!(m.inner,"OutputFlag",0)
+            end
+        else
+            error("Unrecognized parameter $optname")
+        end
+    end
+end
 
 loadproblem!(m::GurobiMathProgModel, filename::AbstractString) = read_model(m.inner, filename)
 
