@@ -395,13 +395,15 @@ using JuMP
 
 m = Model(solver=GurobiSolver())
 
-@defVar(m, 0 <= x <= 5)
-@defVar(m, 0 <= y <= 10, Int)
-@defVar(m, z, Bin)
+@variables(m,begin
+    0 <= x <= 5
+    0 <= y <= 10, Int
+    z, Bin
+end)
 
-@setObjective(m, Max, x + 2y + 5z)
-@addConstraint(m, x + y + z <= 10)
-@addConstraint(m, x + 2y + z <= 15)
+@objective(m, Max, x + 2y + 5z)
+@constraint(m, x + y + z <= 10)
+@constraint(m, x + 2y + z <= 15)
 
 solve(m)
 ```
