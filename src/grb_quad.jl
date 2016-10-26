@@ -153,7 +153,7 @@ function add_qconstr!(model::Model, lind::IVec, lval::FVec, qr::IVec, qc::IVec, 
     lnnz = length(lind)
     lnnz == length(lval) || error("Inconsistent argument dimensions.")
     
-    if qnnz > 0
+    if qnnz > 0 || lnnz > 0
         ret = @grb_ccall(addqconstr, Cint, (
             Ptr{Void},    # model
             Cint,         # lnnz
