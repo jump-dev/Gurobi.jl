@@ -10,6 +10,7 @@ tests = [
     "mathprog",
     "test_grb_attrs",
     "env",
+    "range_constraints"
 ]
 
 for t in tests
