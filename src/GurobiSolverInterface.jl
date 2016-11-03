@@ -91,7 +91,7 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   # Re-set options on new model's copy of env
   setparams!(m)
 
-  add_cvars!(m.inner, float(obj), float(collb), float(colub))
+  add_cvars!(m.inner, float(copy(obj)), float(collb), float(colub))
   update_model!(m.inner)
 
   neginf = typemin(eltype(rowlb))
@@ -100,10 +100,13 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   # check if we have any range constraints
   # to properly support these, we will need to keep track of the
   # slack variables automatically added by gurobi.
-  rangeconstrs = any((rowlb .!= rowub) & (rowlb .> neginf) & (rowub .< posinf))
-  if rangeconstrs
+  rangeconstrs = sum((rowlb .!= rowub) & (rowlb .> neginf) & (rowub .< posinf))
+  if rangeconstrs > 0
       warn("Julia Gurobi interface doesn't properly support range (two-sided) constraints. See Gurobi.jl issue #14")
       add_rangeconstrs!(m.inner, float(A), float(rowlb), float(rowub))
+      # A work around for the additional slack variables introduced and the
+      # reformulation bug warning
+      append!(obj, zeros(rangeconstrs))
   else
       b = Array(Float64,length(rowlb))
       senses = Array(Cchar,length(rowlb))
