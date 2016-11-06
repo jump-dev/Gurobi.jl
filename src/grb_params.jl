@@ -22,10 +22,12 @@ const GRB_INT_PARAMS =[
     "Crossover",
     "CrossoverBasis",
     "BranchDir",
+    "DegenMoves",
     "Disconnected",
     "MinRelNodes",
     "MIPFocus",
     "NodeMethod",
+    "NoRelHeuristic",
     "PumpPasses",
     "RINS",
     "SubMIPNodes",
@@ -40,20 +42,26 @@ const GRB_INT_PARAMS =[
     "FlowPathCuts",
     "GUBCoverCuts",
     "ImpliedCuts",
+    "ProjImpliedCuts",
     "MIPSepCuts",
     "MIRCuts",
+    "StrongCGCuts",
     "ModKCuts",
     "ZeroHalfCuts",
     "NetworkCuts",
     "SubMIPCuts",
+    "InfProofCuts",
     "CutAggPasses",
     "CutPasses",
     "GomoryPasses",
+    "WorkerPort",
     "Aggregate",
     "AggFill",
     "ConcurrentMIP",
-    "ConcurrentMIPJobs",
+    "ConcurrentMIPJobs", # deprecated after Gurobi7
+    "ConcurrentJobs",
     "DisplayInterval",
+    "DistributedMIPJobs",
     "DualReductions",
     "IISMethod",
     "InfUnbdInfo",
@@ -61,7 +69,7 @@ const GRB_INT_PARAMS =[
     "LogToConsole",
     "MIQCPMethod",
     "NumericFocus",
-    "NonBlocking",
+    "NonBlocking", # deprecated after Gurobi7
     "OutputFlag",
     "PreCrush",
     "PreDepRow",
@@ -70,14 +78,23 @@ const GRB_INT_PARAMS =[
     "PreQLinearize",
     "Presolve",
     "PreSparsify",
+    "PreMIQCPForm",
     "QCPDual",
+    "Record",
     "Seed",
     "Threads",
     "TuneResults",
+    "TuneCriterion",
     "TuneTrials",
     "TuneOutput",
     "TuneJobs",
-    "PreMIQPMethod"]
+    "PreMIQPMethod", # deprecated after Gurobi7
+    "UpdateMode",
+    "ObjNumber",
+    "MultiObjMethod",
+    "MultiObjPre",
+    "PoolSolutions",
+    "PoolSearchMode"]
 
 # This list was obtained through AWK (with Gurobi 5.6)
 # command:
@@ -89,6 +106,8 @@ const GRB_DBL_PARAMS = [
     "IterationLimit",
     "NodeLimit",
     "TimeLimit",
+    "BestObjStop",
+    "BestBdStop",
     "FeasibilityTol",
     "IntFeasTol",
     "MarkowitzTol",
@@ -108,7 +127,8 @@ const GRB_DBL_PARAMS = [
     "FeasRelaxBigM",
     "PreSOS1BigM",
     "PreSOS2BigM",
-    "TuneTimeLimit"]
+    "TuneTimeLimit",
+    "PoolGap"]
 
 # This list was obtained through AWK (with Gurobi 5.6)
 # command:
