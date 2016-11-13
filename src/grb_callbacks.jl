@@ -51,9 +51,15 @@ export cbcut, cblazy
 function cbsolution(cbdata::CallbackData, sol::Vector{Float64})
     nvar = num_vars(cbdata.model)
     @assert length(sol) >= nvar
+    objP = Ref{Float64}()
 
-    ret = @grb_ccall(cbsolution, Cint, (Ptr{Void},Ptr{Float64}),
-        cbdata.cbdata, sol)
+    if version >= v"7.0.0"
+        ret = @grb_ccall(cbsolution, Cint, (Ptr{Void},Ptr{Float64},Ref{Float64}),
+            cbdata.cbdata, sol, objP)
+    else
+        ret = @grb_ccall(cbsolution, Cint, (Ptr{Void},Ptr{Float64}),
+            cbdata.cbdata, sol)
+    end
     if ret != 0
         throw(GurobiError(cbdata.model.env, ret))
     end
