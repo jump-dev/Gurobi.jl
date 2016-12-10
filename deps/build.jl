@@ -1,5 +1,3 @@
-import Compat: is_unix, is_windows, is_apple
-
 depsfile = joinpath(dirname(@__FILE__),"deps.jl")
 if isfile(depsfile)
     rm(depsfile)

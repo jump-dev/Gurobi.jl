@@ -45,6 +45,7 @@ const emptyfmat = Array(Float64, 0, 0)
 # macro to call a Gurobi C function
 macro grb_ccall(func, args...)
     f = "GRB$(func)"
+    args = map(esc,args)
     is_unix() && return quote
         ccall(($f,libgurobi), $(args...))
     end
