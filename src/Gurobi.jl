@@ -11,7 +11,6 @@ module Gurobi
     ### imports
 
     import Base.show, Base.copy
-    import Compat: unsafe_string, String, is_windows, is_unix
 
     # Standard LP interface
     importall MathProgBase.SolverInterface
