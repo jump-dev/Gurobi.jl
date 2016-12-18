@@ -275,7 +275,7 @@ A = [50. 24.; 30. 33.]
 b = [2400., 2100.]
 lb = [5., 45.]
  
-solution = linprog(f, A, '<', b, lb, Inf, GurobiSolver())
+solution = linprog(f, A, '<', b, lb, Inf, GurobiSolver(env))
 ```
 
 ##### Example 1.4: Linear programming with JuMP (Algebraic model)
