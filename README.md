@@ -286,7 +286,7 @@ natural algebraic approach.
 ```julia
 using JuMP
 
-m = Model(solver=GurobiSolver())
+m = Model(solver=GurobiSolver(env))
 
 @variable(m, x >= 5)
 @variable(m, y >= 45)
