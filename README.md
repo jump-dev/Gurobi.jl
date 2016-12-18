@@ -29,6 +29,19 @@ Here is the procedure to setup this package:
 
 4. Now, you can start using it.
 
+## Use Other Packages
+
+We highly reccommend that you use the *Gurobi.jl* package with higher level packages such as [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl) or [MathProgBase.jl](https://github.com/JuliaOpt/MathProgBase.jl). 
+
+This can be done using the ``GurobiSolver`` object. Here is how to create a *JuMP* model that uses Gurobi as the solver. Parameters are passed as keyword arguments:
+```julia
+using JuMP, Gurobi
+
+m = Model(solver=GurobiSolver(Presolve=0))
+```
+
+*Most users should not need to use the low-level API detailed in the following sections.*
+
 ## API Overview
 
 This package provides both APIs at different levels for constructing models and solving optimization problems.
@@ -159,10 +172,6 @@ add_rangeconstrs!(model, A, lb, ub)  # here A can be dense or sparse
 add_rangeconstrs_t!(model, At, lb, ub)  # here At can be dense or sparse
 ```
 
-#### Use Other Packages
-
-The *Gurobi.jl* package also works with other packages, including [MathProgBase.jl](https://github.com/JuliaOpt/MathProgBase.jl) and [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl), as a backend provider. 
-
 #### Modify Problem
 
 It is not uncommon in practice that one would like to adjust the objective coefficients and solve the problem again. This package provides a function ``set_objcoeffs!`` for this purpose:
@@ -189,19 +198,19 @@ s.t. 50 x + 24 y <= 2400
      x >= 45, y >= 5
 ```
 
-Below, we show how this problem can be constructed and solved in different ways. In all examples below, we assume that the preamble codes like the following exist in the script:
-
-```julia
-using Gurobi
-env = Gurobi.Env()
-... optional codes to set parameters to env ...
-```
+Below, we show how this problem can be constructed and solved in different ways.
 
 ##### Example 1.1: High-level Linear Programming API
 
 Using the ``gurobi_model`` function:
 
 ```julia
+using Gurobi
+
+env = Gurobi.Env()
+
+# set presolve to 0
+setparam!(env, "Presolve", 0)
 
  # construct the model
 model = gurobi_model(env;
@@ -225,6 +234,13 @@ println("objv = $(objv)")
 ##### Example 1.2: Low-level Linear Programming API
 
 ```julia
+using Gurobi
+
+env = Gurobi.Env()
+
+# set presolve to 0
+setparam!(env, "Presolve", 0)
+
  # creates an empty model ("lp_01" is the model name)
 model = Gurobi.Model(env, "lp_01", :maximize)
 
@@ -268,14 +284,15 @@ solver-independent [MathProgBase](https://github.com/JuliaOpt/MathProgBase.jl) p
 
 Julia code:
 ```julia
-using MathProgBase
+using MathProgBase, Gurobi
 
 f = [1., 1.]
 A = [50. 24.; 30. 33.]
 b = [2400., 2100.]
 lb = [5., 45.]
  
-solution = linprog(f, A, '<', b, lb, Inf, GurobiSolver())
+# pass params as keyword arguments to GurobiSolver
+solution = linprog(f, A, '<', b, lb, Inf, GurobiSolver(Presolve=0))
 ```
 
 ##### Example 1.4: Linear programming with JuMP (Algebraic model)
@@ -284,9 +301,10 @@ Using [JuMP](https://github.com/JuliaOpt/JuMP.jl), we can specify linear program
 natural algebraic approach.
 
 ```julia
-using JuMP
+using JuMP, Gurobi
 
-m = Model(solver=GurobiSolver())
+# pass params as keyword arguments to GurobiSolver
+m = Model(solver=GurobiSolver(Presolve=0))
 
 @variable(m, x >= 5)
 @variable(m, y >= 45)
@@ -314,6 +332,8 @@ s.t.  x + 2 y + 3 z >= 4
 
 using the function ``gurobi_model``:
 ```julia
+using Gurobi
+
 env = Gurobi.Env()
 
 model = gurobi_model(env; 
@@ -328,6 +348,10 @@ optimize(model)
 ##### Example 2.2: Low-level Quadratic Programming API
 
 ```julia
+using Gurobi 
+
+env = Gurobi.Env()
+
 model = Gurobi.Model(env, "qp_01")
 
 add_cvars!(model, [1., 1.], 0., Inf)
@@ -365,7 +389,10 @@ s.t.  x + y + z <= 10
 
 Julia code:
 ```julia
+using Gurobi
+
 env = Gurobi.Env()
+
 model = Gurobi.Model(env, "mip_01", :maximize)
 
  # add continuous variable
@@ -391,7 +418,7 @@ Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer 
 ##### Example 3.2: MIP using JuMP with Gurobi
 
 ```julia
-using JuMP
+using JuMP, Gurobi
 
 m = Model(solver=GurobiSolver())
 
@@ -422,6 +449,8 @@ s.t.  x, y >= 0
 
 Julia code:
 ```julia
+using Gurobi
+
 env = Gurobi.Env()
 
 model = Gurobi.Model(env, "qcqp_01", :maximize)
