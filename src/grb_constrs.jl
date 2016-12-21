@@ -13,7 +13,7 @@ function add_constr!(model::Model, inds::IVec, coeffs::FVec, rel::Cchar, rhs::Fl
         Float64,      # rhs
         Ptr{UInt8}    # name
         ),
-        model, length(inds), inds - 1, coeffs, rel, rhs, C_NULL)
+        model, length(inds), inds - Cint(1), coeffs, rel, rhs, C_NULL)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -49,7 +49,7 @@ function add_constrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec, rel
             Ptr{Float64}, # rhs
             Ptr{UInt8}    # names
             ),
-            model, m, nnz, cbegins - 1, inds - 1, coeffs,
+            model, m, nnz, cbegins - Cint(1), inds - Cint(1), coeffs,
             rel, rhs, C_NULL)
 
         if ret != 0
@@ -94,7 +94,7 @@ function add_rangeconstr!(model::Model, inds::IVec, coeffs::FVec, lb::Float64, u
         Float64,      # upper
         Ptr{UInt8}    # name
         ),
-        model, length(inds), inds - 1, coeffs, lb, ub, C_NULL)
+        model, length(inds), inds - Cint(1), coeffs, lb, ub, C_NULL)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -131,7 +131,7 @@ function add_rangeconstrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec
             Ptr{Float64}, # upper
             Ptr{UInt8}    # names
             ),
-            model, m, nnz, cbegins - 1, inds - 1, coeffs, lb, ub, C_NULL)
+            model, m, nnz, cbegins - Cint(1), inds - Cint(1), coeffs, lb, ub, C_NULL)
 
         if ret != 0
             throw(GurobiError(model.env, ret))
@@ -223,7 +223,7 @@ function del_constrs!(model::Model, idx::Vector{Cint})
                      Ptr{Void},
                      Cint,
                      Ptr{Cint}),
-                     model, convert(Cint,numdel), idx.-1)
+                     model, convert(Cint,numdel), idx-Cint(1))
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
