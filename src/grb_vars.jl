@@ -19,7 +19,7 @@ function add_var!(model::Model, numnz::Integer, vind::Vector, vval::Vector{Float
         UInt8,        # vtype
         Ptr{UInt8}    # name
         ), 
-        model, numnz, ivec(vind.-1), vval, obj, lb, ub, vtype, C_NULL)
+        model, numnz, ivec(vind-1), vval, obj, lb, ub, vtype, C_NULL)
         
     if ret != 0
         throw(GurobiError(model.env, ret))

@@ -13,7 +13,7 @@ function add_qpterms!(model::Model, qr::IVec, qc::IVec, qv::FVec)
             Ptr{Cint},    # qcol
             Ptr{Float64}, # qval
             ), 
-            model, nnz, qr.-1, qc.-1, qv)
+            model, nnz, qr-Cint(1), qc-Cint(1), qv)
             
         if ret != 0
             throw(GurobiError(model.env, ret))
@@ -167,7 +167,7 @@ function add_qconstr!(model::Model, lind::IVec, lval::FVec, qr::IVec, qc::IVec, 
             Float64,      # rhs
             Ptr{UInt8}    # name
             ), 
-            model, lnnz, lind.-1, lval, qnnz, qr.-1, qc.-1, qv, rel, rhs, C_NULL)
+            model, lnnz, lind-Cint(1), lval, qnnz, qr-Cint(1), qc-Cint(1), qv, rel, rhs, C_NULL)
             
         if ret != 0
             throw(GurobiError(model.env, ret))
