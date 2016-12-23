@@ -228,3 +228,23 @@ function del_constrs!(model::Model, idx::Vector{Cint})
         throw(GurobiError(model.env, ret))
     end
 end
+
+
+chg_coeffs!{T<:Real, S<:Real}(model::Model, cidx::T, vidx::T, val::S) = chg_coeffs!(model, Cint[cidx], Cint[vidx], val)
+chg_coeffs!{T<:Real, S<:Real}(model::Model, cidx::Vector{T}, vidx::Vector{T}, val::Vector{S}) = chg_coeffs!(model, convert(Vector{Cint},cidx), convert(Vector{Cint},cidx), fvec(val))
+function chg_coeffs!(model::Model, cidx::Vector{Cint}, vidx::Vector{Cint}, val::FVec)
+
+    (length(cidx) == length(vidx) == length(val)) || error("Inconsistent argument dimensions.")
+
+    numchgs = length(cidx)
+    ret = @grb_ccall(chgcoeffs, Cint, (
+                     Ptr{Void},
+                     Cint,
+                     Ptr{Cint},
+                     Ptr{Cint},
+                     Ptr{Float64}),
+                     model, convert(Cint,numchgs), cidx-Cint(1), vidx-Cint(1), val)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+end
