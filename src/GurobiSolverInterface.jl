@@ -35,11 +35,11 @@ function copy(m::GurobiMathProgModel)
                                copy(m.obj), 
                                copy(m.lb), 
                                copy(m.ub), 
-                               deepcopy(lazycb),
-                               deepcopy(cutcb),
-                               deepcopy(heuristiccb), 
-                               deepcopy(infocb), 
-                               deepcopy(options))
+                               deepcopy(m.lazycb),
+                               deepcopy(m.cutcb),
+                               deepcopy(m.heuristiccb), 
+                               deepcopy(m.infocb), 
+                               deepcopy(m.options))
 end
 
 function setparams!(m::GurobiMathProgModel)
