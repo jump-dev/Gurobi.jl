@@ -30,10 +30,10 @@ end
 
 function copy(m::GurobiMathProgModel)
 
-    lazycb == nothing || Base.warn_once("Callbacks can't be copied, lazy callback ignored")
-    cutcb == nothing || Base.warn_once("Callbacks can't be copied, cut callback ignored")
-    heuristiccb == nothing || Base.warn_once("Callbacks can't be copied, heuristic callback ignored")
-    infocb == nothing || Base.warn_once("Callbacks can't be copied, info callback ignored")
+    m.lazycb == nothing || Base.warn_once("Callbacks can't be copied, lazy callback ignored")
+    m.cutcb == nothing || Base.warn_once("Callbacks can't be copied, cut callback ignored")
+    m.heuristiccb == nothing || Base.warn_once("Callbacks can't be copied, heuristic callback ignored")
+    m.infocb == nothing || Base.warn_once("Callbacks can't be copied, info callback ignored")
 
     return GurobiMathProgModel(copy(m.inner), 
                                m.last_op_type, 
