@@ -15,7 +15,7 @@
 #
 #   solution: x = 1.3333333, y = 1.3333333, objv = 2.66666666
 
-#using Gurobi
+using Gurobi
 
 env = Gurobi.Env()
 setparams!(env, Method=2)  # using barrier method
