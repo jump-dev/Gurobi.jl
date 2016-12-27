@@ -29,17 +29,23 @@ function GurobiMathProgModel(env=nothing;options...)
 end
 
 function copy(m::GurobiMathProgModel)
+
+    lazycb == nothing || Base.warn_once("Callbacks can't be copied, lazy callback ignored")
+    cutcb == nothing || Base.warn_once("Callbacks can't be copied, cut callback ignored")
+    heuristiccb == nothing || Base.warn_once("Callbacks can't be copied, heuristic callback ignored")
+    infocb == nothing || Base.warn_once("Callbacks can't be copied, info callback ignored")
+
     return GurobiMathProgModel(copy(m.inner), 
                                m.last_op_type, 
                                m.changed_constr_bounds, 
                                copy(m.obj), 
                                copy(m.lb), 
                                copy(m.ub), 
-                               deepcopy(m.lazycb),
-                               deepcopy(m.cutcb),
-                               deepcopy(m.heuristiccb), 
-                               deepcopy(m.infocb), 
-                               deepcopy(m.options))
+                               nothing,
+                               nothing,
+                               nothing, 
+                               nothing, 
+                               deepcopy(options))
 end
 
 function setparams!(m::GurobiMathProgModel)
