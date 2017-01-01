@@ -79,7 +79,12 @@ function setparameters!(m::GurobiMathProgModel; mpboptions...)
     end
 end
 
-loadproblem!(m::GurobiMathProgModel, filename::AbstractString) = read_model(m.inner, filename)
+function loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
+    read_model(m.inner, filename)
+    m.obj = getobj(m)
+    m.lb = getconstrLB(m)
+    m.ub = getconstrUB(m)
+end
 
 function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
   # throw away old model but keep env and finalize_env
