@@ -238,7 +238,7 @@ function addconstr!(m::GurobiMathProgModel, varidx, coef, lb, ub)
 end
 delconstrs!(m::GurobiMathProgModel, idx) = del_constrs!(m.inner, idx)
 
-chgcoeffs!(m::GurobiMathProgModel, cidx, vidx, val) = chg_coeffs!(m.inner, cidx, vidx, val)
+changecoeffs!(m::GurobiMathProgModel, cidx, vidx, val) = chg_coeffs!(m.inner, cidx, vidx, val)
 
 function updatemodel!(m::GurobiMathProgModel)
     update_model!(m.inner)
