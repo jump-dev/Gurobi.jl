@@ -6,7 +6,7 @@
 #    grep GRB_INT_PAR gurobi_c.h | awk '{ printf("%s,\n", $3) }'
 #
 
-const GRB_INT_PARAMS =[ 
+const GRB_INT_PARAMS =[
     "BarIterLimit",
     "SolutionLimit",
     "Method",
@@ -157,7 +157,7 @@ const GRB_MAX_STRLEN = 512   # gurobi.c define this value as 512
 function get_int_param(env::Env, name::String)
     @assert isascii(name)
     a = Array(Cint, 1)
-    ret = @grb_ccall(getintparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cint}), 
+    ret = @grb_ccall(getintparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cint}),
         env, name, a)
     if ret != 0
         throw(GurobiError(env, ret))
@@ -168,7 +168,7 @@ end
 function get_dbl_param(env::Env, name::String)
     @assert isascii(name)
     a = Array(Float64, 1)
-    ret = @grb_ccall(getdblparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Float64}), 
+    ret = @grb_ccall(getdblparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Float64}),
         env, name, a)
     if ret != 0
         throw(GurobiError(env, ret))
@@ -179,18 +179,18 @@ end
 function get_str_param(env::Env, name::String)
     @assert isascii(name)
     buf = Array(Cchar, GRB_MAX_STRLEN)
-    ret = @grb_ccall(getstrparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cchar}), 
+    ret = @grb_ccall(getstrparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cchar}),
         env, name, buf)
     if ret != 0
         throw(GurobiError(env, ret))
     end
-    bytestring(pointer(buf))
+    unsafe_string(pointer(buf))
 end
 
 
 function set_int_param!(env::Env, name::String, v::Integer)
     @assert isascii(name)
-    ret = @grb_ccall(setintparam, Cint, (Ptr{Void}, Ptr{Cchar}, Cint), 
+    ret = @grb_ccall(setintparam, Cint, (Ptr{Void}, Ptr{Cchar}, Cint),
         env, name, v)
     if ret != 0
         throw(GurobiError(env, ret))
@@ -199,7 +199,7 @@ end
 
 function set_dbl_param!(env::Env, name::String, v::Real)
     @assert isascii(name)
-    ret = @grb_ccall(setdblparam, Cint, (Ptr{Void}, Ptr{Cchar}, Float64), 
+    ret = @grb_ccall(setdblparam, Cint, (Ptr{Void}, Ptr{Cchar}, Float64),
         env, name, v)
     if ret != 0
         throw(GurobiError(env, ret))
@@ -209,10 +209,10 @@ end
 function set_str_param!(env::Env, name::String, v::String)
     @assert isascii(name)
     @assert isascii(v)
-    ret = @grb_ccall(setstrparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cchar}), 
+    ret = @grb_ccall(setstrparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cchar}),
         env, name, v)
     if ret != 0
-        throw(GurobiError(env, ret))        
+        throw(GurobiError(env, ret))
     end
 end
 
@@ -257,7 +257,7 @@ function get_str_param(m::Model, name::String)
     if ret != 0
         throw(GurobiError(Env(modenv), ret))
     end
-    bytestring(pointer(buf))
+    unsafe_string(pointer(buf))
 end
 
 
