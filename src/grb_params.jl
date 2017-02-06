@@ -156,7 +156,7 @@ const GRB_MAX_STRLEN = 512   # gurobi.c define this value as 512
 
 function get_int_param(env::Env, name::String)
     @assert isascii(name)
-    a = Array(Cint, 1)
+    a = Array{Cint}(1)
     ret = @grb_ccall(getintparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cint}),
         env, name, a)
     if ret != 0
@@ -167,7 +167,7 @@ end
 
 function get_dbl_param(env::Env, name::String)
     @assert isascii(name)
-    a = Array(Float64, 1)
+    a = Array{Float64}(1)
     ret = @grb_ccall(getdblparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Float64}),
         env, name, a)
     if ret != 0
@@ -178,7 +178,7 @@ end
 
 function get_str_param(env::Env, name::String)
     @assert isascii(name)
-    buf = Array(Cchar, GRB_MAX_STRLEN)
+    buf = Array{Cchar}(GRB_MAX_STRLEN)
     ret = @grb_ccall(getstrparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cchar}),
         env, name, buf)
     if ret != 0
@@ -223,7 +223,7 @@ function get_int_param(m::Model, name::String)
     @assert isascii(name)
     modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
     @assert modenv != C_NULL
-    a = Array(Cint, 1)
+    a = Array{Cint}(1)
     ret = @grb_ccall(getintparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cint}),
         modenv, name, a)
     if ret != 0
@@ -237,7 +237,7 @@ function get_dbl_param(m::Model, name::String)
     @assert isascii(name)
     modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
     @assert modenv != C_NULL
-    a = Array(Float64, 1)
+    a = Array{Float64}(1)
     ret = @grb_ccall(getdblparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Float64}),
         modenv, name, a)
     if ret != 0
@@ -251,7 +251,7 @@ function get_str_param(m::Model, name::String)
     @assert isascii(name)
     modenv = @grb_ccall(getenv, Ptr{Void}, (Ptr{Void},), m)
     @assert modenv != C_NULL
-    buf = Array(Cchar, GRB_MAX_STRLEN)
+    buf = Array{Cchar}(GRB_MAX_STRLEN)
     ret = @grb_ccall(getstrparam, Cint, (Ptr{Void}, Ptr{Cchar}, Ptr{Cchar}),
         modenv, name, buf)
     if ret != 0

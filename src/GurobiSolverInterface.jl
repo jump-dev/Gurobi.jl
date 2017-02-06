@@ -113,8 +113,8 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
       # reformulation bug warning
       append!(obj, zeros(rangeconstrs))
   else
-      b = Array(Float64,length(rowlb))
-      senses = Array(Cchar,length(rowlb))
+      b = Array{Float64}(length(rowlb))
+      senses = Array{Cchar}(length(rowlb))
       for i in 1:length(rowlb)
           if rowlb[i] == rowub[i]
               senses[i] = '='

@@ -8,7 +8,7 @@
 
 function get_intattr(model::Model, name::String)
     @assert isascii(name)
-    a = Array(Cint, 1)
+    a = Array{Cint}(1)
     ret = @grb_ccall(getintattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Ptr{Cint}),
         model, name, a);
@@ -20,7 +20,7 @@ end
 
 function get_dblattr(model::Model, name::String)
     @assert isascii(name)
-    a = Array(Float64, 1)
+    a = Array{Float64}(1)
     ret = @grb_ccall(getdblattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Ptr{Float64}),
         model, name, a);
@@ -32,7 +32,7 @@ end
 
 function get_strattr(model::Model, name::String)
     @assert isascii(name)
-    a = Array(Ptr{UInt8}, 1)
+    a = Array{Ptr{UInt8}}(1)
     ret = @grb_ccall(getstrattr, Cint,
         (Ptr{Void}, Ptr{UInt8}, Ptr{Ptr{UInt8}}),
         model, name, a)
@@ -46,7 +46,7 @@ end
 
 function get_intattrelement(model::Gurobi.Model, name::String, element::Int)
     @assert isascii(name)
-    a = Array(Cint, 1)
+    a = Array{Cint}(1)
     ret = @grb_ccall(getintattrelement, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cint}),
         model, name, element - 1, a
@@ -59,7 +59,7 @@ end
 
 function get_dblattrelement(model::Gurobi.Model, name::String, element::Int)
     @assert isascii(name)
-    a = Array(Float64, 1)
+    a = Array{Float64}(1)
     ret = @grb_ccall(getdblattrelement, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Float64}),
         model, name, element - 1, a
@@ -72,7 +72,7 @@ end
 
 function get_charattrelement(model::Gurobi.Model, name::String, element::Int)
     @assert isascii(name)
-    a = Array(Cchar, 1)
+    a = Array{Cchar}(1)
     ret = @grb_ccall(getcharattrelement, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cchar}),
         model, name, element - 1, a
@@ -98,7 +98,7 @@ end
 
 function get_intattrarray(model::Model, name::String, start::Integer, len::Integer)
     @assert isascii(name)
-    get_intattrarray!(Array(Cint, len), model, name, start)
+    get_intattrarray!(Array{Cint}(len), model, name, start)
 end
 
 function get_dblattrarray!(r::Array{Float64}, model::Model, name::String, start::Integer)
@@ -114,7 +114,7 @@ end
 
 function get_dblattrarray(model::Model, name::String, start::Integer, len::Integer)
     @assert isascii(name)
-    get_dblattrarray!(Array(Float64, len), model, name, start)
+    get_dblattrarray!(Array{Float64}(len), model, name, start)
 end
 
 function get_charattrarray!(r::Array{Cchar}, model::Model, name::String, start::Integer)
@@ -130,7 +130,7 @@ end
 
 function get_charattrarray(model::Model, name::String, start::Integer, len::Integer)
     @assert isascii(name)
-    get_charattrarray!(Array(Cchar, len), model, name, start)
+    get_charattrarray!(Array{Cchar}(len), model, name, start)
 end
 
 # setters

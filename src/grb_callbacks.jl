@@ -68,7 +68,7 @@ end
 
 function cbget{T}(::Type{T},cbdata::CallbackData, where::Cint, what::Integer)
 
-    out = Array(T,1)
+    out = Array{T}(1)
     ret = @grb_ccall(cbget, Cint, (Ptr{Void}, Cint, Cint, Ptr{T}),
         cbdata.cbdata, where, convert(Cint,what), out)
     if ret != 0
@@ -152,7 +152,7 @@ for (fname, what) in ((:cbget_mipsol_sol, 4001), (:cbget_mipnode_rel, 5002))
     end
     @eval function ($fname)(cbdata::CallbackData, where::Cint)
         nvar = num_vars(cbdata.model)
-        out = Array(Float64,nvar)
+        out = Array{Float64}(nvar)
         ($fname)(cbdata, where, out)
         return out
     end

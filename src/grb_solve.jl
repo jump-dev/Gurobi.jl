@@ -122,17 +122,17 @@ const conmap = Dict(
     -1 => :Nonbasic)
 
 function get_basis(model::Model)
-    cval = Array(Cint, num_vars(model))
-    cbasis = Array(Symbol, num_vars(model))
+    cval = Array{Cint}(num_vars(model))
+    cbasis = Array{Symbol}(num_vars(model))
     get_intattrarray!(cval, model, "VBasis", 1)
     for it in 1:length(cval)
         cbasis[it] = varmap[cval[it]]
     end
     
-    rval = Array(Cint, num_constrs(model))
-    rbasis = Array(Symbol, num_constrs(model))
+    rval = Array{Cint}(num_constrs(model))
+    rbasis = Array{Symbol}(num_constrs(model))
     get_intattrarray!(rval, model, "CBasis", 1)
-    rsense = Array(Cchar, num_constrs(model))
+    rsense = Array{Cchar}(num_constrs(model))
     get_charattrarray!(rsense, model, "Sense", 1)
     for it in 1:length(rval)
         rbasis[it] = conmap[rval[it]]

@@ -26,7 +26,7 @@ function Model(env::Env, name::String; finalize_env::Bool=false)
     @assert is_valid(env)
     @assert isascii(name)
     
-    a = Array(Ptr{Void}, 1)
+    a = Array{Ptr{Void}}(1)
     ret = @grb_ccall(newmodel, Cint, (
         Ptr{Void},  # env
         Ptr{Ptr{Void}},  # pointer to model pointer
@@ -109,7 +109,7 @@ end
 function read_model(model::Model, filename::String)
     @assert isascii(filename) # TODO: support non-ascii file names
     @assert is_valid(model.env)
-    a = Array(Ptr{Void}, 1)
+    a = Array{Ptr{Void}}(1)
     ret = @grb_ccall(readmodel, Cint, 
         (Ptr{Void}, Ptr{UInt8}, Ptr{Ptr{Void}}), 
         model.env, filename, a)

@@ -163,10 +163,10 @@ function get_constrmatrix(model::Model)
     nnz = get_intattr(model, "NumNZs")
     m = num_constrs(model)
     n = num_vars(model)
-    numnzP = Array(Cint, 1)
-    cbeg = Array(Cint, m+1)
-    cind = Array(Cint, nnz)
-    cval = Array(Cdouble, nnz)
+    numnzP = Array{Cint}(1)
+    cbeg = Array{Cint}(m+1)
+    cind = Array{Cint}(nnz)
+    cval = Array{Cdouble}(nnz)
     ret = @grb_ccall(getconstrs, Cint, (
                      Ptr{Void},
                      Ptr{Cint},
@@ -181,9 +181,9 @@ function get_constrmatrix(model::Model)
         throw(GurobiError(model.env, ret))
     end
     cbeg[end] = nnz
-    I = Array(Int64, nnz)
-    J = Array(Int64, nnz)
-    V = Array(Float64, nnz)
+    I = Array{Int64}(nnz)
+    J = Array{Int64}(nnz)
+    V = Array{Float64}(nnz)
     for i in 1:length(cbeg)-1
         for j in (cbeg[i]+1):cbeg[i+1]
             I[j] = i
