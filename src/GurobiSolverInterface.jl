@@ -182,12 +182,12 @@ getobj(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "Obj", 1, num_va
 setobj!(m::GurobiMathProgModel, c) = (m.obj=copy(c); set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c))
 
 function setmultiobj!(m::GurobiMathProgModel, i, c)
-    set_intattr!(m.innter, "ObjNumber", i)
+    set_intattr!(m.inner, "ObjNumber", i)
     set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c)
 end
 
 function setmultiobjpriority!(m::GurobiMathProgModel, i, priority)
-    set_intattr!(m.innter, "ObjNumber", i)
+    set_intattr!(m.inner, "ObjNumber", i)
     set_intattr!(m.inner, "ObjNPriority", priority)
 end
 
