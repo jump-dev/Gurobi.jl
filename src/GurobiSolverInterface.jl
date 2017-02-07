@@ -181,14 +181,24 @@ setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.ub
 getobj(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "Obj", 1, num_vars(m.inner)   )
 setobj!(m::GurobiMathProgModel, c) = (m.obj=copy(c); set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c))
 
-function setmultiobj!(m::GurobiMathProgModel, i, c)
+function setmultiobj!(m::GurobiMathProgModel, i::Int, c)
     set_intattr!(m.inner, "ObjNumber", i)
     set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c)
 end
 
-function setmultiobjpriority!(m::GurobiMathProgModel, i, priority)
+function getmultiobj(m::GurobiMathProgModel, i::Int)
+    set_intattr!(m.inner, "ObjNumber", i)
+    get_dblattrarray(m.inner, "Obj", 1, num_vars(m.inner))
+end
+
+function setmultiobjpriority!(m::GurobiMathProgModel, i::Int, priority::Int)
     set_intattr!(m.inner, "ObjNumber", i)
     set_intattr!(m.inner, "ObjNPriority", priority)
+end
+
+function getmultiobjpriority(m::GurobiMathProgModel, i::Int)
+    set_intattr!(m.inner, "ObjNumber", i)
+    get_intattr(m.inner, "ObjNPriority")
 end
 
 function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
