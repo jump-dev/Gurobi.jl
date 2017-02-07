@@ -182,27 +182,31 @@ getobj(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "Obj", 1, num_va
 setobj!(m::GurobiMathProgModel, c) = (m.obj=copy(c); set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c))
 
 function setmultiobj!(m::Model, i::Int, c)
+    i0 = get_int_param(m.env, "ObjNumber")
     set_int_param!(m.env, "ObjNumber", i)
     set_dblattrarray!(m, "Obj", 1, num_vars(m), c)
-    set_int_param!(m.env, "ObjNumber", 1)
+    set_int_param!(m.env, "ObjNumber", i0)
 end
 
 function getmultiobj(m::Model, i::Int)
+    i0 = get_int_param(m.env, "ObjNumber")
     set_int_param!(m.env, "ObjNumber", i)
     get_dblattrarray(m, "Obj", 1, num_vars(m))
-    set_int_param!(m.env, "ObjNumber", 1)
+    set_int_param!(m.env, "ObjNumber", i0)
 end
 
 function setmultiobjpriority!(m::Model, i::Int, priority::Int)
+    i0 = get_int_param(m.env, "ObjNumber")
     set_int_param!(m.env, "ObjNumber", i)
     set_intattr!(m, "ObjNPriority", priority)
-    set_int_param!(m.env, "ObjNumber", 1)
+    set_int_param!(m.env, "ObjNumber", i0)
 end
 
 function getmultiobjpriority(m::Model, i::Int)
+    i0 = get_int_param(m.env, "ObjNumber")
     set_int_param!(m.env, "ObjNumber", i)
     get_intattr(m, "ObjNPriority")
-    set_int_param!(m.env, "ObjNumber", 1)
+    set_int_param!(m.env, "ObjNumber", i0)
 end
 
 function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
