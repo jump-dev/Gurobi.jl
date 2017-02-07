@@ -101,7 +101,7 @@ This function constructs a model that represents the following problem:
 objective:  (1/2) x' H x + f' x
 
       s.t.   A x <= b
-           Aeq x <= beq
+           Aeq x = beq
          lb <= x <= ub
 ```
 
