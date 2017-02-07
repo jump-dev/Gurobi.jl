@@ -178,8 +178,8 @@ end
 setconstrLB!(m::GurobiMathProgModel, lb) = (m.changed_constr_bounds = true; m.lb = copy(lb))
 setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.ub = copy(ub))
 
-getobj(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "Obj", 1, num_vars(m.inner)   )
-setobj!(m::GurobiMathProgModel, c) = (m.obj=copy(c); set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c))
+getobj(m::GurobiMathProgModel, i=1)     = get_dblattrarray( m.inner, "Obj", i, num_vars(m.inner)   )
+setobj!(m::GurobiMathProgModel, c, i=1) = (m.obj=copy(c); set_dblattrarray!(m.inner, "Obj", i, num_vars(m.inner), c))
 
 function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
     if m.last_op_type == :Con
