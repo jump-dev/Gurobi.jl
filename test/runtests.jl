@@ -13,7 +13,8 @@ tests = [
     "env",
     "range_constraints",
     "test_get_strarray",
-    "large_coefficients"
+    "large_coefficients",
+    "multiobj"
 ]
 
 for t in tests
