@@ -181,24 +181,28 @@ setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.ub
 getobj(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "Obj", 1, num_vars(m.inner)   )
 setobj!(m::GurobiMathProgModel, c) = (m.obj=copy(c); set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c))
 
-function setmultiobj!(m::GurobiMathProgModel, i::Int, c)
-    set_intattr!(m.inner, "ObjNumber", i)
-    set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c)
+function setmultiobj!(m::Model, i::Int, c)
+    set_int_param!(m.env, "ObjNumber", i)
+    set_dblattrarray!(m, "Obj", 1, num_vars(m), c)
+    set_int_param!(m.env, "ObjNumber", 1)
 end
 
-function getmultiobj(m::GurobiMathProgModel, i::Int)
-    set_intattr!(m.inner, "ObjNumber", i)
-    get_dblattrarray(m.inner, "Obj", 1, num_vars(m.inner))
+function getmultiobj(m::Model, i::Int)
+    set_int_param!(m.env, "ObjNumber", i)
+    get_dblattrarray(m, "Obj", 1, num_vars(m))
+    set_int_param!(m.env, "ObjNumber", 1)
 end
 
-function setmultiobjpriority!(m::GurobiMathProgModel, i::Int, priority::Int)
-    set_intattr!(m.inner, "ObjNumber", i)
-    set_intattr!(m.inner, "ObjNPriority", priority)
+function setmultiobjpriority!(m::Model, i::Int, priority::Int)
+    set_int_param!(m.env, "ObjNumber", i)
+    set_intattr!(m, "ObjNPriority", priority)
+    set_int_param!(m.env, "ObjNumber", 1)
 end
 
-function getmultiobjpriority(m::GurobiMathProgModel, i::Int)
-    set_intattr!(m.inner, "ObjNumber", i)
-    get_intattr(m.inner, "ObjNPriority")
+function getmultiobjpriority(m::Model, i::Int)
+    set_int_param!(m.env, "ObjNumber", i)
+    get_intattr(m, "ObjNPriority")
+    set_int_param!(m.env, "ObjNumber", 1)
 end
 
 function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
