@@ -231,7 +231,7 @@ function get_multiobj_weight(m::Model, i::Int)::Float64
 end
 
 function set_multiobj!(m::Model, i::Int, c::AbstractVector{Float64}, p::Float64, w::Float64)
-    set_multiobj!(m, i, c)
+    set_multiobj_c!(m, i, c)
     set_multiobj_priority!(m, i, p)
     set_multiobj_weight!(m, i, w)
 end
