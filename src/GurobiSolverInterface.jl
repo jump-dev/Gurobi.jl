@@ -319,9 +319,9 @@ function status(m::GurobiMathProgModel)
   elseif s == :interrupted # ended by user?
     return :UserLimit
   elseif s == :inprogress
-      return :InProgress
+    return :InProgress
   elseif s == :user_obj_limit
-      return :UserObjLimit
+    return :UserObjLimit
   else
     error("Unrecognized solution status: $s")
   end
