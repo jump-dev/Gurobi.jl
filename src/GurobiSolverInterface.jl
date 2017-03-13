@@ -318,6 +318,10 @@ function status(m::GurobiMathProgModel)
     return :Suboptimal # not very useful status
   elseif s == :interrupted # ended by user?
     return :UserLimit
+  elseif s == :inprogress
+      return :InProgress
+  elseif s == :user_obj_limit
+      return :UserObjLimit
   else
     error("Unrecognized solution status: $s")
   end
