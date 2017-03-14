@@ -146,7 +146,7 @@ function get_strattrarray!(r::Array{Ptr{UInt8}}, model::Model, name::String, sta
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-	map(unsafe_string, r)
+    map(unsafe_string, r)
 end
 
 # setters
