@@ -38,6 +38,8 @@ const GRB_SOLUTION_LIMIT  = 10
 const GRB_INTERRUPTED     = 11
 const GRB_NUMERIC         = 12
 const GRB_SUBOPTIMAL      = 13
+const GRB_INPROGRESS      = 14
+const GRB_USER_OBJ_LIMIT  = 15
 
 const status_symbols = [
     :loaded, 
@@ -52,7 +54,9 @@ const status_symbols = [
     :solution_limit,
     :interrupted,
     :numeric,
-    :suboptimal
+    :suboptimal,
+    :inprogress,
+    :user_obj_limit
 ]
 
 get_status_code(model::Model) = get_intattr(model, "Status")
