@@ -35,16 +35,16 @@ function copy(m::GurobiMathProgModel)
     m.heuristiccb == nothing || Base.warn_once("Callbacks can't be copied, heuristic callback ignored")
     m.infocb == nothing || Base.warn_once("Callbacks can't be copied, info callback ignored")
 
-    return GurobiMathProgModel(copy(m.inner), 
-                               m.last_op_type, 
-                               m.changed_constr_bounds, 
-                               copy(m.obj), 
-                               copy(m.lb), 
-                               copy(m.ub), 
+    return GurobiMathProgModel(copy(m.inner),
+                               m.last_op_type,
+                               m.changed_constr_bounds,
+                               copy(m.obj),
+                               copy(m.lb),
+                               copy(m.ub),
                                nothing,
                                nothing,
-                               nothing, 
-                               nothing, 
+                               nothing,
+                               nothing,
                                deepcopy(m.options))
 end
 
@@ -154,7 +154,7 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   end
 
   m.lb, m.ub = rowlb, rowub
-  m.obj = obj
+  m.obj = copy(obj)
   update_model!(m.inner)
   setsense!(m,sense)
 end
@@ -211,16 +211,12 @@ function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
     push!(m.obj, objcoef)
     add_var!(m.inner, length(constridx), constridx, float(constrcoef), float(objcoef), float(l), float(u), GRB_CONTINUOUS)
 end
-function addvar!(m::GurobiMathProgModel, l, u, objcoef)
-    if m.last_op_type == :Con
-        updatemodel!(m)
-        m.last_op_type = :Var
-    end
-    push!(m.obj, objcoef)
-    add_var!(m.inner, 0, Integer[], Float64[], float(objcoef), float(l), float(u), GRB_CONTINUOUS)
-end
+addvar!(m::GurobiMathProgModel, l, u, objcoef) = addvar!(m, Int[], Float64[], l, u, objcoef)
 
-delvars!(m::GurobiMathProgModel, idx) = del_vars!(m.inner, idx)
+function delvars!(m::GurobiMathProgModel, idx)
+    deleteat!(m.obj, idx)
+    del_vars!(m.inner, idx)
+end
 
 function addconstr!(m::GurobiMathProgModel, varidx, coef, lb, ub)
     if m.last_op_type == :Var
