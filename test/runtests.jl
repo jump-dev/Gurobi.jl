@@ -10,7 +10,8 @@ tests = [
     "mathprog",
     "test_grb_attrs",
     "env",
-    "range_constraints"
+    "range_constraints",
+    "test_get_strarray"
 ]
 
 for t in tests
