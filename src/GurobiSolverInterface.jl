@@ -17,6 +17,7 @@ type GurobiMathProgModel <: AbstractLinearQuadraticModel
     infocb
     options
 end
+
 function GurobiMathProgModel(env=nothing;options...)
    finalize_env = (env == nothing)
    if env == nothing
@@ -26,6 +27,27 @@ function GurobiMathProgModel(env=nothing;options...)
    setparams!(m)
    return m
 end
+
+function copy(m::GurobiMathProgModel)
+
+    m.lazycb == nothing || Base.warn_once("Callbacks can't be copied, lazy callback ignored")
+    m.cutcb == nothing || Base.warn_once("Callbacks can't be copied, cut callback ignored")
+    m.heuristiccb == nothing || Base.warn_once("Callbacks can't be copied, heuristic callback ignored")
+    m.infocb == nothing || Base.warn_once("Callbacks can't be copied, info callback ignored")
+
+    return GurobiMathProgModel(copy(m.inner), 
+                               m.last_op_type, 
+                               m.changed_constr_bounds, 
+                               copy(m.obj), 
+                               copy(m.lb), 
+                               copy(m.ub), 
+                               nothing,
+                               nothing,
+                               nothing, 
+                               nothing, 
+                               deepcopy(options))
+end
+
 function setparams!(m::GurobiMathProgModel)
     # Helper to set the parameters on the model's copy of env rather than
     # modifying the global env (ref: http://www.gurobi.com/support/faqs#P)
@@ -197,6 +219,9 @@ function addvar!(m::GurobiMathProgModel, l, u, objcoef)
     push!(m.obj, objcoef)
     add_var!(m.inner, 0, Integer[], Float64[], float(objcoef), float(l), float(u), GRB_CONTINUOUS)
 end
+
+delvars!(m::GurobiMathProgModel, idx) = del_vars!(m.inner, idx)
+
 function addconstr!(m::GurobiMathProgModel, varidx, coef, lb, ub)
     if m.last_op_type == :Var
         updatemodel!(m)
@@ -216,6 +241,9 @@ function addconstr!(m::GurobiMathProgModel, varidx, coef, lb, ub)
         error("Adding range constraints not supported yet.")
     end
 end
+delconstrs!(m::GurobiMathProgModel, idx) = del_constrs!(m.inner, idx)
+
+changecoeffs!(m::GurobiMathProgModel, cidx, vidx, val) = chg_coeffs!(m.inner, cidx, vidx, val)
 
 function updatemodel!(m::GurobiMathProgModel)
     update_model!(m.inner)
