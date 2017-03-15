@@ -5,7 +5,7 @@ type Env
     ptr_env::Ptr{Void}
     
     function Env()
-        a = Array(Ptr{Void}, 1)
+        a = Array{Ptr{Void}}(1)
         ret = @grb_ccall(loadenv, Cint, (Ptr{Ptr{Void}}, Ptr{UInt8}), 
             a, C_NULL)
         if ret != 0

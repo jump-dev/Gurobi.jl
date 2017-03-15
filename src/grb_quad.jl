@@ -32,9 +32,9 @@ function add_qpterms!(model, H::SparseMatrixCSC{Float64}) # H must be symmetric
     (H.m == n && H.n == n) || error("H must be an n-by-n symmetric matrix.")
     
     nnz_h = nnz(H)
-    qr = Array(Cint, nnz_h)
-    qc = Array(Cint, nnz_h)
-    qv = Array(Float64, nnz_h)
+    qr = Array{Cint}(nnz_h)
+    qc = Array{Cint}(nnz_h)
+    qv = Array{Float64}(nnz_h)
     k = 0
     
     colptr::Vector{Int} = H.colptr
@@ -67,9 +67,9 @@ function add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
     size(H) == (n, n) || error("H must be an n-by-n symmetric matrix.")
     
     nmax = round(Int,n * (n + 1) / 2)
-    qr = Array(Cint, nmax)
-    qc = Array(Cint, nmax)
-    qv = Array(Float64, nmax)
+    qr = Array{Cint}(nmax)
+    qc = Array{Cint}(nmax)
+    qv = Array{Float64}(nmax)
     k::Int = 0
     
     for i = 1 : n
@@ -123,10 +123,10 @@ end
 
 function getq(model::Model)
     nz = get_intattr(model, "NumQNZs")
-    rowidx = Array(Cint, nz)
-    colidx = Array(Cint, nz)
-    val = Array(Float64, nz)
-    nzout = Array(Cint,1)
+    rowidx = Array{Cint}(nz)
+    colidx = Array{Cint}(nz)
+    val = Array{Float64}(nz)
+    nzout = Array{Cint}(1)
     
     ret = @grb_ccall(getq, Cint, (
         Ptr{Void},  # model

@@ -38,6 +38,8 @@ const GRB_SOLUTION_LIMIT  = 10
 const GRB_INTERRUPTED     = 11
 const GRB_NUMERIC         = 12
 const GRB_SUBOPTIMAL      = 13
+const GRB_INPROGRESS      = 14
+const GRB_USER_OBJ_LIMIT  = 15
 
 const status_symbols = [
     :loaded, 
@@ -52,7 +54,9 @@ const status_symbols = [
     :solution_limit,
     :interrupted,
     :numeric,
-    :suboptimal
+    :suboptimal,
+    :inprogress,
+    :user_obj_limit
 ]
 
 get_status_code(model::Model) = get_intattr(model, "Status")
@@ -122,17 +126,17 @@ const conmap = Dict(
     -1 => :Nonbasic)
 
 function get_basis(model::Model)
-    cval = Array(Cint, num_vars(model))
-    cbasis = Array(Symbol, num_vars(model))
+    cval = Array{Cint}(num_vars(model))
+    cbasis = Array{Symbol}(num_vars(model))
     get_intattrarray!(cval, model, "VBasis", 1)
     for it in 1:length(cval)
         cbasis[it] = varmap[cval[it]]
     end
     
-    rval = Array(Cint, num_constrs(model))
-    rbasis = Array(Symbol, num_constrs(model))
+    rval = Array{Cint}(num_constrs(model))
+    rbasis = Array{Symbol}(num_constrs(model))
     get_intattrarray!(rval, model, "CBasis", 1)
-    rsense = Array(Cchar, num_constrs(model))
+    rsense = Array{Cchar}(num_constrs(model))
     get_charattrarray!(rsense, model, "Sense", 1)
     for it in 1:length(rval)
         rbasis[it] = conmap[rval[it]]

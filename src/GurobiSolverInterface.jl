@@ -101,7 +101,12 @@ function setparameters!(m::GurobiMathProgModel; mpboptions...)
     end
 end
 
-loadproblem!(m::GurobiMathProgModel, filename::AbstractString) = read_model(m.inner, filename)
+function loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
+    read_model(m.inner, filename)
+    m.obj = getobj(m)
+    m.lb = getconstrLB(m)
+    m.ub = getconstrUB(m)
+end
 
 function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
   # throw away old model but keep env and finalize_env
@@ -130,8 +135,8 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
       # reformulation bug warning
       append!(obj, zeros(rangeconstrs))
   else
-      b = Array(Float64,length(rowlb))
-      senses = Array(Cchar,length(rowlb))
+      b = Array{Float64}(length(rowlb))
+      senses = Array{Cchar}(length(rowlb))
       for i in 1:length(rowlb)
           if rowlb[i] == rowub[i]
               senses[i] = '='
@@ -341,6 +346,10 @@ function status(m::GurobiMathProgModel)
     return :Suboptimal # not very useful status
   elseif s == :interrupted # ended by user?
     return :UserLimit
+  elseif s == :inprogress
+    return :InProgress
+  elseif s == :user_obj_limit
+    return :UserObjLimit
   else
     error("Unrecognized solution status: $s")
   end
