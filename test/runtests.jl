@@ -11,7 +11,8 @@ tests = [
     "mathprog",
     "test_grb_attrs",
     "env",
-    "range_constraints"
+    "range_constraints",
+    "multiobj"
 ]
 
 for t in tests
