@@ -49,10 +49,14 @@ macro grb_ccall(func, args...)
     is_unix() && return quote
         ccall(($f,libgurobi), $(args...))
     end
-    is_windows() && return quote
+    is_windows() && VERSION < v"0.6-" && return quote
         ccall(($f,libgurobi), stdcall, $(args...))
     end
+    is_windows() && VERSION >= v"0.6-" && return quote
+        ccall(($f,libgurobi), $(esc(:stdcall)), $(args...))
+    end
 end
+
 
 # Gurobi library version
 function getlibversion()
