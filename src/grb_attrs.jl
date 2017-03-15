@@ -133,6 +133,22 @@ function get_charattrarray(model::Model, name::String, start::Integer, len::Inte
     get_charattrarray!(Array{Cchar}(len), model, name, start)
 end
 
+function get_strattrarray(model::Model, name::String, start::Integer, len::Integer)
+    @assert isascii(name)
+    get_strattrarray!(Array(Ptr{UInt8}, len), model, name, start)
+end
+
+function get_strattrarray!(r::Array{Ptr{UInt8}}, model::Model, name::String, start::Integer)
+    @assert isascii(name)
+    ret = @grb_ccall(getstrattrarray, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Ptr{UInt8}}),
+        model, name, start - 1, length(r), r)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    map(unsafe_string, r)
+end
+
 # setters
 
 function set_intattr!(model::Model, name::String, v::Integer)
