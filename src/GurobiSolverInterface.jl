@@ -45,7 +45,7 @@ function copy(m::GurobiMathProgModel)
                                nothing,
                                nothing, 
                                nothing, 
-                               deepcopy(options))
+                               deepcopy(m.options))
 end
 
 function setparams!(m::GurobiMathProgModel)
