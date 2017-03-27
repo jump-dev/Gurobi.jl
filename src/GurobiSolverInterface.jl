@@ -104,6 +104,7 @@ end
 function loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
     read_model(m.inner, filename)
     m.obj = getobj(m)
+    _truncateobj!(m.obj)
     m.lb = getconstrLB(m)
     m.ub = getconstrUB(m)
 end
@@ -155,10 +156,27 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
 
   m.lb, m.ub = rowlb, rowub
   m.obj = copy(obj)
+  _truncateobj!(m.obj)
   update_model!(m.inner)
   setsense!(m,sense)
 end
-
+function _truncateobj!(obj::Vector)
+    for i in eachindex(obj)
+        if obj[i] > GRB_INFINITY
+            obj[i] = GRB_INFINITY
+        elseif obj[i] < -GRB_INFINITY
+            obj[i] = -GRB_INFINITY
+        end
+    end
+end
+function _truncateobj(v::Real)
+    if v > GRB_INFINITY
+        return GRB_INFINITY
+    elseif v < -GRB_INFINITY
+        return -GRB_INFINITY
+    end
+    return v
+end
 writeproblem(m::GurobiMathProgModel, filename::AbstractString) = write_model(m.inner, filename)
 
 getvarLB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "LB", 1, num_vars(m.inner))
@@ -201,14 +219,18 @@ setconstrLB!(m::GurobiMathProgModel, lb) = (m.changed_constr_bounds = true; m.lb
 setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.ub = copy(ub))
 
 getobj(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "Obj", 1, num_vars(m.inner)   )
-setobj!(m::GurobiMathProgModel, c) = (m.obj=copy(c); set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c))
+function setobj!(m::GurobiMathProgModel, c)
+    m.obj = copy(c)
+    _truncateobj!(m.obj)
+    set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c)
+end
 
 function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
     if m.last_op_type == :Con
         updatemodel!(m)
         m.last_op_type = :Var
     end
-    push!(m.obj, objcoef)
+    push!(m.obj, _truncateobj(objcoef))
     add_var!(m.inner, length(constridx), constridx, float(constrcoef), float(objcoef), float(l), float(u), GRB_CONTINUOUS)
 end
 addvar!(m::GurobiMathProgModel, l, u, objcoef) = addvar!(m, Int[], Float64[], l, u, objcoef)

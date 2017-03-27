@@ -64,10 +64,12 @@ function getlibversion()
     _minor = Cint[0]
     _tech = Cint[0]
     @grb_ccall(version, Void, (Ptr{Cint}, Ptr{Cint}, Ptr{Cint}), _major, _minor, _tech)
-    return VersionNumber(_major[1], _minor[1], _tech[1])        
+    return VersionNumber(_major[1], _minor[1], _tech[1])
 end
 
 # version need not be export
 # one can write Gurobi.version to get the version numbers
 const version = getlibversion()
 
+const GRB_INFINITY = 1e100
+const GRB_BOUNDMAX = 1e30
