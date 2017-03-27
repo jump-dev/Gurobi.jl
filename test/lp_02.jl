@@ -6,28 +6,29 @@
 #            x - 1.5y >= 0  (i.e. -x + 1.5 y <= 0)
 #            12 x + 8 y <= 1000
 #            1000 x + 300 y <= 70000
-#            
+#
 #   solution: (59.0909, 36.3636)
 #   objv: 71818.1818
 #
 
-using MathProgBase
-using Gurobi
+using MathProgBase, Gurobi, Base.Test
 
-env = Gurobi.Env()
+@testset "LP 02" begin
 
-model = gurobi_model(env; 
-	name="lp_02", 
-	sense=:maximize, 
-	f = [1000., 350.],
-	A = [-1. 1.5; 12. 8.; 1000. 300.], 
-	b = [0., 1000., 70000.], 
-	lb = [0., 30.])
+	env = Gurobi.Env()
 
-println(model)
+	model = gurobi_model(env;
+		name="lp_02",
+		sense=:maximize,
+		f = [1000., 350.],
+		A = [-1. 1.5; 12. 8.; 1000. 300.],
+		b = [0., 1000., 70000.],
+		lb = [0., 30.])
 
-optimize(model)
+	println(model)
 
-println()
-println("soln = $(get_solution(model))")
-println("objv = $(get_objval(model))")
+	optimize(model)
+
+	@test_approx_eq_eps get_solution(model) [59.0909, 36.3636] 1e-4
+	@test_approx_eq_eps get_objval(model) 71818.1818 1e-4
+end

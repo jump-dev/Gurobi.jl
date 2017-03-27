@@ -8,39 +8,38 @@
 #
 #   solution: x = 45, y = 6.25, objv = 51.25
 
-using Gurobi
+using Gurobi, Base.Test
 
-env = Gurobi.Env()
+@testset "LP 01a" begin
+    env = Gurobi.Env()
 
-method = getparam(env, "Method")
-println("method = $method")
+    method = getparam(env, "Method")
+    println("method = $method")
 
-model = Gurobi.Model(env, "lp_01", :maximize)
+    model = Gurobi.Model(env, "lp_01", :maximize)
 
-# add variables
-add_cvar!(model, 1.0, 45., Inf)  # x
-add_cvar!(model, 1.0,  5., Inf)  # y
-update_model!(model)
+    # add variables
+    add_cvar!(model, 1.0, 45., Inf)  # x
+    add_cvar!(model, 1.0,  5., Inf)  # y
+    update_model!(model)
 
-# add constraints
-add_constr!(model, [50., 24.], '<', 2400.)
-add_constr!(model, [30., 33.], '<', 2100.)
-update_model!(model)
+    # add constraints
+    add_constr!(model, [50., 24.], '<', 2400.)
+    add_constr!(model, [30., 33.], '<', 2100.)
+    update_model!(model)
 
-println(model)
+    println(model)
 
-# perform optimization
-optimize(model)
+    # perform optimization
+    optimize(model)
 
-# show results
-info = get_optiminfo(model)
-println()
-println(info)
+    # show results
+    info = get_optiminfo(model)
+    println()
+    println(info)
 
-sol = get_solution(model)
-println("soln = $(sol)")
+    @test get_solution(model) == [45, 6.25]
+    @test get_objval(model) == 51.25
 
-objv = get_objval(model)
-println("objv = $(objv)")
-
-gc()  # test finalizers
+    gc()  # test finalizers
+end

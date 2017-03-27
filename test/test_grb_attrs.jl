@@ -10,28 +10,29 @@
 #         z is binary
 #
 
-using Gurobi
-using Base.Test
+using Gurobi, Base.Test
 
-env = Gurobi.Env()
+@testset "GRB Attributes" begin
+    env = Gurobi.Env()
 
-model = Gurobi.Model(env, "mip_01", :maximize)
+    model = Gurobi.Model(env, "mip_01", :maximize)
 
-add_cvar!(model, 1., 0., 5.)  # x
-add_ivar!(model, 2., 0, 10)   # y
-add_bvar!(model, 5.)          # z
-update_model!(model)
+    add_cvar!(model, 1., 0., 5.)  # x
+    add_ivar!(model, 2., 0, 10)   # y
+    add_bvar!(model, 5.)          # z
+    update_model!(model)
 
-add_constr!(model, ones(3), '<', 10.)
-add_constr!(model, [1., 2., 1.], '<', 15.)
+    add_constr!(model, ones(3), '<', 10.)
+    add_constr!(model, [1., 2., 1.], '<', 15.)
 
-update_model!(model)
+    update_model!(model)
 
-@test Gurobi.get_dblattrelement(model, "UB", 1) == 5.0
-@test Gurobi.get_charattrelement(model, "Sense", 1) == '<'
+    @test Gurobi.get_dblattrelement(model, "UB", 1) == 5.0
+    @test Gurobi.get_charattrelement(model, "Sense", 1) == '<'
 
-Gurobi.set_dblattrelement!(model, "UB", 1, 4.0)
-Gurobi.set_charattrelement!(model, "Sense", 1, '>')
-update_model!(model)
-@test Gurobi.get_dblattrelement(model, "UB", 1) == 4.0
-@test Gurobi.get_charattrelement(model, "Sense", 1) == '>'
+    Gurobi.set_dblattrelement!(model, "UB", 1, 4.0)
+    Gurobi.set_charattrelement!(model, "Sense", 1, '>')
+    update_model!(model)
+    @test Gurobi.get_dblattrelement(model, "UB", 1) == 4.0
+    @test Gurobi.get_charattrelement(model, "Sense", 1) == '>'
+end
