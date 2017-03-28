@@ -160,16 +160,11 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   update_model!(m.inner)
   setsense!(m,sense)
 end
-function _truncateobj!(obj::Vector)
-    for i in eachindex(obj)
-        if obj[i] > GRB_INFINITY
-            obj[i] = GRB_INFINITY
-        elseif obj[i] < -GRB_INFINITY
-            obj[i] = -GRB_INFINITY
-        end
-    end
-end
+
 function _truncateobj(v::Real)
+    # Gurobi truncates objective coefficients to +/-GRB_INFINITY
+    # We need to do this to the m.obj vector for consistency
+    #   see #94
     if v > GRB_INFINITY
         return GRB_INFINITY
     elseif v < -GRB_INFINITY
@@ -177,6 +172,8 @@ function _truncateobj(v::Real)
     end
     return v
 end
+_truncateobj!(obj::Vector) = map!(_truncateobj, obj, obj)
+
 writeproblem(m::GurobiMathProgModel, filename::AbstractString) = write_model(m.inner, filename)
 
 getvarLB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "LB", 1, num_vars(m.inner))
