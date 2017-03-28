@@ -1,4 +1,4 @@
-# QCQP example 
+# QCQP example
 #    maximize x + y
 #
 #    s.t.  x, y >= 0
@@ -6,23 +6,25 @@
 #
 #    solution: (0.71, 0.71) objv = 1.414
 
-using Gurobi
+using Gurobi, Base.Test
 
-env = Gurobi.Env()
+@testset "QCQP1" begin
 
-model = Gurobi.Model(env, "qcqp_01", :maximize)
+    env = Gurobi.Env()
 
-add_cvars!(model, [1., 1.], 0., Inf)
-update_model!(model)
+    model = Gurobi.Model(env, "qcqp_01", :maximize)
 
- # add_qpterms!(model, linearindices, linearcoeffs, qrowinds, qcolinds, qcoeffs, sense, rhs)
-add_qconstr!(model, [], [], [1, 2], [1, 2], [1, 1.], '<', 1.0)
-update_model!(model)
+    add_cvars!(model, [1., 1.], 0., Inf)
+    update_model!(model)
 
-println(model)
+     # add_qpterms!(model, linearindices, linearcoeffs, qrowinds, qcolinds, qcoeffs, sense, rhs)
+    add_qconstr!(model, [], [], [1, 2], [1, 2], [1, 1.], '<', 1.0)
+    update_model!(model)
 
-optimize(model)
+    println(model)
 
-println("sol = $(get_solution(model))")
-println("obj = $(get_objval(model))")
+    optimize(model)
 
+    @test_approx_eq_eps get_solution(model) [0.707107, 0.707107] 1e-5
+    @test_approx_eq_eps get_objval(model) 1.414214 1e-5
+end

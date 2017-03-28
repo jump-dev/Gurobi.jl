@@ -6,18 +6,21 @@
 #           x +   y       >= 1
 #
 
-using Gurobi
+using Gurobi, Base.Test
 
-env = Gurobi.Env()
+@testset "QP2" begin
 
-model = gurobi_model(env; 
-	name = "qp_02", 
-	f = [0., 0., 0.],
-	H = [2. 1. 0.; 1. 2. 1.; 0. 1. 2.],
-	A = -[1. 2. 3.; 1. 1. 0.], 
-	b = -[4., 1.])
+	env = Gurobi.Env()
 
-optimize(model)
+	model = gurobi_model(env;
+		name = "qp_02",
+		f = [0., 0., 0.],
+		H = [2. 1. 0.; 1. 2. 1.; 0. 1. 2.],
+		A = -[1. 2. 3.; 1. 1. 0.],
+		b = -[4., 1.])
 
-println("sol = $(get_solution(model))")
-println("obj = $(get_objval(model))")
+	optimize(model)
+
+	@test_approx_eq_eps get_solution(model) [0.571429,0.428571,0.857143] 1e-5
+	@test_approx_eq_eps get_objval(model) 1.857143 1e-5
+end

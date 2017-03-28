@@ -8,39 +8,42 @@
 #
 #   solution: x = 45, y = 6.25, objv = 51.25
 
-using Gurobi
+using Gurobi, Base.Test
 
-env = Gurobi.Env()
-setparams!(env, Method=2)  # using barrier method
+@testset "LP 01b" begin
 
-method = getparam(env, "Method")
-println("method = $method")
+    env = Gurobi.Env()
+    setparams!(env, Method=2)  # using barrier method
 
-model = Gurobi.Model(env, "lp_01", :maximize)
+    method = getparam(env, "Method")
+    println("method = $method")
 
-# add variables
-add_cvars!(model, [1., 1.], [45., 5.], Inf)
-update_model!(model)
+    model = Gurobi.Model(env, "lp_01", :maximize)
 
-# add constraints
-add_constrs!(model, Cint[1, 3], Cint[1, 2, 1, 2], 
-    [50., 24., 30., 33.], '<', [2400., 2100.])
-update_model!(model)
+    # add variables
+    add_cvars!(model, [1., 1.], [45., 5.], Inf)
+    update_model!(model)
 
-println(model)
+    # add constraints
+    add_constrs!(model, Cint[1, 3], Cint[1, 2, 1, 2],
+        [50., 24., 30., 33.], '<', [2400., 2100.])
+    update_model!(model)
 
-# perform optimization
-optimize(model)
+    println(model)
 
-# show results
-info = get_optiminfo(model)
-println()
-println(info)
+    # perform optimization
+    optimize(model)
 
-sol = get_solution(model)
-println("soln = $(sol)")
+    # show results
+    info = get_optiminfo(model)
+    println()
+    println(info)
 
-objv = get_objval(model)
-println("objv = $(objv)")
+    sol = get_solution(model)
+    @test sol == [45, 6.25]
 
-gc()  # test finalizers
+    objv = get_objval(model)
+    @test objv == 51.25
+
+    gc()  # test finalizers
+end
