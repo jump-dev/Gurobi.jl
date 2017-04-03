@@ -104,6 +104,9 @@ end
 function loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
     read_model(m.inner, filename)
     m.obj = getobj(m)
+    if checkvalue(m.obj, GRB_INFINITY)
+        _objwarning(m.obj)
+    end
     _truncateobj!(m.obj)
     m.lb = getconstrLB(m)
     m.ub = getconstrUB(m)
@@ -217,6 +220,9 @@ setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.ub
 
 getobj(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "Obj", 1, num_vars(m.inner)   )
 function setobj!(m::GurobiMathProgModel, c)
+    if checkvalue(c, GRB_INFINITY)
+        _objwarning(c)
+    end
     m.obj = copy(c)
     _truncateobj!(m.obj)
     set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c)

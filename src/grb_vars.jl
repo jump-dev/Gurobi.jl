@@ -6,18 +6,6 @@ const GRB_CONTINUOUS = convert(Cchar, 'C')
 const GRB_BINARY     = convert(Cchar, 'B')
 const GRB_INTEGER    = convert(Cchar, 'I')
 
-function checkvalue(x, bound)
-    abs(x) > bound && abs(x) != Inf
-end
-
-_objwarning(c) = warn("""Gurobi will silently silently truncate objective coefficients >$(GRB_INFINITY) or <-$(GRB_INFINITY).
-Current objective coefficient extrema: $(extrema(c))""")
-
-_boundwarning(lb, ub) = warn("""Gurobi has implicit variable bounds of [-1e30, 1e30].
-Settings variable bounds outside this can cause infeasibility or unboundedness.
-Current lower bound extrema: $(extrema(lb))
-Current upper bound extrema: $(extrema(ub))""")
-
 # add_var!
 function add_var!(model::Model, numnz::Integer, vind::Vector, vval::Vector{Float64}, c::Float64, lb::Float64, ub::Float64, vtype::Cchar)
     if checkvalue(c, GRB_INFINITY)
@@ -86,10 +74,10 @@ add_ivar!(model::Model, c::Real) = add_ivar!(model, c, -Inf, Inf)
 # add_vars!
 
 function add_vars!(model::Model, vtypes::CVec, c::FVec, lb::FVec, ub::FVec)
-    if any(checkvalue(obj, GRB_INFINITY) for obj in c)
+    if checkvalue(c, GRB_INFINITY)
         _objwarning(c)
     end
-    if any(checkvalue(b, GRB_BOUNDMAX) for b in lb) || any(checkvalue(b, GRB_BOUNDMAX) for b in ub)
+    if checkvalue(lb, GRB_BOUNDMAX) || checkvalue(ub, GRB_BOUNDMAX)
         _boundwarning(lb, ub)
     end
     # check dimensions
