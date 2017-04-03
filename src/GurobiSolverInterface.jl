@@ -180,10 +180,20 @@ _truncateobj!(obj::Vector) = map!(_truncateobj, obj, obj)
 writeproblem(m::GurobiMathProgModel, filename::AbstractString) = write_model(m.inner, filename)
 
 getvarLB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "LB", 1, num_vars(m.inner))
-setvarLB!(m::GurobiMathProgModel, l) = set_dblattrarray!(m.inner, "LB", 1, num_vars(m.inner), l)
+function setvarLB!(m::GurobiMathProgModel, l)
+    if checkvalue(l, GRB_BOUNDMAX)
+        _boundwarning(l, getvarUB(m))
+    end
+    set_dblattrarray!(m.inner, "LB", 1, num_vars(m.inner), l)
+end
 
 getvarUB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "UB", 1, num_vars(m.inner))
-setvarUB!(m::GurobiMathProgModel, u) = set_dblattrarray!(m.inner, "UB", 1, num_vars(m.inner), u)
+function setvarUB!(m::GurobiMathProgModel, u)
+    if checkvalue(u, GRB_BOUNDMAX)
+        _boundwarning(getvarLB(m), u)
+    end
+    set_dblattrarray!(m.inner, "UB", 1, num_vars(m.inner), u)
+end
 
 function getconstrLB(m::GurobiMathProgModel)
     sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
