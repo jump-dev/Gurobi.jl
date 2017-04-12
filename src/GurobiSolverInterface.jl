@@ -248,7 +248,7 @@ function updatemodel!(m::GurobiMathProgModel)
             You have encountered a known bug in Gurobi. Any information you query from the model may be incorrect.
             This bug has existed since the first version of Gurobi but is fixed in Gurobi v7.0.
 
-            For more information go to https://github.com/JuliaOpt/Gurobi.jl/issues/60.
+            For more information go to https://github.com/JuliaOpt/Gurobi.jl/issues/60
             Please leave a comment stating that you encountered this bug! We would like to know how prevalent it is.
         """)
     end
