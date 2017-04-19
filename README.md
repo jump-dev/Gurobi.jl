@@ -25,7 +25,7 @@ Here is the procedure to setup this package:
 
 2. Install this package using ``Pkg.add("Gurobi")``.
 
-3. Make sure the ``GUROBI_HOME`` environmental variable is set to the path of the Gurobi directory. This is part of a standard installation. The Gurobi library will be searched for in ``GUROBI_HOME/lib`` on unix platforms and ``GUROBI_HOME/bin`` on Windows. If the library is not found, check that your version is listed in ``deps/build.jl``.
+3. Make sure the ``GUROBI_HOME`` environmental variable is set to the path of the Gurobi directory. This is part of a standard installation. The Gurobi library will be searched for in ``GUROBI_HOME/lib`` on unix platforms and ``GUROBI_HOME\bin`` on Windows. If the library is not found, check that your version is listed in ``deps/build.jl``.
 
 4. Now, you can start using it.
 

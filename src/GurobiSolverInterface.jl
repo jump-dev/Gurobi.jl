@@ -131,7 +131,7 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   # check if we have any range constraints
   # to properly support these, we will need to keep track of the
   # slack variables automatically added by gurobi.
-  rangeconstrs = sum((rowlb .!= rowub) & (rowlb .> neginf) & (rowub .< posinf))
+  rangeconstrs = sum((rowlb .!= rowub) .& (rowlb .> neginf) .& (rowub .< posinf))
   if rangeconstrs > 0
       warn("Julia Gurobi interface doesn't properly support range (two-sided) constraints. See Gurobi.jl issue #14")
       add_rangeconstrs!(m.inner, float(A), float(rowlb), float(rowub))
@@ -278,12 +278,12 @@ changecoeffs!(m::GurobiMathProgModel, cidx, vidx, val) = chg_coeffs!(m.inner, ci
 
 function updatemodel!(m::GurobiMathProgModel)
     update_model!(m.inner)
-    if m.obj != getobj(m)
-        error("""
+    if Gurobi.version < v"7.0" && m.obj != getobj(m)
+        warn("""
             You have encountered a known bug in Gurobi. Any information you query from the model may be incorrect.
             This bug has existed since the first version of Gurobi but is fixed in Gurobi v7.0.
 
-            For more information go to https://github.com/JuliaOpt/Gurobi.jl/issues/60.
+            For more information go to https://github.com/JuliaOpt/Gurobi.jl/issues/60
             Please leave a comment stating that you encountered this bug! We would like to know how prevalent it is.
         """)
     end

@@ -2,15 +2,15 @@
 
 ## convenient types and type conversion functions
 
-typealias GChars Union{Cchar, Char}
-typealias IVec Vector{Cint}
-typealias FVec Vector{Float64}
-typealias CVec Vector{Cchar}
+const GChars          = Union{Cchar, Char}
+const IVec            = Vector{Cint}
+const FVec            = Vector{Float64}
+const CVec            = Vector{Cchar}
 
-typealias GCharOrVec Union{Cchar, Char, Vector{Cchar}, Vector{Char}}
+const GCharOrVec      = Union{Cchar, Char, Vector{Cchar}, Vector{Char}}
 
-typealias Bounds{T<:Real} Union{T, Vector{T}}
-typealias CoeffMat Union{Matrix{Float64}, SparseMatrixCSC{Float64}}
+@compat const Bounds{T<:Real} = Union{T, Vector{T}}
+const CoeffMat        = Union{Matrix{Float64}, SparseMatrixCSC{Float64}}
 
 cchar(c::Cchar) = c
 cchar(c::Char) = convert(Cchar, c)
@@ -84,4 +84,4 @@ Current objective coefficient extrema: $(extrema(c))""")
 _boundwarning(lb, ub) = warn("""Gurobi has implicit variable bounds of [-1e30, 1e30].
 Settings variable bounds outside this can cause infeasibility or unboundedness.
 Current lower bound extrema: $(extrema(lb))
-Current upper bound extrema: $(extrema(ub))""")
+Current upper bound extrema: $(extrema(ub))"""

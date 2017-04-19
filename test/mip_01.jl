@@ -10,23 +10,24 @@
 #         z is binary
 #
 
-using Gurobi
+using Gurobi, Base.Test
 
-env = Gurobi.Env()
+@testset "MIP 01" begin
+    env = Gurobi.Env()
 
-model = Gurobi.Model(env, "mip_01", :maximize)
+    model = Gurobi.Model(env, "mip_01", :maximize)
 
-add_cvar!(model, 1., 0., 5.)  # x
-add_ivar!(model, 2., 0, 10)   # y
-add_bvar!(model, 5.)          # z
-update_model!(model)
+    add_cvar!(model, 1., 0., 5.)  # x
+    add_ivar!(model, 2., 0, 10)   # y
+    add_bvar!(model, 5.)          # z
+    update_model!(model)
 
-add_constr!(model, ones(3), '<', 10.)
-add_constr!(model, [1., 2., 1.], '<', 15.)
+    add_constr!(model, ones(3), '<', 10.)
+    add_constr!(model, [1., 2., 1.], '<', 15.)
 
-println(model)
+    println(model)
 
-optimize(model)
-
-println("sol = $(get_solution(model))")
-println("objv = $(get_objval(model))")
+    optimize(model)
+    @test get_solution(model) == [0.0, 7.0, 1.0]
+    @test get_objval(model) == 19.0
+end

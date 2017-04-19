@@ -12,11 +12,13 @@ module Gurobi
 
     import Base.show, Base.copy
 
+    using Compat
+
     # Standard LP interface
     importall MathProgBase.SolverInterface
 
     ### exports
-    export 
+    export
 
     # grb_env
     free_env,
@@ -44,7 +46,7 @@ module Gurobi
     del_vars!,
 
     # grb_constrs
-    add_constr!, add_constrs!, add_constrs_t!, 
+    add_constr!, add_constrs!, add_constrs_t!,
     add_rangeconstr!, add_rangeconstrs!, add_rangeconstrs_t!,
     get_constrmatrix, add_sos!, del_constrs!, chg_coeffs!,
 
@@ -57,7 +59,7 @@ module Gurobi
     # grb_solve
     optimize, computeIIS, get_solution,
     get_status, OptimInfo, get_optiminfo, get_objval
-    
+
 
     ### include source files
 

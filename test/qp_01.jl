@@ -8,22 +8,25 @@
 #    solution: (0.25, 0.75), objv = 1.875
 #
 
-using Gurobi 
+using Gurobi, Base.Test
 
-env = Gurobi.Env()
+@testset "QP1" begin
 
-model = Gurobi.Model(env, "qp_02")
+    env = Gurobi.Env()
 
-add_cvars!(model, [1., 1.], 0., Inf)
-update_model!(model)
+    model = Gurobi.Model(env, "qp_01")
 
-add_qpterms!(model, [1, 1, 2], [1, 2, 2], [2., 1., 1.])
-add_constr!(model, [1., 1.], '=', 1.)
-update_model!(model)
+    add_cvars!(model, [1., 1.], 0., Inf)
+    update_model!(model)
 
-println(model)
+    add_qpterms!(model, [1, 1, 2], [1, 2, 2], [2., 1., 1.])
+    add_constr!(model, [1., 1.], '=', 1.)
+    update_model!(model)
 
-optimize(model)
+    println(model)
 
-println("sol = $(get_solution(model))")
-println("obj = $(get_objval(model))")
+    optimize(model)
+
+    @test isapprox(get_solution(model), [0.25, 0.75], atol=1e-4)
+    @test get_objval(model) == 1.875
+end
