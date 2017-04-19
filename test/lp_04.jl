@@ -38,16 +38,16 @@ using Gurobi, Base.Test
     # perform optimization
     optimize(model)
 
-    @test_approx_eq_eps get_solution(model) [1.3333, 1.3333] 1e-4
-    @test_approx_eq_eps get_objval(model) 2.6666 1e-4
+    @test isapprox(get_solution(model), [1.3333, 1.3333], atol=1e-4)
+    @test isapprox(get_objval(model), 2.6666, atol=1e-4)
 
     # PART 2:
     # copy and solve
 
     model2 = copy(model)
     optimize(model2)
-    @test_approx_eq_eps get_solution(model2) [1.3333, 1.3333] 1e-4
-    @test_approx_eq_eps get_objval(model2) 2.6666 1e-4
+    @test isapprox(get_solution(model2), [1.3333, 1.3333], atol=1e-4)
+    @test isapprox(get_objval(model2), 2.6666, atol=1e-4)
 
     # PART 3:
     # change coeff and solve
@@ -68,7 +68,7 @@ using Gurobi, Base.Test
     @test !any(sol .< 0)
     @test !any(sol .> 2)
     @test sum(sol) == 2.0
-    @test_approx_eq_eps get_objval(model) 2.0 1e-4
+    @test isapprox(get_objval(model), 2.0, atol=1e-4)
 
     # PART 4:
     # del constr and solve
@@ -83,8 +83,8 @@ using Gurobi, Base.Test
     del_constrs!(model, [1])
     update_model!(model)
     optimize(model)
-    @test_approx_eq_eps get_solution(model) [4.0, 0.0] 1e-4
-    @test_approx_eq_eps get_objval(model) 4.0 1e-4
+    @test isapprox(get_solution(model), [4.0, 0.0], atol=1e-4)
+    @test isapprox(get_objval(model), 4.0, atol=1e-4)
 
     # PART 5:
     # del var and solve
@@ -99,8 +99,8 @@ using Gurobi, Base.Test
     del_vars!(model, [1])
     update_model!(model)
     optimize(model)
-    @test_approx_eq_eps get_solution(model) [2.0] 1e-4
-    @test_approx_eq_eps get_objval(model) 2.0 1e-4
+    @test isapprox(get_solution(model), [2.0], atol=1e-4)
+    @test isapprox(get_objval(model), 2.0, atol=1e-4)
 
     gc()  # test finalizers
 end
