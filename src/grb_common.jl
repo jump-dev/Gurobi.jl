@@ -70,3 +70,18 @@ end
 # version need not be export
 # one can write Gurobi.version to get the version numbers
 const version = getlibversion()
+
+const GRB_INFINITY = 1e100
+const GRB_BOUNDMAX = 1e30
+function checkvalue(x::Real, bound)
+    abs(x) > bound && abs(x) != Inf
+end
+checkvalue(x::Vector, bound) = any(checkvalue(c, bound) for c in x)
+
+_objwarning(c) = warn("""Gurobi will silently silently truncate objective coefficients >$(GRB_INFINITY) or <-$(GRB_INFINITY).
+Current objective coefficient extrema: $(extrema(c))""")
+
+_boundwarning(lb, ub) = warn("""Gurobi has implicit variable bounds of [-1e30, 1e30].
+Settings variable bounds outside this can cause infeasibility or unboundedness.
+Current lower bound extrema: $(extrema(lb))
+Current upper bound extrema: $(extrema(ub))"""

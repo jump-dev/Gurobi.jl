@@ -104,6 +104,10 @@ end
 function loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
     read_model(m.inner, filename)
     m.obj = getobj(m)
+    if checkvalue(m.obj, GRB_INFINITY)
+        _objwarning(m.obj)
+    end
+    _truncateobj!(m.obj)
     m.lb = getconstrLB(m)
     m.ub = getconstrUB(m)
 end
@@ -155,17 +159,41 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
 
   m.lb, m.ub = rowlb, rowub
   m.obj = copy(obj)
+  _truncateobj!(m.obj)
   update_model!(m.inner)
   setsense!(m,sense)
 end
 
+function _truncateobj(v::Real)
+    # Gurobi truncates objective coefficients to +/-GRB_INFINITY
+    # We need to do this to the m.obj vector for consistency
+    #   see #94
+    if v > GRB_INFINITY
+        return GRB_INFINITY
+    elseif v < -GRB_INFINITY
+        return -GRB_INFINITY
+    end
+    return v
+end
+_truncateobj!(obj::Vector) = map!(_truncateobj, obj, obj)
+
 writeproblem(m::GurobiMathProgModel, filename::AbstractString) = write_model(m.inner, filename)
 
 getvarLB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "LB", 1, num_vars(m.inner))
-setvarLB!(m::GurobiMathProgModel, l) = set_dblattrarray!(m.inner, "LB", 1, num_vars(m.inner), l)
+function setvarLB!(m::GurobiMathProgModel, l)
+    if checkvalue(l, GRB_BOUNDMAX)
+        _boundwarning(l, getvarUB(m))
+    end
+    set_dblattrarray!(m.inner, "LB", 1, num_vars(m.inner), l)
+end
 
 getvarUB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "UB", 1, num_vars(m.inner))
-setvarUB!(m::GurobiMathProgModel, u) = set_dblattrarray!(m.inner, "UB", 1, num_vars(m.inner), u)
+function setvarUB!(m::GurobiMathProgModel, u)
+    if checkvalue(u, GRB_BOUNDMAX)
+        _boundwarning(getvarLB(m), u)
+    end
+    set_dblattrarray!(m.inner, "UB", 1, num_vars(m.inner), u)
+end
 
 function getconstrLB(m::GurobiMathProgModel)
     sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
@@ -201,14 +229,21 @@ setconstrLB!(m::GurobiMathProgModel, lb) = (m.changed_constr_bounds = true; m.lb
 setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.ub = copy(ub))
 
 getobj(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "Obj", 1, num_vars(m.inner)   )
-setobj!(m::GurobiMathProgModel, c) = (m.obj=copy(c); set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c))
+function setobj!(m::GurobiMathProgModel, c)
+    if checkvalue(c, GRB_INFINITY)
+        _objwarning(c)
+    end
+    m.obj = copy(c)
+    _truncateobj!(m.obj)
+    set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c)
+end
 
 function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
     if m.last_op_type == :Con
         updatemodel!(m)
         m.last_op_type = :Var
     end
-    push!(m.obj, objcoef)
+    push!(m.obj, _truncateobj(objcoef))
     add_var!(m.inner, length(constridx), constridx, float(constrcoef), float(objcoef), float(l), float(u), GRB_CONTINUOUS)
 end
 addvar!(m::GurobiMathProgModel, l, u, objcoef) = addvar!(m, Int[], Float64[], l, u, objcoef)
