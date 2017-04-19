@@ -127,7 +127,7 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   # check if we have any range constraints
   # to properly support these, we will need to keep track of the
   # slack variables automatically added by gurobi.
-  rangeconstrs = sum((rowlb .!= rowub) & (rowlb .> neginf) & (rowub .< posinf))
+  rangeconstrs = sum((rowlb .!= rowub) .& (rowlb .> neginf) .& (rowub .< posinf))
   if rangeconstrs > 0
       warn("Julia Gurobi interface doesn't properly support range (two-sided) constraints. See Gurobi.jl issue #14")
       add_rangeconstrs!(m.inner, float(A), float(rowlb), float(rowub))
