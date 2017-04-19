@@ -135,7 +135,7 @@ end
 
 function get_strattrarray(model::Model, name::String, start::Integer, len::Integer)
     @assert isascii(name)
-    get_strattrarray!(Array(Ptr{UInt8}, len), model, name, start)
+    get_strattrarray!(Array{Ptr{UInt8}}(len), model, name, start)
 end
 
 function get_strattrarray!(r::Array{Ptr{UInt8}}, model::Model, name::String, start::Integer)
@@ -359,4 +359,3 @@ function show(io::IO, model::Model)
         println(io, "Gurobi Model: NULL")
     end
 end
-

@@ -27,6 +27,6 @@ using Gurobi, Base.Test
 
     optimize(model)
 
-    @test_approx_eq_eps get_solution(model) [0.25, 0.75] 1e-4
+    @test isapprox(get_solution(model), [0.25, 0.75], atol=1e-4)
     @test get_objval(model) == 1.875
 end
