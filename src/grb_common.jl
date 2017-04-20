@@ -84,4 +84,4 @@ Current objective coefficient extrema: $(extrema(c))""")
 _boundwarning(lb, ub) = warn("""Gurobi has implicit variable bounds of [-1e30, 1e30].
 Settings variable bounds outside this can cause infeasibility or unboundedness.
 Current lower bound extrema: $(extrema(lb))
-Current upper bound extrema: $(extrema(ub))"""
+Current upper bound extrema: $(extrema(ub))""")
