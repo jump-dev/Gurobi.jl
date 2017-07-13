@@ -1,6 +1,6 @@
 # an example on mixed integer programming
 #
-#   maximize x + 2 y + 6 z
+#   maximize x + 3 y + 5 z
 #
 #   s.t.  x + y + z <= 10
 #         x + 2 y + z <= 15
