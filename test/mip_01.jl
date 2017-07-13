@@ -1,6 +1,6 @@
 # an example on mixed integer programming
 #
-#   maximize x + 2 y + 5 z
+#   maximize x + 2 y + 6 z
 #
 #   s.t.  x + y + z <= 10
 #         x + 2 y + z <= 15
@@ -18,7 +18,7 @@ using Gurobi, Base.Test
     model = Gurobi.Model(env, "mip_01", :maximize)
 
     add_cvar!(model, 1., 0., 5.)  # x
-    add_ivar!(model, 2., 0, 10)   # y
+    add_ivar!(model, 3., 0, 10)   # y
     add_bvar!(model, 5.)          # z
     update_model!(model)
 
@@ -29,5 +29,5 @@ using Gurobi, Base.Test
 
     optimize(model)
     @test get_solution(model) == [0.0, 7.0, 1.0]
-    @test get_objval(model) == 19.0
+    @test get_objval(model) == 26.0
 end
