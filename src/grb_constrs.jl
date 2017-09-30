@@ -160,11 +160,16 @@ function add_rangeconstrs!(model::Model, A::CoeffMat, lb::Vector, ub::Vector)
 end
 
 function get_constrmatrix(model::Model)
+    get_constrs(model::Model, 1, num_constrs(model))
+end
+function get_constrs(model::Model, start::Integer, len::Integer)
     nnz = get_intattr(model, "NumNZs")
     m = num_constrs(model)
+    @assert start <= m
+    @assert len <= m
     n = num_vars(model)
     numnzP = Array{Cint}(1)
-    cbeg = Array{Cint}(m+1)
+    cbeg = Array{Cint}(len+1)
     cind = Array{Cint}(nnz)
     cval = Array{Cdouble}(nnz)
     ret = @grb_ccall(getconstrs, Cint, (
@@ -173,10 +178,10 @@ function get_constrmatrix(model::Model)
                      Ptr{Cint},
                      Ptr{Cint},
                      Ptr{Cdouble},
-                     Cint,
-                     Cint
+                     Cint, # start
+                     Cint #len
                      ),
-                     model, numnzP, cbeg, cind, cval, 0, m)
+                     model, numnzP, cbeg, cind, cval, Cint(start-1), Cint(len))
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -214,6 +219,75 @@ function add_sos!(model::Model, sostype::Symbol, idx::Vector{Int}, weight::Vecto
         throw(GurobiError(model.env, ret))
     end
 end
+function del_sos!(model::Model, idx::Vector{Cint})
+    # int XPRS_CC XPRSdelsets(XPRSprob prob, int ndelsets, const int mindex[])
+    numdel = length(idx)
+    ret = @grb_ccall(delsos, Cint, (
+                     Ptr{Void},
+                     Cint,
+                     Ptr{Cint}),
+                     model, convert(Cint,numdel), ivec(idx-1) )
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+end
+
+get_sos_matrix(model::Model) = get_sos(model::Model, 1, num_sos(model))
+function get_sos(model::Model, start::Integer, len::Integer)
+    # int GRBgetsos ( GRBmodel *model,int	*nummembersP,int *sostype,int *beg,int	*ind,doule *weight,int start,int len )
+    numnzP = Array{Cint}(1)
+    m = num_sos(model)
+    sostype = Array{Cint}(m)
+    @assert m > 0
+    @assert start <= m
+    @assert len <= m
+    n = num_vars(model)
+    numnzP = Array{Cint}(1)
+    cbeg = Array{Cint}(len+1)
+    
+    ret = @grb_ccall(getsos, Cint, (
+        Ptr{Void},
+        Ptr{Cint},
+        Ptr{Cint},
+        Ptr{Cint},
+        Ptr{Cint},
+        Ptr{Cdouble},
+        Cint, # start
+        Cint #len
+        ),
+        model, numnzP, sostype, cbeg, C_NULL, C_NULL, Cint(start-1), Cint(len))
+
+    nnz = numnzP[1]
+
+    cind = Array{Cint}(nnz)
+    cval = Array{Cdouble}(nnz)
+    ret = @grb_ccall(getsos, Cint, (
+                     Ptr{Void},
+                     Ptr{Cint},
+                     Ptr{Cint},
+                     Ptr{Cint},
+                     Ptr{Cint},
+                     Ptr{Cdouble},
+                     Cint, # start
+                     Cint #len
+                     ),
+                     model, numnzP, sostype, cbeg, cind, cval, Cint(start-1), Cint(len))
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    cbeg[end] = nnz
+    I = Array{Int64}(nnz)
+    J = Array{Int64}(nnz)
+    V = Array{Float64}(nnz)
+    for i in 1:length(cbeg)-1
+        for j in (cbeg[i]+1):cbeg[i+1]
+            I[j] = i
+            J[j] = cind[j]+1
+            V[j] = cval[j]
+        end
+    end
+    return sparse(I, J, V, m, n), sostype#map(x-> x==Cint(1) ? :SOS1 : :SOS2 ,sostype)
+end
 
 del_constrs!{T<:Real}(model::Model, idx::T) = del_constrs!(model, Cint[idx])
 del_constrs!{T<:Real}(model::Model, idx::Vector{T}) = del_constrs!(model, convert(Vector{Cint},idx))
@@ -230,7 +304,7 @@ function del_constrs!(model::Model, idx::Vector{Cint})
 end
 
 
-chg_coeffs!{T<:Real, S<:Real}(model::Model, cidx::T, vidx::T, val::S) = chg_coeffs!(model, Cint[cidx], Cint[vidx], val)
+chg_coeffs!{T<:Real, S<:Real}(model::Model, cidx::T, vidx::T, val::S) = chg_coeffs!(model, Cint[cidx], Cint[vidx], Float64[val])
 chg_coeffs!{T<:Real, S<:Real}(model::Model, cidx::Vector{T}, vidx::Vector{T}, val::Vector{S}) = chg_coeffs!(model, convert(Vector{Cint},cidx), convert(Vector{Cint},vidx), fvec(val))
 function chg_coeffs!(model::Model, cidx::Vector{Cint}, vidx::Vector{Cint}, val::FVec)
 
@@ -247,4 +321,23 @@ function chg_coeffs!(model::Model, cidx::Vector{Cint}, vidx::Vector{Cint}, val::
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
+end
+
+function getcoeff!(val::FVec, model::Model, cidx::Integer, vidx::Integer)
+    # int GRBgetcoeff ( 	GRBmodel *model, int constrind, int 	varind, double 	*valP )
+    @assert length(val) == 1
+    ret = @grb_ccall(getcoeff, Cint, (
+        Ptr{Void},
+        Cint,
+        Cint,
+        Ptr{Float64}),
+        model, cidx-Cint(1), vidx-Cint(1), val)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+end
+function getcoeff(model::Model, cidx::Integer, vidx::Integer)
+    out = Array{Float64}(1)
+    getcoeff!(out::FVec, model::Model, cidx::Integer, vidx::Integer)
+    return out[1]
 end

@@ -125,6 +125,14 @@ const conmap = Dict(
      0 => :Basic,
     -1 => :Nonbasic)
 
+const basicmap_rev = Dict(
+    :Superbasic => Cint(-3),
+    :NonbasicAtUpper => Cint(-2),
+    :NonbasicAtLower => Cint(-1),
+    :Basic => Cint(0),
+    :Nonbasic => Cint(-1)
+)
+
 function get_basis(model::Model)
     cval = Array{Cint}(num_vars(model))
     cbasis = Array{Symbol}(num_vars(model))
@@ -150,3 +158,74 @@ function get_basis(model::Model)
     end
     return cbasis, rbasis
 end
+
+function loadbasis(model::Model, x::Vector)#, status::Symbol = :unstarted, isnew::Vector{Bool} = [false])
+
+    ncols = num_vars(model)
+    nrows = num_constrs(model)
+
+    length(x) != ncols && error("solution candidate size is different from the number of columns")
+
+    cvals = Array{Cint}( ncols)
+    rvals = Array{Cint}( nrows)
+
+    # obtain situation of columns
+
+    lb = get_dblattrarray(model, "LB", 1, ncols)
+    ub = get_dblattrarray(model, "UB", 1, ncols)
+
+    for i in 1:ncols
+        if isapprox(x[i],lb[i])
+            cvals[i] = basicmap_rev[:NonbasicAtLower]
+        elseif isapprox(x[i],ub[i])
+            cvals[i] = basicmap_rev[:NonbasicAtUpper]
+        else
+            cvals[i] = basicmap_rev[:Basic]
+        end
+    end
+
+    # obtain situation of rows where: y = Ax
+
+    A = get_constrmatrix(model) #A is sparse
+
+    y = A*x
+
+    senses = get_charattrarray(model, "Sense", 1, nrows)
+    rhs    = get_dblattrarray(model, "RHS", 1, nrows)
+
+    for j in 1:nrows
+        if senses[j] == '=' && isapprox(y[j], rhs[j])
+            rvals[j] = basicmap_rev[:Nonbasic]#AtLower
+        elseif senses[j] == '>' && isapprox(y[j], rhs[j])
+            rvals[j] = basicmap_rev[:Nonbasic]#AtLower
+        elseif senses[j] == '<' && isapprox(y[j], rhs[j])
+            rvals[j] = basicmap_rev[:Nonbasic]#AtUpper
+        else
+            rvals[j] = basicmap_rev[:Basic]
+        end
+    end
+
+    loadbasis(model, rvals, cvals)
+
+    return nothing
+end
+function loadbasis(model::Model, rval::Vector{Symbol}, cval::Vector{Symbol})
+
+    nrval = map(x->conmap[x], rval)
+    ncval = map(x->varmap[x], cval)
+
+    loadbasis(model, nrval, ncval)
+
+    return nothing
+end
+function loadbasis(model::Model, rval::Vector{Cint}, cval::Vector{Cint})
+
+    ncols = num_vars(model)
+    nrows = num_constrs(model)
+
+    set_intattrarray!(model, "VBasis", 1, num_vars(model), cval)
+    set_intattrarray!(model, "CBasis", 1, num_constrs(model), rval) # r = row; c = constr
+
+    return nothing
+end
+

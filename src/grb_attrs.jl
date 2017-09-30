@@ -96,6 +96,24 @@ function get_intattrarray!(r::Array{Cint}, model::Model, name::String, start::In
     r
 end
 
+function get_intattrlist!(r::Array{Cint}, model::Model, name::String, inds::Vector{I}) where {I<:Integer}
+    @assert isascii(name)
+    @assert length(r) == length(inds)
+    ret = @grb_ccall(getintattrlist, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cint}, Ptr{Cint}),
+        model, name, Cint(length(inds)), ivec(inds - 1), r)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
+function get_intattrlist(model::Model, name::String, inds::Vector{I}) where {I<:Integer}
+    r = Array{Cint}(length(inds))
+    get_intattrlist!(r::Array{Cint}, model::Model, name::String, inds)
+    return r
+end
+
 function get_intattrarray(model::Model, name::String, start::Integer, len::Integer)
     @assert isascii(name)
     get_intattrarray!(Array{Cint}(len), model, name, start)
@@ -112,6 +130,24 @@ function get_dblattrarray!(r::Array{Float64}, model::Model, name::String, start:
     r
 end
 
+function get_dblattrlist!(r::Array{Float64}, model::Model, name::String, inds::Vector{I}) where {I<:Integer}
+    @assert isascii(name)
+    @assert length(r) == length(inds)
+    ret = @grb_ccall(getdblattrlist, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cint}, Ptr{Float64}),
+        model, name, Cint(length(inds)), ivec(inds - 1), r)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
+function get_dblattrlist(model::Model, name::String, inds::Vector{I}) where {I<:Integer}
+    r = Array{Float64}(length(inds))
+    get_dblattrlist!(r::Array{Float64}, model::Model, name::String, inds)
+    return r
+end
+
 function get_dblattrarray(model::Model, name::String, start::Integer, len::Integer)
     @assert isascii(name)
     get_dblattrarray!(Array{Float64}(len), model, name, start)
@@ -126,6 +162,24 @@ function get_charattrarray!(r::Array{Cchar}, model::Model, name::String, start::
         throw(GurobiError(model.env, ret))
     end
     map(Char,r)
+end
+
+function get_charattrlist!(r::Array{Cchar}, model::Model, name::String, inds::Vector{I}) where {I<:Integer}
+    @assert isascii(name)
+    @assert length(r) == length(inds)
+    ret = @grb_ccall(getcharattrlist, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cint}, Ptr{Cchar}),
+        model, name, Cint(length(inds)), ivec(inds - 1), r)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
+function get_charattrlist(model::Model, name::String, inds::Vector{I}) where {I<:Integer}
+    r = Array{Cchar}(length(inds))
+    get_charattrlist!(r::Array{Cchar}, model::Model, name::String, inds)
+    return r
 end
 
 function get_charattrarray(model::Model, name::String, start::Integer, len::Integer)
@@ -233,11 +287,33 @@ function set_intattrarray!(model::Model, name::String, start::Integer, len::Inte
     nothing
 end
 
+function set_intattrlist!(model::Model, name::String, inds::Vector, values::Vector)
+    @assert isascii(name)
+    @assert length(inds) == length(values)
+    ret = @grb_ccall(setintattrlist, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cint}, Ptr{Cint}), model, name, Cint(length(inds)), ivec(inds-1), ivec(values))
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
 function set_dblattrarray!(model::Model, name::String, start::Integer, len::Integer, values::Vector)
     @assert isascii(name)
     values = convert(Vector{Float64},values)
     ret = @grb_ccall(setdblattrarray, Cint,
         (Ptr{Void}, Ptr{UInt8}, Cint, Cint, Ptr{Float64}), model, name, start-1, len, fvec(values))
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
+function set_dblattrlist!(model::Model, name::String, inds::Vector, values::Vector)
+    @assert isascii(name)
+    @assert length(inds) == length(values)
+    ret = @grb_ccall(setdblattrlist, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cint}, Ptr{Float64}), model, name, Cint(length(inds)), ivec(inds-1), fvec(values))
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -255,6 +331,16 @@ function set_charattrarray!(model::Model, name::String, start::Integer, len::Int
     nothing
 end
 
+function set_charattrlist!(model::Model, name::String, inds::Vector, values::Vector)
+    @assert isascii(name)
+    @assert length(inds) == length(values)
+    ret = @grb_ccall(setcharattrlist, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cint}, Ptr{Cchar}), model, name, Cint(length(inds)), ivec(inds-1), cvec(values))
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
 
 ############################################
 #
