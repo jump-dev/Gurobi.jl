@@ -163,13 +163,26 @@ function get_constrmatrix(model::Model)
     get_constrs(model::Model, 1, num_constrs(model))
 end
 function get_constrs(model::Model, start::Integer, len::Integer)
-    nnz = get_intattr(model, "NumNZs")
+
     m = num_constrs(model)
     @assert start <= m
     @assert len <= m
     n = num_vars(model)
     numnzP = Array{Cint}(1)
     cbeg = Array{Cint}(len+1)
+
+    ret = @grb_ccall(getconstrs, Cint, (
+        Ptr{Void},
+        Ptr{Cint},
+        Ptr{Cint},
+        Ptr{Cint},
+        Ptr{Cdouble},
+        Cint, # start
+        Cint #len
+        ),
+        model, numnzP, cbeg, C_NULL, C_NULL, Cint(start-1), Cint(len))
+
+    nnz = numnzP[1]
     cind = Array{Cint}(nnz)
     cval = Array{Cdouble}(nnz)
     ret = @grb_ccall(getconstrs, Cint, (
