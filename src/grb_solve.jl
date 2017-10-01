@@ -159,7 +159,18 @@ function get_basis(model::Model)
     return cbasis, rbasis
 end
 
-function loadbasis(model::Model, x::Vector)#, status::Symbol = :unstarted, isnew::Vector{Bool} = [false])
+"""
+    loadbasis(model::Model, x::Vector)
+
+Load basis to a problem in form of primal solution.
+
+    loadbasis(model::Model, rval::Vector{Symbol}, cval::Vector{Symbol})
+
+Load basis to a problem in terms of basicness description
+Variables\columns (in `cval`) can be: `:Basic`, `:NonbasicAtLower`, `:NonbasicAtUpper` and `:Superbasic`
+Constraints\rows (in `rval`) can be: `:Basic`, `:Nonbasic`
+"""
+function loadbasis(model::Model, x::Vector)
 
     ncols = num_vars(model)
     nrows = num_constrs(model)
