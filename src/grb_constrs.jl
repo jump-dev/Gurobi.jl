@@ -233,7 +233,6 @@ function add_sos!(model::Model, sostype::Symbol, idx::Vector{Int}, weight::Vecto
     end
 end
 function del_sos!(model::Model, idx::Vector{Cint})
-    # int XPRS_CC XPRSdelsets(XPRSprob prob, int ndelsets, const int mindex[])
     numdel = length(idx)
     ret = @grb_ccall(delsos, Cint, (
                      Ptr{Void},
@@ -247,7 +246,6 @@ end
 
 get_sos_matrix(model::Model) = get_sos(model::Model, 1, num_sos(model))
 function get_sos(model::Model, start::Integer, len::Integer)
-    # int GRBgetsos ( GRBmodel *model,int	*nummembersP,int *sostype,int *beg,int	*ind,doule *weight,int start,int len )
     numnzP = Array{Cint}(1)
     m = num_sos(model)
     sostype = Array{Cint}(m)
@@ -337,7 +335,6 @@ function chg_coeffs!(model::Model, cidx::Vector{Cint}, vidx::Vector{Cint}, val::
 end
 
 function getcoeff!(val::FVec, model::Model, cidx::Integer, vidx::Integer)
-    # int GRBgetcoeff ( 	GRBmodel *model, int constrind, int 	varind, double 	*valP )
     @assert length(val) == 1
     ret = @grb_ccall(getcoeff, Cint, (
         Ptr{Void},
