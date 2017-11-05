@@ -5,7 +5,7 @@ type Env
     ptr_env::Ptr{Void}
 
     """
-        Env(silent::Bool=false)
+        Env(;silent::Bool=false)
 
     Construct a Gurobi environment. The environment maintains parameters of the
     Gurobi solver and its license. In particular, constructing an environment
@@ -19,7 +19,7 @@ type Env
     Gurobi from printing messages to the screen every time an environment
     is constructed.
     """
-    function Env(silent::Bool=false)
+    function Env(;silent::Bool=false)
         a = Array{Ptr{Void}}(1)
         if silent
             _stdout = STDOUT
