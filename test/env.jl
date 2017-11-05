@@ -27,4 +27,20 @@ using Gurobi, MathProgBase, Base.Test
     # Check that env is finalized with model when not supplied manually
     finalize(m3.inner)
     @test !Gurobi.is_valid(m3.inner.env)
+
+    # Test creating environment silently
+    # To actualy test this, we need to redirect STDOUT ourselves,
+    # run the environment constructor, and verify that nothing was
+    # printed to the captured stdout.
+    _stdout = STDOUT
+    try
+        rd, wr = redirect_stdout()
+        Gurobi.Env(silent=true)
+        redirect_stdout(_stdout)
+        @test isempty(readavailable(rd))
+    finally
+        redirect_stdout(_stdout) # this will be done twice if there is no error in the try block, but that's fine
+        close(rd)
+        close(wr)
+    end
 end
