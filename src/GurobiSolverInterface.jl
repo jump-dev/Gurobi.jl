@@ -440,6 +440,8 @@ function status(m::GurobiMathProgModel)
     return :InProgress
   elseif s == :user_obj_limit
     return :UserObjLimit
+  elseif s == :cutoff
+    return :Cutoff
   else
     error("Unrecognized solution status: $s")
   end
