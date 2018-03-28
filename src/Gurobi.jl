@@ -53,6 +53,9 @@ module Gurobi
     # grb_quad
     add_qpterms!, add_qconstr!,
 
+    # Advance Routines
+    get_basisidx, get_tableaurow,
+
     # higher level
     gurobi_model,
 
@@ -72,6 +75,7 @@ module Gurobi
     include("grb_attrs.jl")
     include("grb_constrs.jl")
     include("grb_quad.jl")
+    include("grb_advroutines.jl")
     include("grb_highlevel.jl")
 
     include("grb_solve.jl")

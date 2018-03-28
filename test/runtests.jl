@@ -12,6 +12,7 @@ tests = [
     "test_grb_attrs",
     "env",
     "range_constraints",
+    "advanced_routines",
     "test_get_strarray",
     "large_coefficients"
 ]
