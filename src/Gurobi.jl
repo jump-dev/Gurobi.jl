@@ -54,7 +54,7 @@ module Gurobi
     add_qpterms!, add_qconstr!,
 
     # Advance Routines
-    get_basisidx, get_tableaurow,
+    get_basisidx, get_tableaurow, get_tableaurow!,
 
     # higher level
     gurobi_model,

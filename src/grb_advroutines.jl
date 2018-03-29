@@ -1,26 +1,43 @@
-type GRBsvec
+mutable struct GRBsvec
     len::Cint
     ind::Ptr{Cint}
     val::Ptr{Cdouble}
 end
 
-function get_tableaurow(model::Model, cidx::Integer)
-    len = num_vars(model)+num_constrs(model)
-    grb_v = GRBsvec(0, pointer(Array{Cint}(len)) , pointer(Array{Cdouble}(len) ))
+function get_tableaurow_grb(model::Model, cidx::Integer)
+	len = num_vars(model)+num_constrs(model)
+	idx = Array{Cint}(len)
+	val = Array{Cdouble}(len)
+
+    grb_v = GRBsvec(0, pointer(idx) , pointer(val))
     ret = @grb_ccall(BinvRowi, Cint, (
         Ptr{Void},
         Cint,
-        Ptr{GRBsvec}),
-        model, convert(Cint, cidx-1), &grb_v)
+        Ref{GRBsvec}),
+        model, convert(Cint, cidx-1), grb_v)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
+	return idx[1:grb_v.len]+1, val[1:grb_v.len]
+end
 
-    idx = unsafe_wrap(Array, grb_v.ind, grb_v.len)
-    val = unsafe_wrap(Array, grb_v.val, grb_v.len)
-    spv = spzeros(len)
-    spv[idx+1] = val
-    return spv
+function get_tableaurow!(row::Vector{Float64}, model::Model, cidx::Integer)
+	idx, val = get_tableaurow_grb(model, cidx)
+    row[idx] = val
+    return nothing
+end
+
+function get_tableaurow!(BinvA::Matrix{Float64}, model::Model, cidx::Integer)
+    idx, val = get_tableaurow_grb(model, cidx)
+    BinvA[cidx, idx] = val
+    return nothing
+end
+
+function get_tableaurow(model::Model, cidx::Integer)
+	len = num_vars(model)+num_constrs(model)
+	spv = zeros(len)
+	get_tableaurow!(spv, model, cidx)
+	return spv
 end
 
 function get_basisidx(model::Model)
@@ -34,5 +51,3 @@ function get_basisidx(model::Model)
     end
     return v+1
 end
-
-# TODO GRBBinvi
