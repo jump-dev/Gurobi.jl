@@ -228,14 +228,73 @@ end
 setconstrLB!(m::GurobiMathProgModel, lb) = (m.changed_constr_bounds = true; m.lb = copy(lb))
 setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.ub = copy(ub))
 
-getobj(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "Obj", 1, num_vars(m.inner)   )
-function setobj!(m::GurobiMathProgModel, c)
+getobj(m::GurobiMathProgModel, i::Int=1) = get_dblattrarray( m.inner, "Obj", i, num_vars(m.inner))
+function setobj!(m::GurobiMathProgModel, c, i::Int=1)
     if checkvalue(c, GRB_INFINITY)
         _objwarning(c)
     end
     m.obj = copy(c)
     _truncateobj!(m.obj)
-    set_dblattrarray!(m.inner, "Obj", 1, num_vars(m.inner), c)
+    set_dblattrarray!(m.inner, "Obj", i, num_vars(m.inner), c)
+end
+
+set_multiobj_n!(m::Gurobi.Model, n::Int) = Gurobi.set_intattr!(m, "NumObj", n)
+get_multiobj_n(m::Gurobi.Model)          = Gurobi.get_intattr(m, "NumObj")
+
+function set_multiobj_c!(m::Model, i::Int, c::AbstractVector{Float64})
+    _chklen(c, num_vars(m))
+    i0 = get_int_param(m, "ObjNumber")
+    set_int_param!(m, "ObjNumber", i-1)
+    set_dblattrarray!(m, "ObjN", 1, num_vars(m), c)
+    set_int_param!(m, "ObjNumber", i0)
+end
+
+function get_multiobj_c(m::Model, i::Int)
+    i0 = get_int_param(m, "ObjNumber")
+    set_int_param!(m, "ObjNumber", i-1)
+    c = get_dblattrarray(m, "ObjN", 1, num_vars(m))
+    set_int_param!(m, "ObjNumber", i0)
+    return c
+end
+
+function set_multiobj_priority!(m::Model, i::Int, priority::Int)
+    i0 = get_int_param(m, "ObjNumber")
+    set_int_param!(m, "ObjNumber", i-1)
+    set_intattr!(m, "ObjNPriority", priority)
+    set_int_param!(m, "ObjNumber", i0)
+end
+
+function get_multiobj_priority(m::Model, i::Int)::Int
+    i0 = get_int_param(m, "ObjNumber")
+    set_int_param!(m, "ObjNumber", i-1)
+    p = get_intattr(m, "ObjNPriority")
+    set_int_param!(m, "ObjNumber", i0)
+    return p
+end
+
+function set_multiobj_weight!(m::Model, i::Int, w::Float64)
+    i0 = get_int_param(m, "ObjNumber")
+    set_int_param!(m, "ObjNumber", i-1)
+    set_dblattr!(m, "ObjNWeight", w)
+    set_int_param!(m, "ObjNumber", i0)
+end
+
+function get_multiobj_weight(m::Model, i::Int)::Float64
+    i0 = get_int_param(m, "ObjNumber")
+    set_int_param!(m, "ObjNumber", i-1)
+    w::Float64 = get_dblattr(m, "ObjNWeight")
+    set_int_param!(m, "ObjNumber", i0)
+    return w
+end
+
+function set_multiobj!(m::Model, i::Int, c::AbstractVector{Float64}, p::Int, w::Float64)
+    nobj = get_multiobj_n(m)
+    if !(1 ≤ i ≤ nobj)
+        error("Tried to set objective $i of $nobj. You must use the set_multiobj_n to specify the correct number of objective functions for your problem.")
+    end
+    set_multiobj_c!(m, i, c)
+    set_multiobj_priority!(m, i, p)
+    set_multiobj_weight!(m, i, w)
 end
 
 function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
@@ -381,6 +440,8 @@ function status(m::GurobiMathProgModel)
     return :InProgress
   elseif s == :user_obj_limit
     return :UserObjLimit
+  elseif s == :cutoff
+    return :Cutoff
   else
     error("Unrecognized solution status: $s")
   end
