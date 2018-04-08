@@ -167,6 +167,7 @@ function get_constrs(model::Model, start::Integer, len::Integer)
     m = num_constrs(model)
     @assert start <= m
     @assert len <= m
+    @assert start-1+len <= m
     n = num_vars(model)
     numnzP = Array{Cint}(1)
     cbeg = Array{Cint}(len+1)
