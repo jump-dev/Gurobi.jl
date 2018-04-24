@@ -9,7 +9,7 @@ function write_depsfile(path)
     close(f)
 end
 
-aliases = ["gurobi75","gurobi70","gurobi65","gurobi60","gurobi56","gurobi55"]
+aliases = ["gurobi80","gurobi75","gurobi70","gurobi65","gurobi60","gurobi56","gurobi55"]
 
 paths_to_try = copy(aliases)
 
