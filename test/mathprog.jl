@@ -20,6 +20,11 @@ qpdualtest(GurobiSolver(QCPDual=1))
 
 include(joinpath(Pkg.dir("MathProgBase"),"test","conicinterface.jl"))
 coniclineartest(GurobiSolver())
-conicSOCtest(GurobiSolver())
-conicSOCRotatedtest(GurobiSolver())
+# The following tests are not passing on Gurobi 8.0.0 due to known bug
+# on infeasibility check of SOC models.
+# https://github.com/JuliaOpt/Gurobi.jl/pull/123
+if Gurobi.version < v"8.0.0"
+    conicSOCtest(GurobiSolver())
+    conicSOCRotatedtest(GurobiSolver())
+end
 conicSOCINTtest(GurobiSolver())
