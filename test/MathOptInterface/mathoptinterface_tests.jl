@@ -44,10 +44,22 @@ end
     # 3 is ranged
 end
 @testset "ModelLike tests" begin
-    intconfig = MOIT.TestConfig()
     solver = GurobiOptimizer()
-    MOIT.validtest(solver)
-    MOIT.emptytest(solver)
-    solver2 = GurobiOptimizer()
-    MOIT.copytest(solver,solver2)
+    MOIT.nametest(solver)
+    @testset "validtest" begin
+        MOIT.validtest(solver)
+    end
+    @testset "emptytest" begin
+        MOIT.emptytest(solver)
+    end
+    # @testset "orderedindicestest" begin
+    #     MOIT.orderedindicestest(solver)
+    # end
+    # @testset "canaddconstrainttest" begin
+    #     MOIT.canaddconstrainttest(solver, Float64, Complex{Float64})
+    # end
+    # @testset "copytest" begin
+    #     solver2 = GurobiOptimizer()
+    #     MOIT.copytest(solver,solver2)
+    # end
 end
