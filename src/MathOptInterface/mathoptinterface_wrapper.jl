@@ -437,11 +437,24 @@ function LQOI.lqs_getax!(instance::GurobiOptimizer, place)
     end
     nothing
 end
+
+# LQOI.lqs_getqcax!(m, place)
+function LQOI.lqs_getqcax!(instance::GurobiOptimizer, place)
+    get_dblattrarray!(place, instance.inner, "QCSlack", 1)
+    rhs = get_dblattrarray(instance.inner, "QCRHS", 1, num_qconstrs(instance.inner))
+    for i in eachindex(place)
+        place[i] = -place[i]+rhs[i]
+    end
+    nothing
+end
 # LQOI.lqs_getdj!(m, place)
 LQOI.lqs_getdj!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "RC", 1)
 
 # LQOI.lqs_getpi!(m, place)
 LQOI.lqs_getpi!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "Pi", 1)
+
+# LQOI.lqs_getqcpi!(m, place)
+LQOI.lqs_getqcpi!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "QCPi", 1)
 
 # LQOI.lqs_getobjval(m)
 LQOI.lqs_getobjval(instance::GurobiOptimizer) = get_objval(instance.inner)
