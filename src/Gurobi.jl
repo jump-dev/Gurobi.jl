@@ -77,5 +77,6 @@ module Gurobi
     include("grb_solve.jl")
     include("grb_callbacks.jl")
 
-    include("GurobiSolverInterface.jl")
+    include("MathProgBase/mathprogbase_wrapper.jl")
+    include("MathOptInterface/mathoptinterface_wrapper.jl")
 end
