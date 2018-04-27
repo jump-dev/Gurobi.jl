@@ -28,14 +28,6 @@ const mpb_tests = [
     end
 end
 
-const moi_tests = [
-    "mathoptinterface_tests"
-]
-
 @testset "MathOptInterface Tests" begin
-    for t in moi_tests
-        fp = "$(t).jl"
-        println("running $(fp) ...")
-        evalfile(joinpath("MathOptInterface", fp))
-    end
+    evalfile("MOIWrapper.jl")
 end
