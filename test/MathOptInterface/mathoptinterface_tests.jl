@@ -3,17 +3,21 @@ using Gurobi, Base.Test, MathOptInterface, MathOptInterface.Test
 const MOIT = MathOptInterface.Test
 
 @testset "Linear tests" begin
-    linconfig = linconfig = MOIT.TestConfig()
-    solver = GurobiOptimizer(OutputFlag=0)
-    MOIT.contlineartest(solver, linconfig, ["linear10","linear12","linear8a","linear8b","linear8c"])
-
-    solver_nopresolve = GurobiOptimizer(OutputFlag=0, InfUnbdInfo=1)
-    MOIT.contlineartest(solver_nopresolve, linconfig, ["linear10","linear12","linear8a"])
-
-    linconfig_nocertificate = MOIT.TestConfig(infeas_certificates=false)
-    MOIT.linear12test(solver, linconfig_nocertificate)
-    MOIT.linear8atest(solver, linconfig_nocertificate)
-
+    linconfig = MOIT.TestConfig()
+    @testset "Default Solver"  begin
+        solver = GurobiOptimizer(OutputFlag=0)
+        MOIT.contlineartest(solver, linconfig, ["linear10","linear12","linear8a","linear8b","linear8c"])
+    end
+    @testset "InfUnbdInfo=1" begin
+        solver_nopresolve = GurobiOptimizer(OutputFlag=0, InfUnbdInfo=1)
+        MOIT.contlineartest(solver_nopresolve, linconfig, ["linear10","linear12","linear8a"])
+    end
+    @testset "No certificate" begin
+        solver = GurobiOptimizer(OutputFlag=0)
+        linconfig_nocertificate = MOIT.TestConfig(infeas_certificates=false)
+        MOIT.linear12test(solver, linconfig_nocertificate)
+        MOIT.linear8atest(solver, linconfig_nocertificate)
+    end
     # 10 is ranged
 end
 

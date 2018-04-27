@@ -236,7 +236,9 @@ end
 LQOI.lqs_getnumqconstrs(instance::GurobiOptimizer) = num_qconstrs(instance.inner)
 
 # LQOI.lqs_addqconstr(m, cols,coefs,rhs,sense, I,J,V)
-LQOI.lqs_addqconstr!(instance::GurobiOptimizer, cols,coefs,rhs,sense, I,J,V) = add_qconstr!(instance.inner, cols, coefs, I, J, V, sense, rhs)
+#   NOTE:
+# LQOI assumes 0.5 x' Q x, but Gurobi requires x' Q x so we multiply V by 0.5
+LQOI.lqs_addqconstr!(instance::GurobiOptimizer, cols,coefs,rhs,sense, I,J,V) = add_qconstr!(instance.inner, cols, coefs, I, J, 0.5 * V, sense, rhs)
 
 # LQOI.lqs_chgrngval
 LQOI.lqs_chgrngval!(instance::GurobiOptimizer, rows, vals) = chg_rhsrange!(instance.inner, cintvec(rows), -vals)
