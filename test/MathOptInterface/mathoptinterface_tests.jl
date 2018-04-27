@@ -52,14 +52,14 @@ end
     @testset "emptytest" begin
         MOIT.emptytest(solver)
     end
-    # @testset "orderedindicestest" begin
-    #     MOIT.orderedindicestest(solver)
-    # end
-    # @testset "canaddconstrainttest" begin
-    #     MOIT.canaddconstrainttest(solver, Float64, Complex{Float64})
-    # end
-    # @testset "copytest" begin
-    #     solver2 = GurobiOptimizer()
-    #     MOIT.copytest(solver,solver2)
-    # end
+    @testset "orderedindicestest" begin
+        MOIT.orderedindicestest(solver)
+    end
+    @testset "canaddconstrainttest" begin
+        MOIT.canaddconstrainttest(solver, Float64, Complex{Float64})
+    end
+    @testset "copytest" begin
+        solver2 = GurobiOptimizer()
+        MOIT.copytest(solver,solver2)
+    end
 end
