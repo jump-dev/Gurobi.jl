@@ -282,9 +282,8 @@ function LQOI.lqs_chgobj!(instance::GurobiOptimizer, colvec, coefvec)
 end
 
 # LQOI.lqs_chgobjsen(m, symbol)
-# TODO improve min max names
 function LQOI.lqs_chgobjsen!(instance::GurobiOptimizer, symbol)
-    if symbol in [:minimize, :Min]
+    if symbol == :min
         set_sense!(instance.inner, :minimize)
     else
         set_sense!(instance.inner, :maximize)
@@ -299,7 +298,7 @@ LQOI.lqs_getobj(instance::GurobiOptimizer) = get_dblattrarray( instance.inner, "
 # lqs_getobjsen(m)
 function LQOI.lqs_getobjsen(instance::GurobiOptimizer)
     s = model_sense(instance.inner)
-    if s in [:maximize, :Max]
+    if s == :maximize
         return MOI.MaxSense
     else
         return MOI.MinSense
@@ -316,14 +315,13 @@ LQOI.lqs_getnumcols(instance::GurobiOptimizer) = (update_model!(instance.inner);
 # LQOI.lqs_newcols!(m, int)
 LQOI.lqs_newcols!(instance::GurobiOptimizer, int) = (add_cvars!(instance.inner, zeros(int));update_model!(instance.inner))
 
-# LQOI.lqs_delcols!(m, col, col)
+# TODO(odow): is this implemented correctly?
 LQOI.lqs_delcols!(instance::GurobiOptimizer, col, col2) = (del_vars!(instance.inner, col);update_model!(instance.inner))
 
-# LQOI.lqs_addmipstarts(m, colvec, valvec)
-function LQOI.lqs_addmipstarts!(instance::GurobiOptimizer, colvec, valvec)
+function LQOI.lqs_addmipstarts!(instance::GurobiOptimizer, colvec::Vector{Int}, valvec::Vector)
     x = zeros(num_vars(instance.inner))
-    for i in eachindex(colvec)
-        x[colvec[i]] = valvec[i]
+    for (col, val) in zip(colvec, valvec)
+        x[col] = val
     end
     loadbasis(instance.inner, x)
 end
