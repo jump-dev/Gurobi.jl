@@ -2,10 +2,10 @@ using Gurobi, Base.Test, MathOptInterface, MathOptInterface.Test
 
 const MOIT = MathOptInterface.Test
 
-@testset "Linear solver" begin
+@testset "Unit Tests" begin
     config = MOIT.TestConfig()
     solver = GurobiOptimizer(OutputFlag=0)
-    MOIT.atomictest(solver, config, ["singlevariable_obj"])
+    MOIT.unittest(solver, config, ["solve_singlevariable_obj"])
 end
 
 @testset "Linear tests" begin
