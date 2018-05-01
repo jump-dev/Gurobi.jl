@@ -25,7 +25,7 @@ simple_model = Gurobi.Model(simple_model_env, "simple_mip", :maximize)
 add_ivar!(simple_model, 0., 0, Inf)  # p1
 add_ivar!(simple_model, 0., 0, Inf)  # p2
 add_ivar!(simple_model, 0., 0, Inf)  # p3
-add_cvar!(simple_model, 1., 0., Inf)      # z
+add_cvar!(simple_model, 1., 0., Inf) # z
 update_model!(simple_model)
 
 # two constraints due to '='
