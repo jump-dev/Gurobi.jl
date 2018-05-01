@@ -43,8 +43,8 @@ optimize(simple_model)
 println("-----------------------------")
 println()
 
-## WRITE SOLUTION FILE
-#---------------------
+## WRITE SOLUTION FILES
+#----------------------
 
 write_model(simple_model, "simple_out.sol")
 write_model(simple_model, "simple_out.mst")
