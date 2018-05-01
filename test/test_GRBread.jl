@@ -35,9 +35,13 @@ add_constr!(simple_model, [2., 5., 4., -1.], '>', 0.)
 add_constr!(simple_model, [0.5, 2., 1., 0.], '<', 6.)
 
 setparam!(simple_model, "Heuristics", 0.0)
+setparam!(simple_model, "Presolve", 0)
+
 update_model!(simple_model)
 
 optimize(simple_model)
+println("-----------------------------")
+println()
 
 ## WRITE SOLUTION FILE
 #---------------------
@@ -51,8 +55,12 @@ write_model(simple_model, "simple_out.mst")
 start_1 = Gurobi.get_dblattrarray(simple_model, "Start", 1, 4)
 println("Current start vector:")
 println(start_1)
+println()
 
+println("----------------------")
 println("Reading solution file.")
+println("----------------------")
+println()
 Gurobi.read(simple_model, "simple_out.sol")
 update_model!(simple_model)
 
@@ -63,6 +71,9 @@ println(start_2)
 ## VERIFY MIP START
 #------------------
 
+#The parameters Presolve and Heuristics must be set to 0
+println()
+println("-----------------------------")
 optimize(simple_model)
 
 ## DELETE FILES
@@ -70,6 +81,3 @@ optimize(simple_model)
 
 rm("simple_out.sol")
 rm("simple_out.mst")
-
-#test1 = Gurobi.set_dblattrarray!(simple_model, "", 1, 3, [NaN, NaN, NaN])
-#test1 = Gurobi.get_dblattrarray(simple_model, "", 1, 4)
