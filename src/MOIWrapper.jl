@@ -80,11 +80,11 @@ LQOI.lqs_supported_objectives(s::GurobiOptimizer) = SUPPORTED_OBJECTIVES
 
 # LQOI.lqs_setparam!(env, name, val)
 # TODO fix this one
-LQOI.lqs_setparam!(m::GurobiOptimizer, name, val) = setparam!(m.inner, string(name), val)
+# LQOI.lqs_setparam!(m::GurobiOptimizer, name, val) = setparam!(m.inner, string(name), val)
 
 # LQOI.lqs_setlogfile!(env, path)
 # TODO fix this one
-LQOI.lqs_setlogfile!(m::GurobiOptimizer, path) = setlogfile(m.env, path::String)
+# LQOI.lqs_setlogfile!(m::GurobiOptimizer, path) = setlogfile(m.env, path::String)
 
 # LQOI.lqs_getprobtype(m)
 # TODO - consider removing, apparently useless
@@ -140,23 +140,30 @@ function LQOI.lqs_chgbds!(instance::GurobiOptimizer, colvec, valvec, sensevec)
 end
 
 
-# LQOI.lqs_getlb(m, col)
-LQOI.lqs_getlb(instance::GurobiOptimizer, col) = (update_model!(instance.inner);get_dblattrlist( instance.inner, "LB", ivec(col))[1])
-# LQOI.lqs_getub(m, col)
-LQOI.lqs_getub(instance::GurobiOptimizer, col) = get_dblattrlist( instance.inner, "UB", ivec(col))[1]
 
-# LQOI.lqs_getnumrows(m)
-LQOI.lqs_getnumrows(instance::GurobiOptimizer) = num_constrs(instance.inner)
+function LQOI.get_variable_lowerbound(instance::GurobiOptimizer, col)
+    # TODO(odow): is this needed? update_model!(instance.inner)
+    get_dblattrlist(instance.inner, "LB", ivec(col))[1]
+end
 
-# LQOI.lqs_addrows!(m, rowvec, colvec, coefvec, sensevec, rhsvec)
-LQOI.lqs_addrows!(instance::GurobiOptimizer, rowvec, colvec, coefvec, sensevec, rhsvec) = (add_constrs!(instance.inner, rowvec, colvec, coefvec, sensevec, rhsvec);update_model!(instance.inner))
+function LQOI.get_variable_upperbound(instance::GurobiOptimizer, col)
+    get_dblattrlist(instance.inner, "UB", ivec(col))[1]
+end
 
-# LQOI.lqs_getrhs(m, rowvec)
-LQOI.lqs_getrhs(instance::GurobiOptimizer, row) = get_dblattrlist( instance.inner, "RHS", ivec(row))[1]
+function LQOI.get_number_linear_constraints(instance::GurobiOptimizer)
+    num_constrs(instance.inner)
+end
 
-# colvec, coef = LQOI.lqs_getrows(m, rowvec)
-# TODO improve
-function LQOI.lqs_getrows(instance::GurobiOptimizer, idx)
+function LQOI.add_linear_constraints!(instance::GurobiOptimizer, rowvec, colvec, coefvec, sensevec, rhsvec)
+    add_constrs!(instance.inner, rowvec, colvec, coefvec, sensevec, rhsvec)
+    update_model!(instance.inner)
+end
+
+function LQOI.get_rhs(instance::GurobiOptimizer, row)
+    get_dblattrlist( instance.inner, "RHS", ivec(row))[1]
+end
+
+function LQOI.get_linear_constraint(instance::GurobiOptimizer, idx)
     A = get_constrs(instance.inner, idx, 1)'
     return A.rowval-1, A.nzval
 end
