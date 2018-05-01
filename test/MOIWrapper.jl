@@ -5,7 +5,10 @@ const MOIT = MathOptInterface.Test
 @testset "Unit Tests" begin
     config = MOIT.TestConfig()
     solver = GurobiOptimizer(OutputFlag=0)
-    MOIT.unittest(solver, config, ["solve_singlevariable_obj"])
+    MOIT.unittest(solver, config, [
+        "solve_singlevariable_obj",
+        "solve_affine_interval"
+    ])
 end
 
 @testset "Linear tests" begin
