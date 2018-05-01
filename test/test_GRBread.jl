@@ -53,7 +53,7 @@ write_model(simple_model, "simple_out.mst")
 #--------------------
 
 start_1 = Gurobi.get_dblattrarray(simple_model, "Start", 1, 4)
-println("Current start vector:")
+println("Current MIP start vector:")
 println(start_1)
 println()
 
@@ -64,7 +64,7 @@ println()
 Gurobi.read(simple_model, "simple_out.sol")
 update_model!(simple_model)
 
-println("Updated start vector:")
+println("Updated MIP start vector:")
 start_2 = Gurobi.get_dblattrarray(simple_model, "Start", 1, 4)
 println(start_2)
 
