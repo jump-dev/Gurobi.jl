@@ -1,6 +1,6 @@
 using Gurobi
 
-dir = "C:/Users/anton/.julia/v0.6/Gurobi/test"
+dir = pwd()
 cd(dir)
 
 # an example on mixed integer programming
