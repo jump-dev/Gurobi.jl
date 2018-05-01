@@ -95,14 +95,12 @@ LQOI.lqs_setlogfile!(m::GurobiOptimizer, path) = setlogfile(m.env, path::String)
 
 cintvec(v::Vector) = convert(Vector{Int32}, v)
 
-_getsense(m::GurobiOptimizer, ::MOI.EqualTo{Float64}) = Cchar('=')
-_getsense(m::GurobiOptimizer, ::MOI.LessThan{Float64}) = Cchar('<')
-_getsense(m::GurobiOptimizer, ::MOI.GreaterThan{Float64}) = Cchar('>')
-_getsense(m::GurobiOptimizer, ::MOI.Zeros)        = Cchar('=')
-_getsense(m::GurobiOptimizer, ::MOI.Nonpositives) = Cchar('<')
-_getsense(m::GurobiOptimizer, ::MOI.Nonnegatives) = Cchar('>')
-_getboundsense(m::GurobiOptimizer, ::MOI.Nonpositives) = Cchar('>')
-_getboundsense(m::GurobiOptimizer, ::MOI.Nonnegatives) = Cchar('<')
+LQOI.lqs_char(m::GurobiOptimizer, ::MOI.EqualTo{Float64})     = Cchar('=')
+LQOI.lqs_char(m::GurobiOptimizer, ::MOI.LessThan{Float64})    = Cchar('<')
+LQOI.lqs_char(m::GurobiOptimizer, ::MOI.GreaterThan{Float64}) = Cchar('>')
+LQOI.lqs_char(m::GurobiOptimizer, ::MOI.Zeros)                = Cchar('=')
+LQOI.lqs_char(m::GurobiOptimizer, ::MOI.Nonpositives)         = Cchar('<')
+LQOI.lqs_char(m::GurobiOptimizer, ::MOI.Nonnegatives)         = Cchar('>')
 
 # LQOI.lqs_chgbds!(m, colvec, valvec, sensevec)
 # TODO - improve single type
@@ -203,23 +201,10 @@ LQOI.lqs_chgctype!(instance::GurobiOptimizer, colvec, typevec) = set_charattrlis
 # TODO fix types
 LQOI.lqs_chgsense!(instance::GurobiOptimizer, rowvec, sensevec) = set_charattrlist!(instance.inner, "Sense", ivec(rowvec), cvec(sensevec))
 
-const VAR_TYPE_MAP = Dict{Symbol,Cchar}(
-    :CONTINUOUS => Cchar('C'),
-    :INTEGER => Cchar('I'),
-    :BINARY => Cchar('B')
-)
-LQOI.lqs_vartype_map(m::GurobiOptimizer) = VAR_TYPE_MAP
-
 # LQOI.lqs_addsos(m, colvec, valvec, typ)
 LQOI.lqs_addsos!(instance::GurobiOptimizer, colvec, valvec, typ) = (add_sos!(instance.inner, typ, colvec, valvec);update_model!(instance.inner))
 # LQOI.lqs_delsos(m, idx, idx)
 LQOI.lqs_delsos!(instance::GurobiOptimizer, idx1, idx2) = (del_sos!(instance.inner, cintvec(collect(idx1:idx2)));update_model!(instance.inner))
-
-const SOS_TYPE_MAP = Dict{Symbol,Symbol}(
-    :SOS1 => :SOS1,#Cchar('1'),
-    :SOS2 => :SOS2#Cchar('2')
-)
-LQOI.lqs_sertype_map(m::GurobiOptimizer) = SOS_TYPE_MAP
 
 # LQOI.lqs_getsos(m, idx)
 # TODO improve getting processes
@@ -242,14 +227,6 @@ LQOI.lqs_addqconstr!(instance::GurobiOptimizer, cols,coefs,rhs,sense, I,J,V) = a
 
 # LQOI.lqs_chgrngval
 LQOI.lqs_chgrngval!(instance::GurobiOptimizer, rows, vals) = chg_rhsrange!(instance.inner, cintvec(rows), -vals)
-
-const CTR_TYPE_MAP = Dict{Symbol,Cchar}(
-    :RANGE => Cchar('R'),
-    :LOWER => Cchar('L'),
-    :UPPER => Cchar('U'),
-    :EQUALITY => Cchar('E')
-)
-LQOI.lqs_ctrtype_map(m::GurobiOptimizer) = CTR_TYPE_MAP
 
 #=
     Objective
