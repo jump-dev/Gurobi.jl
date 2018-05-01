@@ -3,7 +3,7 @@ using Gurobi
 dir = pwd()
 cd(dir)
 
-# an example on mixed integer programming
+# A simple mip
 #
 #   maximize z
 #
