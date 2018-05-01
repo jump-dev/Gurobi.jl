@@ -29,7 +29,7 @@ module Gurobi
     # grb_model
     set_sense!, update_model!, reset_model!, get_tune_result!,
     read_model, write_model, tune_model, presolve_model, fixed_model,
-    copy,
+    copy, read,
 
     # grb_attrs
     model_name, model_sense, model_type,
