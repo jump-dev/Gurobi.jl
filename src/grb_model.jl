@@ -11,7 +11,7 @@ type Model
     ptr_model::Ptr{Void}
     callback::Any
     finalize_env::Bool
-    
+
     function Model(env::Env, p::Ptr{Void}; finalize_env::Bool=false)
         model = new(env, p, nothing, finalize_env)
         finalizer(model, m -> (free_model(m); if m.finalize_env; free_env(m.env); end))
@@ -25,7 +25,7 @@ function Model(env::Env, name::String; finalize_env::Bool=false)
 
     @assert is_valid(env)
     @assert isascii(name)
-    
+
     a = Array{Ptr{Void}}(1)
     ret = @grb_ccall(newmodel, Cint, (
         Ptr{Void},  # env
@@ -37,15 +37,15 @@ function Model(env::Env, name::String; finalize_env::Bool=false)
         Ptr{Float64}, # ubounds
         Ptr{UInt8},   # var types,
         Ptr{Ptr{UInt8}} # varnames
-        ), 
-        env, a, name, 0, 
+        ),
+        env, a, name, 0,
         C_NULL, C_NULL, C_NULL, C_NULL, C_NULL
     )
-    
+
     if ret != 0
         throw(GurobiError(env, ret))
     end
-    
+
     Model(env, a[1]; finalize_env=finalize_env)
 end
 
@@ -56,7 +56,7 @@ function Model(env::Env, name::String, sense::Symbol)
     if sense != :minimize
         set_sense!(model, sense)
     end
-    model 
+    model
 end
 
 
@@ -106,12 +106,23 @@ end
 
 # read / write file
 
+function read(model::Model, filename::String)
+    @assert isascii(filename) # TODO: support non-ascii file names
+        ret = @grb_ccall(read, Cint,
+        (Ptr{Void}, Ptr{UInt8}),
+        model.ptr_model, filename)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    nothing
+end
+
 function read_model(model::Model, filename::String)
     @assert isascii(filename) # TODO: support non-ascii file names
     @assert is_valid(model.env)
     a = Array{Ptr{Void}}(1)
-    ret = @grb_ccall(readmodel, Cint, 
-        (Ptr{Void}, Ptr{UInt8}, Ptr{Ptr{Void}}), 
+    ret = @grb_ccall(readmodel, Cint,
+        (Ptr{Void}, Ptr{UInt8}, Ptr{Ptr{Void}}),
         model.env, filename, a)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -122,7 +133,7 @@ end
 
 function write_model(model::Model, filename::String)
     @assert isascii(filename) # TODO: support non-ascii file names
-    ret = @grb_ccall(write, Cint, (Ptr{Void}, Ptr{UInt8}), 
+    ret = @grb_ccall(write, Cint, (Ptr{Void}, Ptr{UInt8}),
         model.ptr_model, filename)
     if ret != 0
         throw(GurobiError(model.env, ret))
