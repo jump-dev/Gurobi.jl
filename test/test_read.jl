@@ -42,6 +42,8 @@ using Gurobi, Base.Test
 
     optimize(simple_model)
 
+    first_solution = Gurobi.get_dblattrarray(simple_model, "X", 1, 4)
+
     ## WRITE SOLUTION FILES
     #----------------------
 
@@ -62,6 +64,7 @@ using Gurobi, Base.Test
 
     start_2 = Gurobi.get_dblattrarray(simple_model, "Start", 1, 4)
     @test start_2 == [12.0, 0.0, 0.0, 36.0]
+    @test start_2 == first_solution
 
     ## VERIFY MIP START
     #------------------
