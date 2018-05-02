@@ -13,6 +13,9 @@
 using Gurobi, Base.Test
 
 @testset "test_read" begin
+# The function read() is used to produce a MIP start vector
+# from a *.sol or *.mst file. These files must first be
+# created using write_model().
 
     ## BUILD MODEL
     #-------------
@@ -63,7 +66,8 @@ using Gurobi, Base.Test
     ## VERIFY MIP START
     #------------------
 
-    #The parameters Presolve and Heuristics must be set to 0
+    # The parameters Presolve and Heuristics must be set to 0
+    # so the MIP start is used.
     optimize(simple_model)
 
     ## DELETE FILES
