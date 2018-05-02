@@ -10,7 +10,7 @@ module Gurobi
 
     ### imports
 
-    import Base.show, Base.copy
+    import Base.show, Base.copy, Base.read
 
     using Compat
 
