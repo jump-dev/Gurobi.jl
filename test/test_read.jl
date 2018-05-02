@@ -12,7 +12,7 @@
 
 using Gurobi, Base.Test
 
-@testset "GRBread" begin
+@testset "test_read" begin
 
     ## BUILD MODEL
     #-------------
