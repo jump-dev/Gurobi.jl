@@ -179,7 +179,7 @@ LQOI.get_number_quadratic_constraints(instance::GurobiOptimizer) = num_qconstrs(
 # LQOI assumes 0.5 x' Q x, but Gurobi requires x' Q x so we multiply V by 0.5
 LQOI.add_quadratic_constraint!(instance::GurobiOptimizer, cols,coefs,rhs,sense, I,J,V) = add_qconstr!(instance.inner, cols, coefs, I, J, 0.5 * V, sense, rhs)
 
-LQOI.change_range_value!(instance::GurobiOptimizer, rows, vals) = chg_rhsrange!(instance.inner, cintvec(rows), -vals)
+# LQOI.change_range_value!(instance::GurobiOptimizer, rows, vals) = chg_rhsrange!(instance.inner, cintvec(rows), -vals)
 
 function LQOI.set_quadratic_objective!(instance::GurobiOptimizer, I, J, V)
     delq!(instance.inner)
