@@ -41,7 +41,7 @@ mutable struct GurobiOptimizer <: LQOI.LinQuadOptimizer
     GurobiOptimizer(::Void) = new()
 end
 
-LQOI.LinQuadModel(::Type{GurobiOptimizer},env) = Model(env::Env,"defaultname")
+LQOI.LinearQuadraticModel(::Type{GurobiOptimizer},env) = Model(env::Env,"defaultname")
 
 function GurobiOptimizer(;kwargs...)
 
@@ -77,7 +77,7 @@ LQOI.lqs_char(m::GurobiOptimizer, ::MOI.Nonpositives)         = Cchar('<')
 LQOI.lqs_char(m::GurobiOptimizer, ::MOI.Nonnegatives)         = Cchar('>')
 
 # TODO - improve single type
-function LQOI.lqs_chgbds!(instance::GurobiOptimizer, colvec, valvec, sensevec)
+function LQOI.change_variable_bounds!(instance::GurobiOptimizer, colvec, valvec, sensevec)
     lb_len = count(x->x==Cchar('L'), sensevec)
     LB_val = Array{Float64}(0)
     sizehint!(LB_val, lb_len)
