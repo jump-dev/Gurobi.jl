@@ -248,7 +248,7 @@ LQOI.solve_quadratic_problem!(instance::GurobiOptimizer) = LQOI.solve_linear_pro
 
 LQOI.solve_linear_problem!(instance::GurobiOptimizer) = (update_model!(instance.inner);optimize(instance.inner))
 
-function LQOI.get_terminationstatus(instance::GurobiOptimizer)
+function LQOI.get_termination_status(instance::GurobiOptimizer)
     stat = get_status(instance.inner)
     if stat == :loaded
         return MOI.OtherError
@@ -292,7 +292,7 @@ function LQOI.get_terminationstatus(instance::GurobiOptimizer)
     return MOI.OtherError
 end
 
-function LQOI.get_primalstatus(instance::GurobiOptimizer)
+function LQOI.get_primal_status(instance::GurobiOptimizer)
 
     stat = get_status(instance.inner)
 
@@ -309,7 +309,7 @@ function LQOI.get_primalstatus(instance::GurobiOptimizer)
     end
 end
 
-function LQOI.get_dualstatus(instance::GurobiOptimizer)
+function LQOI.get_dual_status(instance::GurobiOptimizer)
     stat = get_status(instance.inner)
 
     if is_mip(instance.inner) || is_qcp(instance.inner)
@@ -349,7 +349,7 @@ function LQOI.get_quadratic_primal_solution!(instance::GurobiOptimizer, place)
     nothing
 end
 
-LQOI.get_reducedcosts!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "RC", 1)
+LQOI.get_variable_dual_solution!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "RC", 1)
 
 LQOI.get_linear_dual_solution!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "Pi", 1)
 
@@ -371,7 +371,7 @@ LQOI.get_barrier_iterations(instance::GurobiOptimizer) = get_barrier_iter_count(
 
 LQOI.get_node_count(instance::GurobiOptimizer) = get_node_count(instance.inner)
 
-LQOI.get_farkasdual!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "FarkasDual", 1)
+LQOI.get_farkas_dual!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "FarkasDual", 1)
 
 function hasdualray(instance::GurobiOptimizer)
     try
@@ -382,7 +382,7 @@ function hasdualray(instance::GurobiOptimizer)
     end
 end
 
-LQOI.get_unboundedray!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "UnbdRay", 1)
+LQOI.get_unbounded_ray!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "UnbdRay", 1)
 
 function hasprimalray(instance::GurobiOptimizer)
     try
