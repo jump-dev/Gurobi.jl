@@ -1,9 +1,8 @@
 export GurobiOptimizer
 
-using MathOptInterface
-const MOI = MathOptInterface
 using LinQuadOptInterface
 const LQOI = LinQuadOptInterface
+const MOI  = LQOI.MOI
 
 const SUPPORTED_OBJECTIVES = [
     LQOI.Linear,
