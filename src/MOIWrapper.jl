@@ -68,12 +68,12 @@ LQOI.supported_objectives(s::GurobiOptimizer) = SUPPORTED_OBJECTIVES
 
 cintvec(v::Vector) = convert(Vector{Int32}, v)
 
-LQOI.lqs_char(m::GurobiOptimizer, ::MOI.EqualTo{Float64})     = Cchar('=')
-LQOI.lqs_char(m::GurobiOptimizer, ::MOI.LessThan{Float64})    = Cchar('<')
-LQOI.lqs_char(m::GurobiOptimizer, ::MOI.GreaterThan{Float64}) = Cchar('>')
-LQOI.lqs_char(m::GurobiOptimizer, ::MOI.Zeros)                = Cchar('=')
-LQOI.lqs_char(m::GurobiOptimizer, ::MOI.Nonpositives)         = Cchar('<')
-LQOI.lqs_char(m::GurobiOptimizer, ::MOI.Nonnegatives)         = Cchar('>')
+LQOI.backend_type(m::GurobiOptimizer, ::MOI.EqualTo{Float64})     = Cchar('=')
+LQOI.backend_type(m::GurobiOptimizer, ::MOI.LessThan{Float64})    = Cchar('<')
+LQOI.backend_type(m::GurobiOptimizer, ::MOI.GreaterThan{Float64}) = Cchar('>')
+LQOI.backend_type(m::GurobiOptimizer, ::MOI.Zeros)                = Cchar('=')
+LQOI.backend_type(m::GurobiOptimizer, ::MOI.Nonpositives)         = Cchar('<')
+LQOI.backend_type(m::GurobiOptimizer, ::MOI.Nonnegatives)         = Cchar('>')
 
 # TODO - improve single type
 function LQOI.change_variable_bounds!(instance::GurobiOptimizer, colvec, valvec, sensevec)
