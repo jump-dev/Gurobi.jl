@@ -150,7 +150,15 @@ function LQOI.change_coefficient!(instance::GurobiOptimizer, row, col, coef)
     end
 end
 
-LQOI.delete_linear_constraints!(instance::GurobiOptimizer, rowbeg, rowend) = del_constrs!(instance.inner, cintvec(collect(rowbeg:rowend)))
+function LQOI.delete_linear_constraints!(instance::GurobiOptimizer, rowbeg, rowend)
+    del_constrs!(instance.inner, cintvec(collect(rowbeg:rowend)))
+    update_model!(instance.inner)
+end
+
+function LQOI.delete_quadratic_constraints!(instance::GurobiOptimizer, i, j)
+    delqconstrs!(instance.inner, collect(i:j))
+    update_model!(instance.inner)
+end
 
 # TODO fix types
 LQOI.change_variable_types!(instance::GurobiOptimizer, colvec, typevec) = set_charattrlist!(instance.inner, "VType", ivec(colvec), cvec(typevec))
@@ -158,9 +166,15 @@ LQOI.change_variable_types!(instance::GurobiOptimizer, colvec, typevec) = set_ch
 # TODO fix types
 LQOI.change_linear_constraint_sense!(instance::GurobiOptimizer, rowvec, sensevec) = set_charattrlist!(instance.inner, "Sense", ivec(rowvec), cvec(sensevec))
 
-LQOI.add_sos_constraint!(instance::GurobiOptimizer, colvec, valvec, typ) = (add_sos!(instance.inner, typ, colvec, valvec);update_model!(instance.inner))
+function LQOI.add_sos_constraint!(instance::GurobiOptimizer, colvec, valvec, typ)
+    add_sos!(instance.inner, typ, colvec, valvec)
+    update_model!(instance.inner)
+end
 
-LQOI.delete_sos!(instance::GurobiOptimizer, idx1, idx2) = (del_sos!(instance.inner, cintvec(collect(idx1:idx2)));update_model!(instance.inner))
+function LQOI.delete_sos!(instance::GurobiOptimizer, idx1, idx2)
+    del_sos!(instance.inner, cintvec(collect(idx1:idx2)))
+    update_model!(instance.inner)
+end
 
 # TODO improve getting processes
 function LQOI.get_sos_constraint(instance::GurobiOptimizer, idx)
@@ -176,7 +190,10 @@ LQOI.get_number_quadratic_constraints(instance::GurobiOptimizer) = num_qconstrs(
 
 #   NOTE:
 # LQOI assumes 0.5 x' Q x, but Gurobi requires x' Q x so we multiply V by 0.5
-LQOI.add_quadratic_constraint!(instance::GurobiOptimizer, cols,coefs,rhs,sense, I,J,V) = add_qconstr!(instance.inner, cols, coefs, I, J, 0.5 * V, sense, rhs)
+function LQOI.add_quadratic_constraint!(instance::GurobiOptimizer, cols,coefs,rhs,sense, I,J,V)
+    add_qconstr!(instance.inner, cols, coefs, I, J, 0.5 * V, sense, rhs)
+    update_model!(instance.inner)
+end
 
 # LQOI.change_range_value!(instance::GurobiOptimizer, rows, vals) = chg_rhsrange!(instance.inner, cintvec(rows), -vals)
 
@@ -188,6 +205,7 @@ function LQOI.set_quadratic_objective!(instance::GurobiOptimizer, I, J, V)
         end
     end
     add_qpterms!(instance.inner, I, J, V)
+    update_model!(instance.inner)
     return nothing
 end
 
