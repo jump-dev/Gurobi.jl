@@ -183,7 +183,6 @@ function add_qconstr!(model::Model, lind::Vector, lval::Vector, qr::Vector, qc::
 end
 
 function delqconstrs!(model::Model, indices::Vector{Int})
-    @show indices
     ret = @grb_ccall(delqconstrs, Cint, (Ptr{Void}, Cint, Ptr{Cint}), model, length(indices), Cint.(indices-1))
     if ret != 0
         throw(GurobiError(model.env, ret))

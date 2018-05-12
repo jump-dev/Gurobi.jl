@@ -10,16 +10,9 @@ const MOIT = MathOptInterface.Test
 
         "test_scalaraffine_in_interval",
 
-        # "test_scalarquadratic_in_greaterthan",
-        # "test_scalarquadratic_in_lessthan",
-        # "test_scalarquadratic_in_equalto",
         "test_scalarquadratic_in_interval",
 
-        "test_vectorofvariables_in_reals",
-
-        "test_singlevariable_in_semiinteger",
-        "test_singlevariable_in_semicontinuous"
-
+        "test_vectorofvariables_in_reals"
     ])
 end
 
