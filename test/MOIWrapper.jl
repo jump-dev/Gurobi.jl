@@ -1,17 +1,32 @@
 using Gurobi, Base.Test, MathOptInterface, MathOptInterface.Test
 
+const MOI  = MathOptInterface
 const MOIT = MathOptInterface.Test
 
 @testset "Unit Tests" begin
     config = MOIT.TestConfig()
     solver = GurobiOptimizer(OutputFlag=0)
-    MOIT.unittest(solver, config, [
-        "solve_affine_interval",
 
-        "test_scalaraffine_in_interval",
-        "test_scalarquadratic_in_interval",
-        "test_vectoraffine_in_reals",
-        "test_vectorofvariables_in_reals"
+    MOIT.basic_constraint_tests(solver, config;
+        exclude = [
+            (MOI.ScalarQuadraticFunction{Float64}, MOI.LessThan{Float64}),
+            (MOI.ScalarQuadraticFunction{Float64}, MOI.GreaterThan{Float64}),
+            (MOI.ScalarQuadraticFunction{Float64}, MOI.EqualTo{Float64})
+        ]
+    )
+
+    MOIT.basic_constraint_tests(solver, config;
+        get_constraint_function = false,
+        get_constraint_set      = false,
+        include = [
+            (MOI.ScalarQuadraticFunction{Float64}, MOI.LessThan{Float64}),
+            (MOI.ScalarQuadraticFunction{Float64}, MOI.GreaterThan{Float64}),
+            (MOI.ScalarQuadraticFunction{Float64}, MOI.EqualTo{Float64})
+        ]
+    )
+
+    MOIT.unittest(solver, config, [
+        "solve_affine_interval"
     ])
 end
 
