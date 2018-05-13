@@ -9,9 +9,8 @@ const MOIT = MathOptInterface.Test
         "solve_affine_interval",
 
         "test_scalaraffine_in_interval",
-
         "test_scalarquadratic_in_interval",
-
+        "test_vectoraffine_in_reals",
         "test_vectorofvariables_in_reals"
     ])
 end
