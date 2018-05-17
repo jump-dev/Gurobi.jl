@@ -413,3 +413,13 @@ function hasprimalray(instance::GurobiOptimizer)
 end
 
 MOI.free!(m::GurobiOptimizer) = free_model(m.inner)
+
+
+# ==============================================================================
+#    Callbacks in Gurobi
+# ==============================================================================
+struct CallbackFunction <: MOI.AbstractOptimizerAttribute end
+function MOI.set!(m::GurobiOptimizer, ::CallbackFunction, f::Function)
+    set_callback_func!(m.inner, f)
+    update_model!(m.inner)
+end

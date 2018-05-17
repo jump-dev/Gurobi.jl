@@ -6,8 +6,7 @@ type CallbackData
 end
 
 function gurobi_callback_wrapper(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, userdata::Ptr{Void})
-
-    callback,model = unsafe_pointer_to_objref(userdata)::(Function,Model)
+    (callback,model) = unsafe_pointer_to_objref(userdata)::Tuple{Function,Model}
     callback(CallbackData(cbdata,model), where)
     return convert(Cint,0)
 end
@@ -16,7 +15,7 @@ end
 # callback(cbdata::CallbackData, where::Cint)
 
 function set_callback_func!(model::Model, callback::Function)
-    
+
     grbcallback = cfunction(gurobi_callback_wrapper, Cint, (Ptr{Void}, Ptr{Void}, Cint, Ptr{Void}))
     usrdata = (callback,model)
     ret = @grb_ccall(setcallbackfunc, Cint, (Ptr{Void}, Ptr{Void}, Any), model.ptr_model, grbcallback, usrdata)
@@ -124,7 +123,7 @@ const cbconstants = [
 ("mipnode_nodcnt",5005,Float64),
 ("mipnode_solcnt",5006,Cint),
 ##("mipnode_brvar",5007), -- undocumented
-##("msg_string",6001), -- not yet implemented: 
+##("msg_string",6001), -- not yet implemented:
 ### documentation is unclear on output type
 ("runtime",6002, Float64),
 ("barrier_itrcnt",7001,Cint),
@@ -158,6 +157,3 @@ for (fname, what) in ((:cbget_mipsol_sol, 4001), (:cbget_mipnode_rel, 5002))
     end
     eval(Expr(:export,fname))
 end
-
-
-

@@ -91,3 +91,26 @@ end
         MOIT.copytest(solver,solver2)
     end
 end
+
+@testset "Gurobi Callback" begin
+    m = GurobiOptimizer(OutputFlag=0)
+    x = MOI.addvariable!(m)
+    MOI.addconstraint!(m, MOI.SingleVariable(x), MOI.GreaterThan(1.0))
+    MOI.set!(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        MOI.ScalarAffineFunction{Float64}([x], [1.0], 0.0)
+    )
+
+    cb_calls = Int32[]
+    function callback_function(cb_data::Gurobi.CallbackData, cb_where::Int32)
+        push!(cb_calls, cb_where)
+        nothing
+    end
+
+    MOI.set!(m, Gurobi.CallbackFunction(), callback_function)
+    MOI.optimize!(m)
+
+    @test length(cb_calls) > 0
+    @test Gurobi.CB_MESSAGE in cb_calls
+    @test Gurobi.CB_PRESOLVE in cb_calls
+    @test !(Gurobi.CB_MIPSOL in cb_calls)
+end
