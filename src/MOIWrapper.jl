@@ -140,16 +140,16 @@ function LQOI.get_linear_constraint(instance::GurobiOptimizer, idx)
     return A.rowval-1, A.nzval
 end
 
-# TODO SPLIT THIS ONE
-function LQOI.change_coefficient!(instance::GurobiOptimizer, row, col, coef)
-    if row == 0
-        set_dblattrlist!(instance.inner, "Obj", Cint[col], Float64[coef])
-    elseif col == 0
-        set_dblattrlist!(instance.inner, "RHS", Cint[row], Float64[coef])
-    else
-        chg_coeffs!(instance.inner, row, col, coef)
-        #TODO fix this function in gurobi
-    end
+function LQOI.change_matrix_coefficient!(instance::GurobiOptimizer, row, col, coef)
+    chg_coeffs!(instance.inner, row, col, coef)
+end
+
+function LQOI.change_objective_coefficient!(instance::GurobiOptimizer, col, coef)
+    set_dblattrlist!(instance.inner, "Obj", Cint[col], Float64[coef])
+end
+
+function LQOI.change_rhs_coefficient!(instance::GurobiOptimizer, row, coef)
+    set_dblattrlist!(instance.inner, "RHS", Cint[row], Float64[coef])
 end
 
 function LQOI.delete_linear_constraints!(instance::GurobiOptimizer, rowbeg, rowend)
