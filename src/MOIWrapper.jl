@@ -126,8 +126,8 @@ function LQOI.get_number_linear_constraints(instance::GurobiOptimizer)
     num_constrs(instance.inner)
 end
 
-function LQOI.add_linear_constraints!(instance::GurobiOptimizer, rowvec, colvec, coefvec, sensevec, rhsvec)
-    add_constrs!(instance.inner, rowvec, colvec, coefvec, sensevec, rhsvec)
+function LQOI.add_linear_constraints!(instance::GurobiOptimizer, A::LQOI.CSRMatrix{Float64}, sensevec, rhsvec)
+    add_constrs!(instance.inner, A.row_pointers, A.column_indices, A.data, sensevec, rhsvec)
     update_model!(instance.inner)
 end
 
