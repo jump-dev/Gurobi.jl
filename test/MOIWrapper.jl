@@ -97,7 +97,10 @@ end
     x = MOI.addvariable!(m)
     MOI.addconstraint!(m, MOI.SingleVariable(x), MOI.GreaterThan(1.0))
     MOI.set!(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
-        MOI.ScalarAffineFunction{Float64}([x], [1.0], 0.0)
+        MOI.ScalarAffineFunction{Float64}(
+            [MOI.ScalarAffineTerm{Float64}(1.0, x)],
+            0.0
+        )
     )
 
     cb_calls = Int32[]
