@@ -197,9 +197,10 @@ function LQOI.get_number_quadratic_constraints(instance::GurobiOptimizer)
 end
 
 function scalediagonal!(V, I, J, scale)
-    #  LQOI assumes 0.5 x' Q x, but Gurobi requires x' Q x so we multiply
-    #  the diagonal of V by 0.5. We don't multiply the off-diagonal terms
-    #  since we assume they are symmetric and we only need to give one.
+    #  LQOI assumes 0.5 x' Q x, but Gurobi requires the list of terms, e.g.,
+    #  2x^2 + xy + y^2, so we multiply the diagonal of V by 0.5. We don't
+    #  multiply the off-diagonal terms since we assume they are symmetric and we
+    #  only need to give one.
     #
     #  We also need to make sure that after adding the constraint we un-scale
     #  the vector because we can't modify user-data.
