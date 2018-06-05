@@ -196,22 +196,36 @@ function LQOI.get_number_quadratic_constraints(instance::GurobiOptimizer)
     num_qconstrs(instance.inner)
 end
 
-function LQOI.add_quadratic_constraint!(instance::GurobiOptimizer, cols,coefs,rhs,sense, I,J,V)
-    #   NOTE: LQOI assumes 0.5 x' Q x, but Gurobi requires x' Q x so we multiply
-    #         V by 0.5
-    add_qconstr!(instance.inner, cols, coefs, I, J, 0.5 * V, sense, rhs)
+function scalediagonal!(V, I, J, scale)
+    #  LQOI assumes 0.5 x' Q x, but Gurobi requires x' Q x so we multiply
+    #  the diagonal of V by 0.5. We don't multiply the off-diagonal terms
+    #  since we assume they are symmetric and we only need to give one.
+    #
+    #  We also need to make sure that after adding the constraint we un-scale
+    #  the vector because we can't modify user-data.
+    for i in 1:length(I)
+        if I[i] == J[i]
+            V[i] *= scale
+        end
+    end
+end
+function LQOI.add_quadratic_constraint!(instance::GurobiOptimizer,
+        affine_columns::Vector{Int}, affine_coefficients::Vector{Float64},
+        rhs::Float64, sense::Cchar,
+        I::Vector{Int}, J::Vector{Int}, V::Vector{Float64})
+    @assert length(I) == length(J) == length(V)
+    scalediagonal!(V, I, J, 0.5)
+    add_qconstr!(instance.inner, affine_columns, affine_coefficients, I, J, V, sense, rhs)
+    scalediagonal!(V, I, J, 2.0)
     update_model!(instance.inner)
 end
 
-function LQOI.set_quadratic_objective!(instance::GurobiOptimizer, I, J, V)
-    # TODO: why is only the diagonal multiplied by 1/2?
+function LQOI.set_quadratic_objective!(instance::GurobiOptimizer, I::Vector{Int}, J::Vector{Int}, V::Vector{Float64})
+    @assert length(I) == length(J) == length(V)
     delq!(instance.inner)
-    for i in eachindex(V)
-        if I[i] == J[i]
-            V[i] *= 0.5
-        end
-    end
+    scalediagonal!(V, I, J, 0.5)
     add_qpterms!(instance.inner, I, J, V)
+    scalediagonal!(V, I, J, 2.0)
     update_model!(instance.inner)
 end
 
