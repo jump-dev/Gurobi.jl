@@ -124,7 +124,7 @@ end
 
 function LQOI.add_linear_constraints!(instance::GurobiOptimizer,
         A::LQOI.CSRMatrix{Float64}, sense::Vector{Cchar}, rhs::Vector{Float64})
-    add_constrs!(instance.inner, A.row_pointers, A.column_indices, A.data, sense, rhs)
+    add_constrs!(instance.inner, A.row_pointers, A.columns, A.coefficients, sense, rhs)
     update_model!(instance.inner)
 end
 
