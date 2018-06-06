@@ -448,3 +448,11 @@ function MOI.set!(m::GurobiOptimizer, ::CallbackFunction, f::Function)
     set_callback_func!(m.inner, f)
     update_model!(m.inner)
 end
+
+function cblazy!(cb_data::Gurobi.CallbackData, m::GurobiOptimizer, func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
+    columns      = [Cint(LQOI.getcol(m, term.variable_index)) for term in func.terms]
+    coefficients = [term.coefficient for term in func.terms]
+    sense        = Char(LQOI.backend_type(m, set))
+    rhs          = MOI.Utilities.getconstant(set)
+    cblazy(cb_data, columns, coefficients, sense, rhs)
+end

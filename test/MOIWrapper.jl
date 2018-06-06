@@ -100,27 +100,96 @@ end
 end
 
 @testset "Gurobi Callback" begin
-    m = GurobiOptimizer(OutputFlag=0)
-    x = MOI.addvariable!(m)
-    MOI.addconstraint!(m, MOI.SingleVariable(x), MOI.GreaterThan(1.0))
-    MOI.set!(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
-        MOI.ScalarAffineFunction{Float64}(
-            [MOI.ScalarAffineTerm{Float64}(1.0, x)],
-            0.0
+    @testset "Generic callback" begin
+        m = GurobiOptimizer(OutputFlag=0)
+        x = MOI.addvariable!(m)
+        MOI.addconstraint!(m, MOI.SingleVariable(x), MOI.GreaterThan(1.0))
+        MOI.set!(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+            MOI.ScalarAffineFunction{Float64}(
+                [MOI.ScalarAffineTerm{Float64}(1.0, x)],
+                0.0
+            )
         )
-    )
 
-    cb_calls = Int32[]
-    function callback_function(cb_data::Gurobi.CallbackData, cb_where::Int32)
-        push!(cb_calls, cb_where)
-        nothing
+        cb_calls = Int32[]
+        function callback_function(cb_data::Gurobi.CallbackData, cb_where::Int32)
+            push!(cb_calls, cb_where)
+            nothing
+        end
+
+        MOI.set!(m, Gurobi.CallbackFunction(), callback_function)
+        MOI.optimize!(m)
+
+        @test length(cb_calls) > 0
+        @test Gurobi.CB_MESSAGE in cb_calls
+        @test Gurobi.CB_PRESOLVE in cb_calls
+        @test !(Gurobi.CB_MIPSOL in cb_calls)
     end
 
-    MOI.set!(m, Gurobi.CallbackFunction(), callback_function)
-    MOI.optimize!(m)
+    @testset "Lazy cut" begin
+        m = GurobiOptimizer(OutputFlag=0, Cuts=0, Presolve=0, Heuristics=0, LazyConstraints=1)
+        MOI.Utilities.loadfromstring!(m,"""
+            variables: x, y
+            maxobjective: y
+            c1: x in Integer()
+            c2: y in Integer()
+            c3: x in Interval(0.0, 2.0)
+            c4: y in Interval(0.0, 2.0)
+        """)
+        x = MOI.get(m, MOI.VariableIndex, "x")
+        y = MOI.get(m, MOI.VariableIndex, "y")
 
-    @test length(cb_calls) > 0
-    @test Gurobi.CB_MESSAGE in cb_calls
-    @test Gurobi.CB_PRESOLVE in cb_calls
-    @test !(Gurobi.CB_MIPSOL in cb_calls)
+        # We now define our callback function that takes two arguments:
+        #   (1) the callback handle; and
+        #   (2) the location from where the callback was called.
+        # Note that we can access m, x, and y because this function is defined
+        # inside the same scope
+        cb_calls = Int32[]
+        function callback_function(cb_data::Gurobi.CallbackData, cb_where::Int32)
+            push!(cb_calls, cb_where)
+            if cb_where == Gurobi.CB_MIPSOL
+                sol = [0.0, 0.0]
+                Gurobi.cbget_mipsol_sol(cb_data, cb_where, sol)
+                x_val, y_val = sol
+                # We have two constraints, one cutting off the top
+                # left corner and one cutting off the top right corner, e.g.
+                # (0,2) +---+---+ (2,2)
+                #       |xx/ \xx|
+                #       |x/   \x|
+                #       |/     \|
+                # (0,1) +       + (2,1)
+                #       |       |
+                # (0,0) +---+---+ (2,0)
+                TOL = 1e-6  # Allow for some impreciseness in the solution
+                if y_val - x_val > 1 + TOL
+                    Gurobi.cblazy!(cb_data, m,
+                        MOI.ScalarAffineFunction{Float64}(
+                            MOI.ScalarAffineTerm.([-1.0, 1.0], [x, y]),
+                            0.0
+                        ),
+                        MOI.LessThan{Float64}(1.0)
+                    )
+                elseif y_val + x_val > 3 + TOL
+                    Gurobi.cblazy!(cb_data, m,
+                        MOI.ScalarAffineFunction{Float64}(
+                            MOI.ScalarAffineTerm.([1.0, 1.0], [x, y]),
+                            0.0
+                        ),
+                        MOI.LessThan{Float64}(3.0)
+                    )
+                end
+            end
+        end
+
+        MOI.set!(m, Gurobi.CallbackFunction(), callback_function)
+        MOI.optimize!(m)
+
+        @test MOI.get(m, MOI.VariablePrimal(), x) == 1
+        @test MOI.get(m, MOI.VariablePrimal(), y) == 2
+
+        @test length(cb_calls) > 0
+        @test Gurobi.CB_MESSAGE in cb_calls
+        @test Gurobi.CB_PRESOLVE in cb_calls
+        @test Gurobi.CB_MIPSOL in cb_calls
+    end
 end
