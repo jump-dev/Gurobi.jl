@@ -449,7 +449,30 @@ function MOI.set!(m::GurobiOptimizer, ::CallbackFunction, f::Function)
     update_model!(m.inner)
 end
 
-function cblazy!(cb_data::Gurobi.CallbackData, m::GurobiOptimizer, func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
+"""
+    loadcbsolution!(m::GurobiOptimizer, cb_data::GurobiCallbackData, cb_where::Int)
+
+Load the variable primal solution in a callback.
+
+This can only be called in a callback from `CB_MIPSOL`. After it is called, you
+can access the `VariablePrimal` attribute as usual.
+"""
+function loadcbsolution!(m::GurobiOptimizer, cb_data::CallbackData, cb_where::Cint)
+    if cb_where != CB_MIPSOL
+        error("loadcbsolution! can only be called from CB_MIPSOL.")
+    end
+    Gurobi.cbget_mipsol_sol(cb_data, cb_where, m.variable_primal_solution)
+end
+
+"""
+    cblazy!(cb_data::Gurobi.CallbackData, m::GurobiOptimizer, func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
+
+Add a lazy cut to the model `m`.
+
+You must have the option `LazyConstraints` set  via `GurobiOptimizer(LazyConstraint=1)`.
+This can only be called in a callback from `CB_MIPSOL`.
+"""
+function cblazy!(cb_data::CallbackData, m::GurobiOptimizer, func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
     columns      = [Cint(LQOI.getcol(m, term.variable_index)) for term in func.terms]
     coefficients = [term.coefficient for term in func.terms]
     sense        = Char(LQOI.backend_type(m, set))

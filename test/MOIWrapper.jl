@@ -148,9 +148,9 @@ end
         function callback_function(cb_data::Gurobi.CallbackData, cb_where::Int32)
             push!(cb_calls, cb_where)
             if cb_where == Gurobi.CB_MIPSOL
-                sol = [0.0, 0.0]
-                Gurobi.cbget_mipsol_sol(cb_data, cb_where, sol)
-                x_val, y_val = sol
+                Gurobi.loadcbsolution!(m, cb_data, cb_where)
+                x_val = MOI.get(m, MOI.VariablePrimal(), x)
+                y_val = MOI.get(m, MOI.VariablePrimal(), y)
                 # We have two constraints, one cutting off the top
                 # left corner and one cutting off the top right corner, e.g.
                 # (0,2) +---+---+ (2,2)
