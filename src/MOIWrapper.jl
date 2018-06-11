@@ -221,6 +221,18 @@ function LQOI.add_quadratic_constraint!(instance::GurobiOptimizer,
     update_model!(instance.inner)
 end
 
+function LQOI.get_quadratic_constraint(instance::GurobiOptimizer, row::Int)
+    affine_cols, affine_coefficients, I, J, V = getqconstr(instance.inner, row)
+    # I, J, and V are from Gurobi's representation. to un-scale, we need to
+    # multiple the diagonal by 2
+    # scalediagonal!(V, I, J, 2.0)
+    return affine_cols+1, affine_coefficients, sparse(I+1, J+1, V)
+end
+
+function LQOI.get_quadratic_rhs(instance::GurobiOptimizer, row::Int)
+    get_dblattrelement(instance.inner, "QCRHS", row)
+end
+
 function LQOI.set_quadratic_objective!(instance::GurobiOptimizer, I::Vector{Int}, J::Vector{Int}, V::Vector{Float64})
     @assert length(I) == length(J) == length(V)
     delq!(instance.inner)

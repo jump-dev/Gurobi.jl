@@ -7,23 +7,7 @@ const MOIT = MathOptInterface.Test
     config = MOIT.TestConfig()
     solver = GurobiOptimizer(OutputFlag=0)
 
-    MOIT.basic_constraint_tests(solver, config;
-        exclude = [
-            (MOI.ScalarQuadraticFunction{Float64}, MOI.LessThan{Float64}),
-            (MOI.ScalarQuadraticFunction{Float64}, MOI.GreaterThan{Float64}),
-            (MOI.ScalarQuadraticFunction{Float64}, MOI.EqualTo{Float64})
-        ]
-    )
-
-    MOIT.basic_constraint_tests(solver, config;
-        get_constraint_function = false,
-        get_constraint_set      = false,
-        include = [
-            (MOI.ScalarQuadraticFunction{Float64}, MOI.LessThan{Float64}),
-            (MOI.ScalarQuadraticFunction{Float64}, MOI.GreaterThan{Float64}),
-            (MOI.ScalarQuadraticFunction{Float64}, MOI.EqualTo{Float64})
-        ]
-    )
+    MOIT.basic_constraint_tests(solver, config)
 
     MOIT.unittest(solver, config, [
         "solve_affine_interval",

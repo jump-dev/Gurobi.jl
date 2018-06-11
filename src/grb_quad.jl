@@ -188,3 +188,41 @@ function delqconstrs!(model::Model, indices::Vector{Int})
         throw(GurobiError(model.env, ret))
     end
 end
+
+function getqconstr(model::Model, index::Int)
+    # From the Gurobi documentation:
+    # Typical usage is to call this routine twice. In the first call, you
+    # specify the requested quadratic constraint, with NULL values for the array
+    # arguments.
+    affine_nnz    = Cint[0]
+    quadratic_nnz = Cint[0]
+    ret = @grb_ccall(getqconstr, Cint, (Ptr{Void}, Cint,  # model, constraint
+        Ptr{Cint}, Ptr{Cint}, Ptr{Float64},                  # affine terms
+        Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Float64}        # quadratic terms
+        ),
+        model, Cint(index-1),
+        affine_nnz, C_NULL, C_NULL,
+        quadratic_nnz, C_NULL, C_NULL, C_NULL
+    )
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    affine_cols     = fill(Cint(0), affine_nnz[1])
+    affine_coefs    = fill(0.0, affine_nnz[1])
+    quadratic_rows  = fill(Cint(0), quadratic_nnz[1])
+    quadratic_cols  = fill(Cint(0), quadratic_nnz[1])
+    quadratic_coefs = fill(0.0, quadratic_nnz[1])
+
+    ret = @grb_ccall(getqconstr, Cint, (Ptr{Void}, Cint,  # model, constraint
+        Ptr{Cint}, Ptr{Cint}, Ptr{Float64},                  # affine terms
+        Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Float64}        # quadratic terms
+        ),
+        model, Cint(index-1),
+        affine_nnz, affine_cols, affine_coefs,
+        quadratic_nnz, quadratic_rows, quadratic_cols, quadratic_coefs
+    )
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    return affine_cols, affine_coefs, quadratic_rows, quadratic_cols, quadratic_coefs
+end
