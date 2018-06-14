@@ -134,7 +134,8 @@ end
 
 function LQOI.get_linear_constraint(instance::GurobiOptimizer, row::Int)
     A = get_constrs(instance.inner, row, 1)'
-    return A.rowval-1, A.nzval
+    # note: we return 1-index columns
+    return A.rowval, A.nzval
 end
 
 function LQOI.change_matrix_coefficient!(instance::GurobiOptimizer, row::Int, col::Int, coef::Float64)
@@ -223,9 +224,7 @@ end
 
 function LQOI.get_quadratic_constraint(instance::GurobiOptimizer, row::Int)
     affine_cols, affine_coefficients, I, J, V = getqconstr(instance.inner, row)
-    # I, J, and V are from Gurobi's representation. to un-scale, we need to
-    # multiple the diagonal by 2
-    # scalediagonal!(V, I, J, 2.0)
+    # note: we return 1-index columns here
     return affine_cols+1, affine_coefficients, sparse(I+1, J+1, V)
 end
 
