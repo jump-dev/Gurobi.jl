@@ -21,8 +21,6 @@ const MOIT = MathOptInterface.Test
     end
 
     MOIT.modificationtest(solver, config, [
-        "solve_multirow_vectoraffine_nonpos",
-        "solve_transform_singlevariable_lessthan",
         "solve_func_scalaraffine_lessthan"
     ])
 end
