@@ -26,6 +26,10 @@ using Gurobi, Base.Test
     add_constr!(model, [1., 2., 1.], '<', 15.)
 
     update_model!(model)
+    @test Gurobi.get_intattr(model, "NumVars") == 3
+    @test Gurobi.get_dblattr(model, "ObjCon") == 0.0
+    @test Gurobi.get_strattr(model, "ModelName") == "mip_01"
+
 
     @test Gurobi.get_dblattrelement(model, "UB", 1) == 5.0
     @test Gurobi.get_charattrelement(model, "Sense", 1) == '<'
