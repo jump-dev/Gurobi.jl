@@ -8,79 +8,79 @@
 
 function get_intattr(model::Model, name::String)
     @assert isascii(name)
-    a = Array{Cint}(1)
+    a = Ref{Cint}()
     ret = @grb_ccall(getintattr, Cint,
-        (Ptr{Void}, Ptr{UInt8}, Ptr{Cint}),
+        (Ptr{Void}, Ptr{UInt8}, Ref{Cint}),
         model, name, a);
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    convert(Int, a[1])
+    Int(a[])
 end
 
 function get_dblattr(model::Model, name::String)
     @assert isascii(name)
-    a = Array{Float64}(1)
+    a = Ref{Float64}()
     ret = @grb_ccall(getdblattr, Cint,
-        (Ptr{Void}, Ptr{UInt8}, Ptr{Float64}),
+        (Ptr{Void}, Ptr{UInt8}, Ref{Float64}),
         model, name, a);
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    a[1]::Float64
+    a[]
 end
 
 function get_strattr(model::Model, name::String)
     @assert isascii(name)
-    a = Array{Ptr{UInt8}}(1)
+    a = Ref{Ptr{UInt8}}()
     ret = @grb_ccall(getstrattr, Cint,
-        (Ptr{Void}, Ptr{UInt8}, Ptr{Ptr{UInt8}}),
+        (Ptr{Void}, Ptr{UInt8}, Ref{Ptr{UInt8}}),
         model, name, a)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    unsafe_string(a[1])
+    unsafe_string(a[])
 end
 
 # array element
 
 function get_intattrelement(model::Gurobi.Model, name::String, element::Int)
     @assert isascii(name)
-    a = Array{Cint}(1)
+    a = Ref{Cint}()
     ret = @grb_ccall(getintattrelement, Cint,
-        (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cint}),
+        (Ptr{Void}, Ptr{UInt8}, Cint, Ref{Cint}),
         model, name, element - 1, a
     )
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    convert(Int, a[1])
+    Int(a[])
 end
 
 function get_dblattrelement(model::Gurobi.Model, name::String, element::Int)
     @assert isascii(name)
-    a = Array{Float64}(1)
+    a = Ref{Float64}()
     ret = @grb_ccall(getdblattrelement, Cint,
-        (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Float64}),
+        (Ptr{Void}, Ptr{UInt8}, Cint, Ref{Float64}),
         model, name, element - 1, a
     )
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    a[1]::Float64
+    a[]
 end
 
 function get_charattrelement(model::Gurobi.Model, name::String, element::Int)
     @assert isascii(name)
-    a = Array{Cchar}(1)
+    a = Ref{Cchar}()
     ret = @grb_ccall(getcharattrelement, Cint,
-        (Ptr{Void}, Ptr{UInt8}, Cint, Ptr{Cchar}),
+        (Ptr{Void}, Ptr{UInt8}, Cint, Ref{Cchar}),
         model, name, element - 1, a
     )
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    convert(Char, a[1])
+    Char(a[])
 end
 
 # Note: in attrarray API, the start argument is one-based (following Julia convention)
@@ -108,7 +108,7 @@ function get_intattrlist!{I<:Integer}(r::Array{Cint}, model::Model, name::String
     nothing
 end
 
-function get_intattrlist{I<:Integer}(model::Model, name::String, inds::Vector{I}) 
+function get_intattrlist{I<:Integer}(model::Model, name::String, inds::Vector{I})
     r = Array{Cint}(length(inds))
     get_intattrlist!(r::Array{Cint}, model::Model, name::String, inds)
     return r
