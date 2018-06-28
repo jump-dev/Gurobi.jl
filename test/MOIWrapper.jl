@@ -7,7 +7,11 @@ const MOIT = MathOptInterface.Test
     config = MOIT.TestConfig()
     solver = GurobiOptimizer(OutputFlag=0)
 
-    MOIT.basic_constraint_tests(solver, config)
+    # TODO(@odow): see MathOptInterface Issue #404
+    # The basic constraint tests incorrectly add multiple constraints
+    # that are illegal, e.g., two SingleVariable-in-ZeroOne constraints
+    # for the same variable.
+    # MOIT.basic_constraint_tests(solver, config)
 
     MOIT.unittest(solver, config, [
         "solve_affine_interval",  # Interval constraints not wrapped
@@ -76,7 +80,11 @@ end
         MOIT.emptytest(solver)
     end
     @testset "orderedindicestest" begin
-        MOIT.orderedindicestest(solver)
+        # TODO(@odow): see MathOptInterface Issue #404
+        # The basic constraint tests incorrectly add multiple constraints
+        # that are illegal, e.g., two SingleVariable-in-ZeroOne constraints
+        # for the same variable.
+        # MOIT.orderedindicestest(solver)
     end
     @testset "canaddconstrainttest" begin
         MOIT.canaddconstrainttest(solver, Float64, Complex{Float64})
