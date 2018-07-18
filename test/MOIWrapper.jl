@@ -24,9 +24,7 @@ const MOIT = MathOptInterface.Test
         )
     end
 
-    MOIT.modificationtest(solver, config, [
-        "solve_func_scalaraffine_lessthan"
-    ])
+    MOIT.modificationtest(solver, config)
 end
 
 @testset "Linear tests" begin
