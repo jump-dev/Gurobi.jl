@@ -4,7 +4,7 @@
 function add_qpterms!(model::Model, qr::IVec, qc::IVec, qv::FVec)
     nnz = length(qr)
     (nnz == length(qc) == length(qv)) || error("Inconsistent argument dimensions.")
-    
+
     if nnz > 0
         ret = @grb_ccall(addqpterms, Cint, (
             Ptr{Void},    # model
@@ -12,12 +12,12 @@ function add_qpterms!(model::Model, qr::IVec, qc::IVec, qv::FVec)
             Ptr{Cint},    # qrow
             Ptr{Cint},    # qcol
             Ptr{Float64}, # qval
-            ), 
+            ),
             model, nnz, qr-Cint(1), qc-Cint(1), qv)
-            
+
         if ret != 0
             throw(GurobiError(model.env, ret))
-        end 
+        end
     end
     nothing
 end
@@ -30,21 +30,21 @@ end
 function add_qpterms!(model, H::SparseMatrixCSC{Float64}) # H must be symmetric
     n = num_vars(model)
     (H.m == n && H.n == n) || error("H must be an n-by-n symmetric matrix.")
-    
+
     nnz_h = nnz(H)
     qr = Array{Cint}(nnz_h)
     qc = Array{Cint}(nnz_h)
     qv = Array{Float64}(nnz_h)
     k = 0
-    
+
     colptr::Vector{Int} = H.colptr
     nzval::Vector{Float64} = H.nzval
-    
+
     for i = 1 : n
         qi::Cint = convert(Cint, i)
         for j = colptr[i]:(colptr[i+1]-1)
             qj = convert(Cint, H.rowval[j])
-            
+
             if qi < qj
                 k += 1
                 qr[k] = qi
@@ -58,23 +58,23 @@ function add_qpterms!(model, H::SparseMatrixCSC{Float64}) # H must be symmetric
             end
         end
     end
-    
+
     add_qpterms!(model, qr[1:k], qc[1:k], qv[1:k])
 end
 
 function add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
     n = num_vars(model)
     size(H) == (n, n) || error("H must be an n-by-n symmetric matrix.")
-    
+
     nmax = round(Int,n * (n + 1) / 2)
     qr = Array{Cint}(nmax)
     qc = Array{Cint}(nmax)
     qv = Array{Float64}(nmax)
     k::Int = 0
-    
+
     for i = 1 : n
         qi = convert(Cint, i)
-        
+
         v = H[i,i]
         if v != 0.
             k += 1
@@ -82,7 +82,7 @@ function add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
             qc[k] = qi
             qv[k] = v * 0.5
         end
-        
+
         for j = i+1 : n
             v = H[j, i]
             if v != 0.
@@ -93,7 +93,7 @@ function add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
             end
         end
     end
-        
+
     add_qpterms!(model, qr[1:k], qc[1:k], qv[1:k])
 end
 
@@ -113,12 +113,12 @@ end
 function delq!(model::Model)
     ret = @grb_ccall(delq, Cint, (
         Ptr{Void},    # model
-        ), 
+        ),
         model)
-        
+
     if ret != 0
         throw(GurobiError(model.env, ret))
-    end 
+    end
 end
 
 function getq(model::Model)
@@ -127,7 +127,7 @@ function getq(model::Model)
     colidx = Array{Cint}(nz)
     val = Array{Float64}(nz)
     nzout = Array{Cint}(1)
-    
+
     ret = @grb_ccall(getq, Cint, (
         Ptr{Void},  # model
         Ptr{Cint},  # numqnzP
@@ -136,7 +136,7 @@ function getq(model::Model)
         Ptr{Float64}# qval
         ),
         model,nzout,rowidx,colidx,val)
-    
+
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -152,7 +152,7 @@ function add_qconstr!(model::Model, lind::IVec, lval::FVec, qr::IVec, qc::IVec, 
 
     lnnz = length(lind)
     lnnz == length(lval) || error("Inconsistent argument dimensions.")
-    
+
     if qnnz > 0 || lnnz > 0
         ret = @grb_ccall(addqconstr, Cint, (
             Ptr{Void},    # model
@@ -166,12 +166,12 @@ function add_qconstr!(model::Model, lind::IVec, lval::FVec, qr::IVec, qc::IVec, 
             Cchar,        # sense
             Float64,      # rhs
             Ptr{UInt8}    # name
-            ), 
+            ),
             model, lnnz, lind-Cint(1), lval, qnnz, qr-Cint(1), qc-Cint(1), qv, rel, rhs, C_NULL)
-            
+
         if ret != 0
             throw(GurobiError(model.env, ret))
-        end 
+        end
     end
     nothing
 end
@@ -182,3 +182,47 @@ function add_qconstr!(model::Model, lind::Vector, lval::Vector, qr::Vector, qc::
     add_qconstr!(model, ivec(lind), fvec(lval), ivec(qr), ivec(qc), fvec(qv), cchar(rel), Float64(rhs))
 end
 
+function delqconstrs!(model::Model, indices::Vector{Int})
+    ret = @grb_ccall(delqconstrs, Cint, (Ptr{Void}, Cint, Ptr{Cint}), model, length(indices), Cint.(indices-1))
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+end
+
+function getqconstr(model::Model, index::Int)
+    # From the Gurobi documentation:
+    # Typical usage is to call this routine twice. In the first call, you
+    # specify the requested quadratic constraint, with NULL values for the array
+    # arguments.
+    affine_nnz    = Cint[0]
+    quadratic_nnz = Cint[0]
+    ret = @grb_ccall(getqconstr, Cint, (Ptr{Void}, Cint,  # model, constraint
+        Ptr{Cint}, Ptr{Cint}, Ptr{Float64},                  # affine terms
+        Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Float64}        # quadratic terms
+        ),
+        model, Cint(index-1),
+        affine_nnz, C_NULL, C_NULL,
+        quadratic_nnz, C_NULL, C_NULL, C_NULL
+    )
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    affine_cols     = fill(Cint(0), affine_nnz[1])
+    affine_coefs    = fill(0.0, affine_nnz[1])
+    quadratic_rows  = fill(Cint(0), quadratic_nnz[1])
+    quadratic_cols  = fill(Cint(0), quadratic_nnz[1])
+    quadratic_coefs = fill(0.0, quadratic_nnz[1])
+
+    ret = @grb_ccall(getqconstr, Cint, (Ptr{Void}, Cint,  # model, constraint
+        Ptr{Cint}, Ptr{Cint}, Ptr{Float64},                  # affine terms
+        Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Float64}        # quadratic terms
+        ),
+        model, Cint(index-1),
+        affine_nnz, affine_cols, affine_coefs,
+        quadratic_nnz, quadratic_rows, quadratic_cols, quadratic_coefs
+    )
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    return affine_cols, affine_coefs, quadratic_rows, quadratic_cols, quadratic_coefs
+end

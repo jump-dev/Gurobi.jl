@@ -1,4 +1,6 @@
-tests = [
+using Base.Test
+
+const mpb_tests = [
     "lp_01a",
     "lp_01b",
     "lp_02",
@@ -18,8 +20,14 @@ tests = [
     "test_read"
 ]
 
-for t in tests
-    fp = "$(t).jl"
-    println("running $(fp) ...")
-    evalfile(fp)
+@testset "MathProgBase Tests" begin
+    for t in mpb_tests
+        fp = "$(t).jl"
+        println("running $(fp) ...")
+        evalfile(joinpath("MathProgBase", fp))
+    end
+end
+
+@testset "MathOptInterface Tests" begin
+    evalfile("MOIWrapper.jl")
 end
