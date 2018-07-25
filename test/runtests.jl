@@ -31,3 +31,5 @@ end
 @testset "MathOptInterface Tests" begin
     evalfile("MOIWrapper.jl")
 end
+
+include("constraint_modification.jl")

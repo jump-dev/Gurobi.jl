@@ -19,9 +19,9 @@ ivec(v::IVec) = v
 fvec(v::FVec) = v
 cvec(v::CVec) = v
 
-ivec(v::Vector) = convert(IVec, v)
-fvec(v::Vector) = convert(FVec, v)
-cvec(v::Vector) = convert(CVec, v)
+ivec(v::AbstractVector) = convert(IVec, v)
+fvec(v::AbstractVector) = convert(FVec, v)
+cvec(v::AbstractVector) = convert(CVec, v)
 
 ivec(s::Integer) = Cint[s]
 

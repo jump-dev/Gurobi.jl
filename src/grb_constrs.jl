@@ -255,7 +255,7 @@ function get_sos(model::Model, start::Integer, len::Integer)
     n = num_vars(model)
     numnzP = Array{Cint}(1)
     cbeg = Array{Cint}(len+1)
-    
+
     ret = @grb_ccall(getsos, Cint, (
         Ptr{Void},
         Ptr{Cint},
@@ -314,11 +314,23 @@ function del_constrs!(model::Model, idx::Vector{Cint})
     end
 end
 
+function chg_coeffs!(model::Model, cidx::Real, vidx::Real, val::Real)
+    ret = @grb_ccall(chgcoeffs, Cint, (
+                     Ptr{Void},
+                     Cint,
+                     Ref{Cint},
+                     Ref{Cint},
+                     Ref{Float64}),
+                     model, 1, cidx - 1, vidx - 1, val)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+end
 
-chg_coeffs!{T<:Real, S<:Real}(model::Model, cidx::T, vidx::T, val::S) = chg_coeffs!(model, Cint[cidx], Cint[vidx], Float64[val])
-chg_coeffs!{T<:Real, S<:Real}(model::Model, cidx::Vector{T}, vidx::Vector{T}, val::Vector{S}) = chg_coeffs!(model, convert(Vector{Cint},cidx), convert(Vector{Cint},vidx), fvec(val))
-function chg_coeffs!(model::Model, cidx::Vector{Cint}, vidx::Vector{Cint}, val::FVec)
+chg_coeffs!(model::Model, cidx::AbstractVector{<:Real}, vidx::AbstractVector{<:Real}, val::AbstractVector{<:Real}) =
+    chg_coeffs!(model, ivec(cidx), ivec(vidx), fvec(val))
 
+function chg_coeffs!(model::Model, cidx::IVec, vidx::IVec, val::FVec)
     (length(cidx) == length(vidx) == length(val)) || error("Inconsistent argument dimensions.")
 
     numchgs = length(cidx)
@@ -335,6 +347,7 @@ function chg_coeffs!(model::Model, cidx::Vector{Cint}, vidx::Vector{Cint}, val::
 end
 
 function getcoeff!(val::FVec, model::Model, cidx::Integer, vidx::Integer)
+    Base.depwarn("getcoeff!(val, model, cidx, vidx) is deprecated. Instead you can retrieve a coefficient without allocating a vector by doing `val = getcoeff(model, cidx, vidx)`", :grb_getcoeff)
     @assert length(val) == 1
     ret = @grb_ccall(getcoeff, Cint, (
         Ptr{Void},
@@ -346,8 +359,17 @@ function getcoeff!(val::FVec, model::Model, cidx::Integer, vidx::Integer)
         throw(GurobiError(model.env, ret))
     end
 end
+
 function getcoeff(model::Model, cidx::Integer, vidx::Integer)
-    out = Array{Float64}(1)
-    getcoeff!(out::FVec, model::Model, cidx::Integer, vidx::Integer)
-    return out[1]
+    out = Ref{Float64}()
+    ret = @grb_ccall(getcoeff, Cint, (
+        Ptr{Void},
+        Cint,
+        Cint,
+        Ref{Float64}),
+        model, cidx - 1, vidx - 1, out)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    out[]
 end
