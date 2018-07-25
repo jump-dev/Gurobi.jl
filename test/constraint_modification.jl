@@ -13,6 +13,11 @@ using Gurobi: getcoeff
     model = gurobi_model(Gurobi.Env(); f=f, A=A, b=b)
 
     @test getcoeff(model, 1, 1) == 1.0
+
+    # Verify that we can pass any kind of `::Integer` to `getcoeff`
+    @test getcoeff(model, 1, Int8(1)) == 1.0
+    @test getcoeff(model, UInt32(1), UInt32(1)) == 1.0
+
     @test getcoeff(model, 1, 2) == 2.0
     @test getcoeff(model, 2, 1) == 3.0
     @test getcoeff(model, 2, 2) == 0.0
@@ -24,6 +29,8 @@ using Gurobi: getcoeff
     update_model!(model)
     @test getcoeff(model, 2, 1) == 1.5
 
+    # Verify that we are automatically converting the scalars to
+    # Cint and Float64 as necessary
     chg_coeffs!(model, Int8(2), Int128(1), Float32(2.0))
     update_model!(model)
     @test getcoeff(model, 2, 1) == 2.0
