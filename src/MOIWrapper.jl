@@ -245,7 +245,7 @@ function LQOI.set_linear_objective!(instance::GurobiOptimizer, columns::Vector{I
     nvars = num_vars(instance.inner)
     obj = zeros(Float64, nvars)
     for (col, coef) in zip(columns, coefficients)
-        obj[col] = coef
+        obj[col] += coef
     end
     set_dblattrarray!(instance.inner, "Obj", 1, num_vars(instance.inner), obj)
     update_model!(instance.inner)
