@@ -3,7 +3,7 @@
 
 export GurobiSolver
 
-type GurobiMathProgModel <: AbstractLinearQuadraticModel
+mutable struct GurobiMathProgModel <: AbstractLinearQuadraticModel
     inner::Model
     last_op_type::Symbol  # To support arbitrary order of addVar/addCon
                           # Two possibilities :Var :Con
@@ -60,7 +60,7 @@ function setparams!(m::GurobiMathProgModel)
 end
 
 
-type GurobiSolver <: AbstractMathProgSolver
+mutable struct GurobiSolver <: AbstractMathProgSolver
     env
     options
 end
@@ -548,7 +548,7 @@ setcutcallback!(m::GurobiMathProgModel,f) = (m.cutcb = f)
 setheuristiccallback!(m::GurobiMathProgModel,f) = (m.heuristiccb = f)
 setinfocallback!(m::GurobiMathProgModel,f) = (m.infocb = f)
 
-type GurobiCallbackData <: MathProgCallbackData
+mutable struct GurobiCallbackData <: MathProgCallbackData
     cbdata::CallbackData
     state::Symbol
     where::Cint

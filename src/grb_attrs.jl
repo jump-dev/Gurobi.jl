@@ -96,7 +96,7 @@ function get_intattrarray!(r::Array{Cint}, model::Model, name::String, start::In
     r
 end
 
-function get_intattrlist!{I<:Integer}(r::Array{Cint}, model::Model, name::String, inds::Vector{I})
+function get_intattrlist!(r::Array{Cint}, model::Model, name::String, inds::Vector{I}) where I<:Integer
     @assert isascii(name)
     @assert length(r) == length(inds)
     ret = @grb_ccall(getintattrlist, Cint,
@@ -108,7 +108,7 @@ function get_intattrlist!{I<:Integer}(r::Array{Cint}, model::Model, name::String
     nothing
 end
 
-function get_intattrlist{I<:Integer}(model::Model, name::String, inds::Vector{I})
+function get_intattrlist(model::Model, name::String, inds::Vector{I}) where I<:Integer
     r = Array{Cint}(length(inds))
     get_intattrlist!(r::Array{Cint}, model::Model, name::String, inds)
     return r
@@ -130,7 +130,7 @@ function get_dblattrarray!(r::Array{Float64}, model::Model, name::String, start:
     r
 end
 
-function get_dblattrlist!{I<:Integer}(r::Array{Float64}, model::Model, name::String, inds::Vector{I})
+function get_dblattrlist!(r::Array{Float64}, model::Model, name::String, inds::Vector{I}) where I<:Integer
     @assert isascii(name)
     @assert length(r) == length(inds)
     ret = @grb_ccall(getdblattrlist, Cint,
@@ -142,7 +142,7 @@ function get_dblattrlist!{I<:Integer}(r::Array{Float64}, model::Model, name::Str
     nothing
 end
 
-function get_dblattrlist{I<:Integer}(model::Model, name::String, inds::Vector{I})
+function get_dblattrlist(model::Model, name::String, inds::Vector{I}) where I<:Integer
     r = Array{Float64}(length(inds))
     get_dblattrlist!(r::Array{Float64}, model::Model, name::String, inds)
     return r
@@ -164,7 +164,7 @@ function get_charattrarray!(r::Array{Cchar}, model::Model, name::String, start::
     map(Char,r)
 end
 
-function get_charattrlist!{I<:Integer}(r::Array{Cchar}, model::Model, name::String, inds::Vector{I})
+function get_charattrlist!(r::Array{Cchar}, model::Model, name::String, inds::Vector{I}) where I<:Integer
     @assert isascii(name)
     @assert length(r) == length(inds)
     ret = @grb_ccall(getcharattrlist, Cint,
@@ -176,7 +176,7 @@ function get_charattrlist!{I<:Integer}(r::Array{Cchar}, model::Model, name::Stri
     nothing
 end
 
-function get_charattrlist{I<:Integer}(model::Model, name::String, inds::Vector{I})
+function get_charattrlist(model::Model, name::String, inds::Vector{I}) where I<:Integer
     r = Array{Cchar}(length(inds))
     get_charattrlist!(r::Array{Cchar}, model::Model, name::String, inds)
     return r

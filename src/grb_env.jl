@@ -1,7 +1,7 @@
 # Gurobi environment and other supporting facilities
 
 
-type Env
+mutable struct Env
     ptr_env::Ptr{Void}
     
     function Env()
@@ -42,7 +42,7 @@ end
 
 # error
 
-type GurobiError
+mutable struct GurobiError
     code::Int
     msg::String
     
