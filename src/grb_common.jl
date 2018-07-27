@@ -9,7 +9,7 @@ const CVec            = Vector{Cchar}
 
 const GCharOrVec      = Union{Cchar, Char, Vector{Cchar}, Vector{Char}}
 
-@compat const Bounds{T<:Real} = Union{T, Vector{T}}
+const Bounds{T<:Real} = Union{T, Vector{T}}
 const CoeffMat        = Union{Matrix{Float64}, SparseMatrixCSC{Float64}}
 
 cchar(c::Cchar) = c
@@ -37,7 +37,7 @@ cvecx(c::Vector{Char}, n::Integer) = (_chklen(c, n); convert(Vector{Cchar}, c))
 
 fvecx(v::Real, n::Integer) = fill(Float64(v), n)
 fvecx(v::Vector{Float64}, n::Integer) = (_chklen(v, n); v)
-fvecx{T<:Real}(v::Vector{T}, n::Integer) = (_chklen(v, n); convert(Vector{Float64}, v))
+fvecx(v::Vector{T}, n::Integer) where {T<:Real} = (_chklen(v, n); convert(Vector{Float64}, v))
 
 # empty vector & matrix (for the purpose of supplying default arguments)
 
@@ -51,10 +51,8 @@ macro grb_ccall(func, args...)
     is_unix() && return quote
         ccall(($f,libgurobi), $(args...))
     end
-    is_windows() && VERSION < v"0.6-" && return quote
-        ccall(($f,libgurobi), stdcall, $(args...))
-    end
-    is_windows() && VERSION >= v"0.6-" && return quote
+    false
+    is_windows() && return quote
         ccall(($f,libgurobi), $(esc(:stdcall)), $(args...))
     end
 end

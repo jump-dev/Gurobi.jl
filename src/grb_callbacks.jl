@@ -1,6 +1,6 @@
 # Gurobi callbacks
 
-type CallbackData
+mutable struct CallbackData
     cbdata::Ptr{Void}
     model::Model
 end
@@ -65,7 +65,7 @@ function cbsolution(cbdata::CallbackData, sol::Vector{Float64})
 end
 
 
-function cbget{T}(::Type{T},cbdata::CallbackData, where::Cint, what::Integer)
+function cbget(::Type{T},cbdata::CallbackData, where::Cint, what::Integer) where T
 
     out = Array{T}(1)
     ret = @grb_ccall(cbget, Cint, (Ptr{Void}, Cint, Cint, Ptr{T}),

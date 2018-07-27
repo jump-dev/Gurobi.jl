@@ -74,7 +74,7 @@ get_iter_count(model::Model) = convert(Int, get_dblattr(model, "IterCount"))
 get_node_count(model::Model) = convert(Int, get_dblattr(model, "NodeCount"))
 
 
-type OptimInfo
+mutable struct OptimInfo
     status::Symbol
     runtime::Float64
     
