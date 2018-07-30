@@ -36,23 +36,22 @@ end
     linconfig = MOIT.TestConfig()
     @testset "Default Solver"  begin
         solver = GurobiOptimizer(OutputFlag=0)
-        MOIT.contlineartest(solver, linconfig,
-            ["linear10","linear12","linear8a","linear8b","linear8c"]
+        MOIT.contlineartest(solver, linconfig, [
+            # linear10 requires interval
+            "linear10",
+            # these require infeasibility certificates
+            "linear8a", "linear8b", "linear8c", "linear12"]
         )
     end
     @testset "InfUnbdInfo=1" begin
         solver_nopresolve = GurobiOptimizer(OutputFlag=0, InfUnbdInfo=1)
-        MOIT.contlineartest(solver_nopresolve, linconfig,
-            ["linear10","linear12","linear8a"]
-        )
+        MOIT.linear8atest(solver_nopresolve, linconfig)
+        MOIT.linear8btest(solver_nopresolve, linconfig)
+        MOIT.linear8ctest(solver_nopresolve, linconfig)
     end
     @testset "No certificate" begin
         solver = GurobiOptimizer(OutputFlag=0)
-        linconfig_nocertificate = MOIT.TestConfig(infeas_certificates=false)
-        MOIT.linear12test(solver, linconfig_nocertificate)
-        MOIT.linear8atest(solver, linconfig_nocertificate)
-        MOIT.linear8btest(solver, linconfig_nocertificate)
-        MOIT.linear8ctest(solver, linconfig_nocertificate)
+        MOIT.linear12test(solver, MOIT.TestConfig(infeas_certificates=false))
     end
     @testset "Interval Bridge" begin
         MOIT.linear10test(
