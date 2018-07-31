@@ -251,6 +251,16 @@ function LQOI.set_linear_objective!(instance::GurobiOptimizer, columns::Vector{I
     update_model!(instance.inner)
 end
 
+function LQOI.set_constant_objective!(instance::GurobiOptimizer, value::Real)
+    set_dblattr!(instance.inner, "ObjCon", value)
+    if num_vars(instance.inner) > 0
+        # Work-around for https://github.com/JuliaOpt/LinQuadOptInterface.jl/pull/44#issuecomment-409373755
+        set_dblattrarray!(instance.inner, "Obj", 1, 1,
+            get_dblattrarray(instance.inner, "Obj", 1, 1))
+    end
+    update_model!(instance.inner)
+end
+
 function LQOI.change_objective_sense!(instance::GurobiOptimizer, symbol)
     if symbol == :min
         set_sense!(instance.inner, :minimize)
@@ -262,6 +272,10 @@ end
 
 function LQOI.get_linear_objective!(instance::GurobiOptimizer, x)
     copy!(x, get_dblattrarray(instance.inner, "Obj", 1, num_vars(instance.inner)))
+end
+
+function LQOI.get_constant_objective(instance::GurobiOptimizer)
+    get_dblattr(instance.inner, "ObjCon")
 end
 
 function LQOI.get_objectivesense(instance::GurobiOptimizer)

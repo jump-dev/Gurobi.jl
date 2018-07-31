@@ -228,3 +228,21 @@ end
     # But we have no dual status:
     @test MOI.get(m, MOI.DualStatus()) == MOI.UnknownResultStatus
 end
+
+@testset "Constant objective (issue #111)" begin
+    m = GurobiOptimizer()
+    x = MOI.addvariable!(m)
+    MOI.set!(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 2.0))
+    @test MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()).constant == 2.0
+    @test Gurobi.get_dblattr(m.inner, "ObjCon") == 2.0
+
+    MOI.modify!(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarConstantChange(3.0))
+    @test MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()).constant == 3.0
+    @test Gurobi.get_dblattr(m.inner, "ObjCon") == 3.0
+
+    MOI.set!(m, MOI.ObjectiveFunction{MOI.ScalarQuadraticFunction{Float64}}(),
+        MOI.ScalarQuadraticFunction(MOI.ScalarAffineTerm{Float64}[], MOI.ScalarQuadraticTerm{Float64}[], -2.5))
+    @test MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarQuadraticFunction{Float64}}()).constant == -2.5
+    @test Gurobi.get_dblattr(m.inner, "ObjCon") == -2.5
+end
