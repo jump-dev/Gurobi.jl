@@ -189,3 +189,42 @@ end
         @test Gurobi.CB_MIPSOL in cb_calls
     end
 end
+
+@testset "User limit handling (issue #140)" begin
+    # Verify that we return the correct status codes when a mixed-integer
+    # problem has been solved to a *feasible* but not necessarily optimal
+    # solution. To do that, we will set up an intentionally dumbed-down
+    # Gurobi optimizer (with all heuristics and pre-solve turned off) and
+    # ask it to solve a classic knapsack problem. Setting SolutionLimit=1
+    # forces the solver to return after its first feasible MIP solution,
+    # which tests the right part of the code without relying on potentially
+    # flaky or system-dependent time limits.
+    m = GurobiOptimizer(OutputFlag=0,
+                        SolutionLimit=1,
+                        Heuristics=0.0,
+                        Presolve=0)
+    N = 100
+    x = MOI.addvariables!(m, N)
+    for xi in x
+        MOI.addconstraint!(m, MOI.SingleVariable(xi), MOI.ZeroOne())
+        MOI.set!(m, MOI.VariablePrimalStart(), xi, 0.0)
+    end
+    # Given a collection of items with individual weights and values,
+    # maximize the total value carried subject to the constraint that
+    # the total weight carried is less than 10.
+    srand(1)
+    item_weights = rand(N)
+    item_values = rand(N)
+    MOI.addconstraint!(m,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(item_weights, x), 0.0),
+        MOI.LessThan(10.0))
+    MOI.set!(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(.-item_values, x), 0.0))
+    MOI.optimize!(m)
+
+    @test MOI.get(m, MOI.TerminationStatus()) == MOI.SolutionLimit
+    # We should have a primal feasible solution:
+    @test MOI.get(m, MOI.PrimalStatus()) == MOI.FeasiblePoint
+    # But we have no dual status:
+    @test MOI.get(m, MOI.DualStatus()) == MOI.UnknownResultStatus
+end
