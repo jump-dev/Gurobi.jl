@@ -33,3 +33,9 @@ end
 end
 
 include("constraint_modification.jl")
+
+@testset "Empty constraints (Issue #142)" begin
+    model = Gurobi.Model(Gurobi.Env(), "model")
+    A = Gurobi.get_constrmatrix(model)
+    @test size(A) == (0, 0)
+end
