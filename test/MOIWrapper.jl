@@ -1,8 +1,7 @@
-using Gurobi, Base.Test, MathOptInterface, MathOptInterface.Test, LinQuadOptInterface
+using Gurobi, Base.Test, MathOptInterface, MathOptInterface.Test
 
 const MOI  = MathOptInterface
 const MOIT = MathOptInterface.Test
-const LQOI = LinQuadOptInterface
 
 @testset "Unit Tests" begin
     config = MOIT.TestConfig()
@@ -223,9 +222,9 @@ end
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(.-item_values, x), 0.0))
     MOI.optimize!(m)
 
-    @test LQOI.get_termination_status(m) == MOI.SolutionLimit
+    @test MOI.get(m, MOI.TerminationStatus()) == MOI.SolutionLimit
     # We should have a primal feasible solution:
-    @test LQOI.get_primal_status(m) == MOI.FeasiblePoint
+    @test MOI.get(m, MOI.PrimalStatus()) == MOI.FeasiblePoint
     # But we have no dual status:
-    @test LQOI.get_dual_status(m) == MOI.UnknownResultStatus
+    @test MOI.get(m, MOI.DualStatus()) == MOI.UnknownResultStatus
 end
