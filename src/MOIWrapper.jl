@@ -361,6 +361,8 @@ function LQOI.get_primal_status(instance::GurobiOptimizer)
         return MOI.InfeasibilityCertificate
     elseif stat == :suboptimal
         return MOI.FeasiblePoint
+    elseif is_mip(instance.inner) && get_sol_count(instance.inner) > 0
+        return MOI.FeasiblePoint
     else
         return MOI.UnknownResultStatus
     end
