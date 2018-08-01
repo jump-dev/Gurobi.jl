@@ -1,78 +1,88 @@
-using Gurobi, Base.Test, MathOptInterface, MathOptInterface.Test
+using MathOptInterface
 
 const MOI  = MathOptInterface
 const MOIT = MathOptInterface.Test
+const MOIB = MathOptInterface.Bridges
 
 @testset "Unit Tests" begin
     config = MOIT.TestConfig()
     solver = GurobiOptimizer(OutputFlag=0)
-
     # TODO(@odow): see MathOptInterface Issue #404
-    # The basic constraint tests incorrectly add multiple constraints
-    # that are illegal, e.g., two SingleVariable-in-ZeroOne constraints
-    # for the same variable.
     # MOIT.basic_constraint_tests(solver, config)
-
-    MOIT.unittest(solver, config, [
-        "solve_affine_interval",  # Interval constraints not wrapped
-        "solve_qcp_edge_cases"    # tested below
-    ])
-
+    MOIT.unittest(solver, config,
+        ["solve_affine_interval", "solve_qcp_edge_cases"])
+    @testset "solve_affine_interval" begin
+        MOIT.solve_affine_interval(
+            MOIB.SplitInterval{Float64}(GurobiOptimizer(OutputFlag=0)),
+            config
+        )
+    end
     @testset "solve_qcp_edge_cases" begin
         MOIT.solve_qcp_edge_cases(solver,
             MOIT.TestConfig(atol=1e-4)
         )
     end
-
     MOIT.modificationtest(solver, config, [
         "solve_func_scalaraffine_lessthan"
     ])
 end
 
 @testset "Linear tests" begin
-    linconfig = MOIT.TestConfig()
     @testset "Default Solver"  begin
-        solver = GurobiOptimizer(OutputFlag=0)
-        MOIT.contlineartest(solver, linconfig, ["linear10","linear12","linear8a","linear8b","linear8c"])
+        solver = GurobiOptimizer(OutputFlag=0, InfUnbdInfo=1)
+        MOIT.contlineartest(solver, MOIT.TestConfig(), [
+            # This requires interval constraint.
+            "linear10",
+            # This requires an infeasiblity certificate for a variable bound.
+            "linear12"
+        ])
     end
-    @testset "InfUnbdInfo=1" begin
-        solver_nopresolve = GurobiOptimizer(OutputFlag=0, InfUnbdInfo=1)
-        MOIT.contlineartest(solver_nopresolve, linconfig, ["linear10","linear12","linear8a"])
+    @testset "linear10" begin
+        MOIT.linear10test(
+            MOIB.SplitInterval{Float64}(GurobiOptimizer(OutputFlag=0)),
+            MOIT.TestConfig()
+        )
     end
     @testset "No certificate" begin
-        solver = GurobiOptimizer(OutputFlag=0)
-        linconfig_nocertificate = MOIT.TestConfig(infeas_certificates=false)
-        MOIT.linear12test(solver, linconfig_nocertificate)
-        MOIT.linear8atest(solver, linconfig_nocertificate)
+        MOIT.linear12test(
+            GurobiOptimizer(OutputFlag=0),
+            MOIT.TestConfig(infeas_certificates=false)
+        )
     end
-    # 10 is ranged
 end
 
 @testset "Quadratic tests" begin
-    quadconfig = MOIT.TestConfig(atol=1e-4, rtol=1e-4, duals=false, query=false)
-    solver = GurobiOptimizer(OutputFlag=0)
-    MOIT.contquadratictest(solver, quadconfig)
+    MOIT.contquadratictest(
+        GurobiOptimizer(OutputFlag=0),
+        MOIT.TestConfig(atol=1e-4, rtol=1e-4, duals=false, query=false)
+    )
 end
 
 @testset "Linear Conic tests" begin
-    linconfig = MOIT.TestConfig()
-    solver = GurobiOptimizer(OutputFlag=0)
-    MOIT.lintest(solver, linconfig, ["lin3","lin4"])
-
-    solver_nopresolve = GurobiOptimizer(OutputFlag=0, InfUnbdInfo=1)
-    MOIT.lintest(solver_nopresolve, linconfig)
+    MOIT.lintest(
+        GurobiOptimizer(OutputFlag=0, InfUnbdInfo=1),
+        MOIT.TestConfig()
+    )
 end
 
 @testset "Integer Linear tests" begin
-    intconfig = MOIT.TestConfig()
-    solver = GurobiOptimizer(OutputFlag=0)
-    MOIT.intlineartest(solver, intconfig, ["int3"])
-
-    # 3 is ranged
+    MOIT.intlineartest(
+        GurobiOptimizer(OutputFlag=0),
+        MOIT.TestConfig(),
+        ["int3"]  # int3 has interval constriants
+    )
+    @testset "int3" begin
+        MOIT.int3test(
+            MOIB.SplitInterval{Float64}(GurobiOptimizer(OutputFlag=0)),
+            MOIT.TestConfig()
+        )
+    end
 end
 @testset "ModelLike tests" begin
     solver = GurobiOptimizer()
-    MOIT.nametest(solver)
+    @testset "nametest" begin
+        MOIT.nametest(solver)
+    end
     @testset "validtest" begin
         MOIT.validtest(solver)
     end
@@ -81,17 +91,10 @@ end
     end
     @testset "orderedindicestest" begin
         # TODO(@odow): see MathOptInterface Issue #404
-        # The basic constraint tests incorrectly add multiple constraints
-        # that are illegal, e.g., two SingleVariable-in-ZeroOne constraints
-        # for the same variable.
         # MOIT.orderedindicestest(solver)
     end
-    @testset "canaddconstrainttest" begin
-        MOIT.canaddconstrainttest(solver, Float64, Complex{Float64})
-    end
     @testset "copytest" begin
-        solver2 = GurobiOptimizer()
-        MOIT.copytest(solver,solver2)
+        MOIT.copytest(solver, GurobiOptimizer())
     end
 end
 

@@ -1,7 +1,19 @@
-using Gurobi
-using Base.Test
 using Gurobi: getcoeff
 
+@testset "Empty constraints (Issue #142)" begin
+    @testset "No variables, no constraints" begin
+        model = Gurobi.Model(Gurobi.Env(), "model")
+        A = Gurobi.get_constrmatrix(model)
+        @test size(A) == (0, 0)
+    end
+    @testset "One variable, no constraints" begin
+        model = Gurobi.Model(Gurobi.Env(), "model")
+        Gurobi.add_cvar!(model, 0.0)
+        Gurobi.update_model!(model)
+        A = Gurobi.get_constrmatrix(model)
+        @test size(A) == (0, 1)
+    end
+end
 
 @testset "changing coefficients" begin
     A = spzeros(2, 2)
