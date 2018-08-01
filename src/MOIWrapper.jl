@@ -425,10 +425,22 @@ function LQOI.get_relative_mip_gap(instance::GurobiOptimizer)
     return abs(U-L)/U
 end
 
-LQOI.get_iteration_count(instance::GurobiOptimizer)    = get_iter_count(instance.inner)
-LQOI.get_barrier_iterations(instance::GurobiOptimizer) = get_barrier_iter_count(instance.inner)
-LQOI.get_node_count(instance::GurobiOptimizer)         = get_node_count(instance.inner)
-LQOI.get_farkas_dual!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "FarkasDual", 1)
+function LQOI.get_iteration_count(instance::GurobiOptimizer)
+    get_iter_count(instance.inner)
+end
+
+function LQOI.get_barrier_iterations(instance::GurobiOptimizer)
+    get_barrier_iter_count(instance.inner)
+end
+
+function LQOI.get_node_count(instance::GurobiOptimizer)
+    get_node_count(instance.inner)
+end
+
+function LQOI.get_farkas_dual!(instance::GurobiOptimizer, place)
+    get_dblattrarray!(place, instance.inner, "FarkasDual", 1)
+    scale!(place, -1.0)
+end
 
 function hasdualray(instance::GurobiOptimizer)
     try
