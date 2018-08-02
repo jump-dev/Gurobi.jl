@@ -6,14 +6,14 @@ const MOIB = MathOptInterface.Bridges
 
 @testset "Unit Tests" begin
     config = MOIT.TestConfig()
-    solver = GurobiOptimizer(OutputFlag=0)
+    solver = Gurobi.Optimizer(OutputFlag=0)
     # TODO(@odow): see MathOptInterface Issue #404
     # MOIT.basic_constraint_tests(solver, config)
     MOIT.unittest(solver, config,
         ["solve_affine_interval", "solve_qcp_edge_cases"])
     @testset "solve_affine_interval" begin
         MOIT.solve_affine_interval(
-            MOIB.SplitInterval{Float64}(GurobiOptimizer(OutputFlag=0)),
+            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(OutputFlag=0)),
             config
         )
     end
@@ -29,7 +29,7 @@ end
 
 @testset "Linear tests" begin
     @testset "Default Solver"  begin
-        solver = GurobiOptimizer(OutputFlag=0)
+        solver = Gurobi.Optimizer(OutputFlag=0)
         MOIT.contlineartest(solver, MOIT.TestConfig(), [
             # This requires interval constraint.
             "linear10",
@@ -39,13 +39,13 @@ end
     end
     @testset "linear10" begin
         MOIT.linear10test(
-            MOIB.SplitInterval{Float64}(GurobiOptimizer(OutputFlag=0)),
+            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(OutputFlag=0)),
             MOIT.TestConfig()
         )
     end
     @testset "No certificate" begin
         MOIT.linear12test(
-            GurobiOptimizer(OutputFlag=0, InfUnbdInfo=0),
+            Gurobi.Optimizer(OutputFlag=0, InfUnbdInfo=0),
             MOIT.TestConfig(infeas_certificates=false)
         )
     end
@@ -53,33 +53,33 @@ end
 
 @testset "Quadratic tests" begin
     MOIT.contquadratictest(
-        GurobiOptimizer(OutputFlag=0),
+        Gurobi.Optimizer(OutputFlag=0),
         MOIT.TestConfig(atol=1e-4, rtol=1e-4, duals=false, query=false)
     )
 end
 
 @testset "Linear Conic tests" begin
     MOIT.lintest(
-        GurobiOptimizer(OutputFlag=0),
+        Gurobi.Optimizer(OutputFlag=0),
         MOIT.TestConfig()
     )
 end
 
 @testset "Integer Linear tests" begin
     MOIT.intlineartest(
-        GurobiOptimizer(OutputFlag=0),
+        Gurobi.Optimizer(OutputFlag=0),
         MOIT.TestConfig(),
         ["int3"]  # int3 has interval constriants
     )
     @testset "int3" begin
         MOIT.int3test(
-            MOIB.SplitInterval{Float64}(GurobiOptimizer(OutputFlag=0)),
+            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(OutputFlag=0)),
             MOIT.TestConfig()
         )
     end
 end
 @testset "ModelLike tests" begin
-    solver = GurobiOptimizer()
+    solver = Gurobi.Optimizer()
     @testset "nametest" begin
         MOIT.nametest(solver)
     end
@@ -94,13 +94,13 @@ end
         # MOIT.orderedindicestest(solver)
     end
     @testset "copytest" begin
-        MOIT.copytest(solver, GurobiOptimizer())
+        MOIT.copytest(solver, Gurobi.Optimizer())
     end
 end
 
 @testset "Gurobi Callback" begin
     @testset "Generic callback" begin
-        m = GurobiOptimizer(OutputFlag=0)
+        m = Gurobi.Optimizer(OutputFlag=0)
         x = MOI.addvariable!(m)
         MOI.addconstraint!(m, MOI.SingleVariable(x), MOI.GreaterThan(1.0))
         MOI.set!(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
@@ -126,7 +126,7 @@ end
     end
 
     @testset "Lazy cut" begin
-        m = GurobiOptimizer(OutputFlag=0, Cuts=0, Presolve=0, Heuristics=0, LazyConstraints=1)
+        m = Gurobi.Optimizer(OutputFlag=0, Cuts=0, Presolve=0, Heuristics=0, LazyConstraints=1)
         MOI.Utilities.loadfromstring!(m,"""
             variables: x, y
             maxobjective: y
@@ -203,12 +203,12 @@ end
     # Verify that we return the correct status codes when a mixed-integer
     # problem has been solved to a *feasible* but not necessarily optimal
     # solution. To do that, we will set up an intentionally dumbed-down
-    # Gurobi optimizer (with all heuristics and pre-solve turned off) and
+    # Gurobi Gurobi.Optimizer (with all heuristics and pre-solve turned off) and
     # ask it to solve a classic knapsack problem. Setting SolutionLimit=1
     # forces the solver to return after its first feasible MIP solution,
     # which tests the right part of the code without relying on potentially
     # flaky or system-dependent time limits.
-    m = GurobiOptimizer(OutputFlag=0,
+    m = Gurobi.Optimizer(OutputFlag=0,
                         SolutionLimit=1,
                         Heuristics=0.0,
                         Presolve=0)
