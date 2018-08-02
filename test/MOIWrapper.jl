@@ -29,7 +29,7 @@ end
 
 @testset "Linear tests" begin
     @testset "Default Solver"  begin
-        solver = GurobiOptimizer(OutputFlag=0, InfUnbdInfo=1)
+        solver = GurobiOptimizer(OutputFlag=0)
         MOIT.contlineartest(solver, MOIT.TestConfig(), [
             # This requires interval constraint.
             "linear10",
@@ -45,7 +45,7 @@ end
     end
     @testset "No certificate" begin
         MOIT.linear12test(
-            GurobiOptimizer(OutputFlag=0),
+            GurobiOptimizer(OutputFlag=0, InfUnbdInfo=0),
             MOIT.TestConfig(infeas_certificates=false)
         )
     end
@@ -60,7 +60,7 @@ end
 
 @testset "Linear Conic tests" begin
     MOIT.lintest(
-        GurobiOptimizer(OutputFlag=0, InfUnbdInfo=1),
+        GurobiOptimizer(OutputFlag=0),
         MOIT.TestConfig()
     )
 end

@@ -45,35 +45,44 @@ end
 
 LQOI.LinearQuadraticModel(::Type{GurobiOptimizer},env) = Model(env::Env,"defaultname")
 
+"""
+    GurobiOptimizer(;kwargs...)
+
+Create a new GurobiOptimizer object.
+
+Note that we set the parameter `InfUnbdInfo` to `1` rather than the default of
+`0` so that we can query infeasibility certificates. Users are, however, free to
+overide this as follows `GurobiOptimizer(InfUndbInfo=0)`.
+"""
 function GurobiOptimizer(;kwargs...)
-    env = Env()
-    m = GurobiOptimizer(nothing)
-    m.env = env
-    m.params = Dict{String,Any}()
-    MOI.empty!(m)
-    for (name,value) in kwargs
-        m.params[string(name)] = value
-        setparam!(m.inner, string(name), value)
+    model = GurobiOptimizer(nothing)
+    model.env = Env()
+    model.params = Dict{String,Any}()
+    MOI.empty!(model)
+    for (name, value) in kwargs
+        model.params[string(name)] = value
+        setparam!(model.inner, string(name), value)
     end
-    return m
+    return model
 end
 
-function MOI.empty!(m::GurobiOptimizer)
-    MOI.empty!(m,m.env)
-    for (name,value) in m.params
-        setparam!(m.inner, name, value)
+function MOI.empty!(model::GurobiOptimizer)
+    MOI.empty!(model, model.env)
+    setparam!(model.inner, "InfUnbdInfo", 1)
+    for (name, value) in model.params
+        setparam!(model.inner, name, value)
     end
 end
 
-LQOI.supported_constraints(s::GurobiOptimizer) = SUPPORTED_CONSTRAINTS
-LQOI.supported_objectives(s::GurobiOptimizer)  = SUPPORTED_OBJECTIVES
+LQOI.supported_constraints(::GurobiOptimizer) = SUPPORTED_CONSTRAINTS
+LQOI.supported_objectives(::GurobiOptimizer)  = SUPPORTED_OBJECTIVES
 
-LQOI.backend_type(m::GurobiOptimizer, ::MOI.EqualTo{Float64})     = Cchar('=')
-LQOI.backend_type(m::GurobiOptimizer, ::MOI.LessThan{Float64})    = Cchar('<')
-LQOI.backend_type(m::GurobiOptimizer, ::MOI.GreaterThan{Float64}) = Cchar('>')
-LQOI.backend_type(m::GurobiOptimizer, ::MOI.Zeros)                = Cchar('=')
-LQOI.backend_type(m::GurobiOptimizer, ::MOI.Nonpositives)         = Cchar('<')
-LQOI.backend_type(m::GurobiOptimizer, ::MOI.Nonnegatives)         = Cchar('>')
+LQOI.backend_type(::GurobiOptimizer, ::MOI.EqualTo{Float64})     = Cchar('=')
+LQOI.backend_type(::GurobiOptimizer, ::MOI.LessThan{Float64})    = Cchar('<')
+LQOI.backend_type(::GurobiOptimizer, ::MOI.GreaterThan{Float64}) = Cchar('>')
+LQOI.backend_type(::GurobiOptimizer, ::MOI.Zeros)                = Cchar('=')
+LQOI.backend_type(::GurobiOptimizer, ::MOI.Nonpositives)         = Cchar('<')
+LQOI.backend_type(::GurobiOptimizer, ::MOI.Nonnegatives)         = Cchar('>')
 
 function LQOI.change_variable_bounds!(model::GurobiOptimizer,
           columns::Vector{Int}, new_bounds::Vector{Float64},
