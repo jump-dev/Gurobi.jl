@@ -436,31 +436,35 @@ function LQOI.get_quadratic_dual_solution!(model::Optimizer, place)
 end
 
 LQOI.get_objective_value(model::Optimizer) = get_objval(model.inner)
-LQOI.get_objective_bound(model::Optimizer) = get_objval(model.inner)
+
+function LQOI.get_objective_bound(model::Optimizer)
+    return get_objbound(model.inner)
+end
 
 function LQOI.get_relative_mip_gap(model::Optimizer)
-    L = get_objval(model.inner)
-    U = get_objbound(model.inner)
-    return abs(U-L)/U
+    value = LQOI.get_objective_value(model)
+    bound = LQOI.get_objective_bound(model)
+    return abs(value - bound) / abs(bound)
 end
 
 function LQOI.get_iteration_count(instance::Optimizer)
-    get_iter_count(instance.inner)
+    return get_iter_count(instance.inner)
 end
 
 function LQOI.get_barrier_iterations(instance::Optimizer)
-    get_barrier_iter_count(instance.inner)
+    return get_barrier_iter_count(instance.inner)
 end
 
 function LQOI.get_node_count(instance::Optimizer)
-    get_node_count(instance.inner)
+    return get_node_count(instance.inner)
 end
 
 function LQOI.get_farkas_dual!(instance::Optimizer, place)
     get_dblattrarray!(place, instance.inner, "FarkasDual", 1)
-    scale!(place, -1.0)
+    place .*= -1.0
 end
 
+# TODO(odow): remove try/catch
 function hasdualray(model::Optimizer)
     try
         get_dblattrarray(model.inner, "FarkasDual", 1, num_constrs(model.inner))
@@ -470,8 +474,11 @@ function hasdualray(model::Optimizer)
     end
 end
 
-LQOI.get_unbounded_ray!(model::Optimizer, place) = get_dblattrarray!(place, model.inner, "UnbdRay", 1)
+function LQOI.get_unbounded_ray!(model::Optimizer, place)
+    get_dblattrarray!(place, model.inner, "UnbdRay", 1)
+end
 
+# TODO(odow): remove try/catch
 function hasprimalray(model::Optimizer)
     try
         get_dblattrarray(model.inner, "UnbdRay", 1, num_vars(model.inner))
@@ -482,7 +489,6 @@ function hasprimalray(model::Optimizer)
 end
 
 MOI.free!(m::Optimizer) = free_model(m.inner)
-
 
 # ==============================================================================
 #    Callbacks in Gurobi
