@@ -11,11 +11,10 @@ const MOIB = MathOptInterface.Bridges
     MOIT.unittest(solver, config,
         ["solve_affine_interval", "solve_qcp_edge_cases"])
     @testset "solve_affine_interval" begin
-        # TODO(odow): check why failing
-        # MOIT.solve_affine_interval(
-        #     MOIB.SplitInterval{Float64}(Gurobi.Optimizer(OutputFlag=0)),
-        #     config
-        # )
+        MOIT.solve_affine_interval(
+            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(OutputFlag=0)),
+            config
+        )
     end
     @testset "solve_qcp_edge_cases" begin
         MOIT.solve_qcp_edge_cases(solver,
