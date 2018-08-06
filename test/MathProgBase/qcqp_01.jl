@@ -6,11 +6,12 @@
 #
 #    solution: (0.71, 0.71) objv = 1.414
 
-using Gurobi, Base.Test
+using Gurobi, Compat.Test
 
 @testset "QCQP1" begin
 
     env = Gurobi.Env()
+    setparam!(env, "OutputFlag", 0)
 
     model = Gurobi.Model(env, "qcqp_01", :maximize)
 
@@ -20,8 +21,6 @@ using Gurobi, Base.Test
      # add_qpterms!(model, linearindices, linearcoeffs, qrowinds, qcolinds, qcoeffs, sense, rhs)
     add_qconstr!(model, [], [], [1, 2], [1, 2], [1, 1.], '<', 1.0)
     update_model!(model)
-
-    println(model)
 
     optimize(model)
 

@@ -1,9 +1,10 @@
 # hierarchical multi-objetive LP
 #
 
-using Gurobi
+using Gurobi, Compat.Test
 
 env = Gurobi.Env()
+setparam!(env, "OutputFlag", 0)
 
 A = [1. 1.]
 lb = [0.; 0.]
@@ -19,10 +20,10 @@ Gurobi.set_multiobj!(model, 2, [1., 0.], 1, 1.0)
 Gurobi.update_model!(model)
 
 optimize(model)
-Test.@test get_solution(model) == [1., 0.]
+@test get_solution(model) == [1., 0.]
 
 Gurobi.set_multiobj!(model, 2, [0., 1.], 1, 1.0)
 Gurobi.update_model!(model)
 
 optimize(model)
-Test.@test get_solution(model) == [0., 1.]
+@test get_solution(model) == [0., 1.]

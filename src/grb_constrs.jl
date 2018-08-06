@@ -5,7 +5,7 @@
 function add_constr!(model::Model, inds::IVec, coeffs::FVec, rel::Cchar, rhs::Float64)
     length(inds) == length(coeffs) || error("Inconsistent argument dimensions.")
     ret = @grb_ccall(addconstr, Cint, (
-        Ptr{Void},    # model
+        Ptr{Cvoid},    # model
         Cint,         # numnz
         Ptr{Cint},    # cind
         Ptr{Float64}, # cvals
@@ -13,7 +13,7 @@ function add_constr!(model::Model, inds::IVec, coeffs::FVec, rel::Cchar, rhs::Fl
         Float64,      # rhs
         Ptr{UInt8}    # name
         ),
-        model, length(inds), inds - Cint(1), coeffs, rel, rhs, C_NULL)
+        model, length(inds), inds .- Cint(1), coeffs, rel, rhs, C_NULL)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -25,7 +25,7 @@ function add_constr!(model::Model, inds::Vector, coeffs::Vector, rel::GChars, rh
 end
 
 function add_constr!(model::Model, coeffs::Vector, rel::GChars, rhs::Real)
-    inds = find(coeffs)
+    inds = findall(x->x!=0, coeffs)
     vals = coeffs[inds]
     add_constr!(model, inds, vals, rel, rhs)
 end
@@ -39,7 +39,7 @@ function add_constrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec, rel
 
     if m > 0
         ret = @grb_ccall(addconstrs, Cint, (
-            Ptr{Void},    # model
+            Ptr{Cvoid},    # model
             Cint,         # num constraints
             Cint,         # num non-zeros
             Ptr{Cint},    # cbeg
@@ -49,7 +49,7 @@ function add_constrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec, rel
             Ptr{Float64}, # rhs
             Ptr{UInt8}    # names
             ),
-            model, m, nnz, cbegins - Cint(1), inds - Cint(1), coeffs,
+            model, m, nnz, cbegins .- Cint(1), inds .- Cint(1), coeffs,
             rel, rhs, C_NULL)
 
         if ret != 0
@@ -78,7 +78,7 @@ end
 function add_constrs!(model::Model, A::CoeffMat, rel::GCharOrVec, b::Vector{Float64})
     m, n = size(A)
     (m == length(b) && n == num_vars(model)) || error("Incompatible argument dimensions.")
-    add_constrs_t!(model, transpose(A), rel, b)
+    add_constrs_t!(model, sparse(transpose(A)), rel, b)
 end
 
 
@@ -86,7 +86,7 @@ end
 
 function add_rangeconstr!(model::Model, inds::IVec, coeffs::FVec, lb::Float64, ub::Float64)
     ret = @grb_ccall(addrangeconstr, Cint, (
-        Ptr{Void},    # model
+        Ptr{Cvoid},    # model
         Cint,         # numnz
         Ptr{Cint},    # cind
         Ptr{Float64}, # cvals
@@ -94,7 +94,7 @@ function add_rangeconstr!(model::Model, inds::IVec, coeffs::FVec, lb::Float64, u
         Float64,      # upper
         Ptr{UInt8}    # name
         ),
-        model, length(inds), inds - Cint(1), coeffs, lb, ub, C_NULL)
+        model, length(inds), inds .- Cint(1), coeffs, lb, ub, C_NULL)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -121,7 +121,7 @@ function add_rangeconstrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec
 
     if m > 0
         ret = @grb_ccall(addrangeconstrs, Cint, (
-            Ptr{Void},    # model
+            Ptr{Cvoid},    # model
             Cint,         # num constraints
             Cint,         # num non-zeros
             Ptr{Cint},    # cbeg
@@ -131,7 +131,7 @@ function add_rangeconstrs!(model::Model, cbegins::IVec, inds::IVec, coeffs::FVec
             Ptr{Float64}, # upper
             Ptr{UInt8}    # names
             ),
-            model, m, nnz, cbegins - Cint(1), inds - Cint(1), coeffs, lb, ub, C_NULL)
+            model, m, nnz, cbegins .- Cint(1), inds .- Cint(1), coeffs, lb, ub, C_NULL)
 
         if ret != 0
             throw(GurobiError(model.env, ret))
@@ -156,7 +156,7 @@ function add_rangeconstrs!(model::Model, A::CoeffMat, lb::Vector, ub::Vector)
     m, n = size(A)
     (m == length(lb) == length(ub) && n == num_vars(model)) || error("Incompatible argument dimensions.")
 
-    add_rangeconstrs_t!(model, transpose(A), lb, ub)
+    add_rangeconstrs_t!(model, sparse(transpose(A)), lb, ub)
 end
 
 function get_constrmatrix(model::Model)
@@ -169,11 +169,11 @@ function get_constrs(model::Model, start::Integer, len::Integer)
     @assert len >= 0
     @assert start + len <= m + 1
     n = num_vars(model)
-    numnzP = Array{Cint}(1)
-    cbeg = Array{Cint}(len+1)
+    numnzP = Ref{Cint}()
+    cbeg = Array{Cint}(undef, len+1)
 
     ret = @grb_ccall(getconstrs, Cint, (
-        Ptr{Void},
+        Ptr{Cvoid},
         Ptr{Cint},
         Ptr{Cint},
         Ptr{Cint},
@@ -183,11 +183,11 @@ function get_constrs(model::Model, start::Integer, len::Integer)
         ),
         model, numnzP, cbeg, C_NULL, C_NULL, Cint(start-1), Cint(len))
 
-    nnz = numnzP[1]
-    cind = Array{Cint}(nnz)
-    cval = Array{Cdouble}(nnz)
+    nnz = numnzP[]
+    cind = Array{Cint}(undef, nnz)
+    cval = Array{Cdouble}(undef, nnz)
     ret = @grb_ccall(getconstrs, Cint, (
-                     Ptr{Void},
+                     Ptr{Cvoid},
                      Ptr{Cint},
                      Ptr{Cint},
                      Ptr{Cint},
@@ -200,9 +200,9 @@ function get_constrs(model::Model, start::Integer, len::Integer)
         throw(GurobiError(model.env, ret))
     end
     cbeg[end] = nnz
-    I = Array{Int64}(nnz)
-    J = Array{Int64}(nnz)
-    V = Array{Float64}(nnz)
+    I = Array{Int64}(undef, nnz)
+    J = Array{Int64}(undef, nnz)
+    V = Array{Float64}(undef, nnz)
     for i in 1:length(cbeg)-1
         for j in (cbeg[i]+1):cbeg[i+1]
             I[j] = i
@@ -220,7 +220,7 @@ function add_sos!(model::Model, sostype::Symbol, idx::Vector{Int}, weight::Vecto
     ((nelem = length(idx)) == length(weight)) || error("Index and weight vectors of unequal length")
     (sostype == :SOS1) ? (typ = GRB_SOS_TYPE1) : ( (sostype == :SOS2) ? (typ = GRB_SOS_TYPE2) : error("Invalid SOS constraint type") )
     ret = @grb_ccall(addsos, Cint, (
-                     Ptr{Void},
+                     Ptr{Cvoid},
                      Cint,
                      Cint,
                      Ptr{Cint},
@@ -228,7 +228,7 @@ function add_sos!(model::Model, sostype::Symbol, idx::Vector{Int}, weight::Vecto
                      Ptr{Cint},
                      Ptr{Cdouble}
                      ),
-                     model, convert(Cint, 1), convert(Cint, nelem), Cint[typ], Cint[0], convert(Vector{Cint}, idx-1), weight)
+                     model, convert(Cint, 1), convert(Cint, nelem), Cint[typ], Cint[0], convert(Vector{Cint}, idx.-1), weight)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -236,10 +236,10 @@ end
 function del_sos!(model::Model, idx::Vector{Cint})
     numdel = length(idx)
     ret = @grb_ccall(delsos, Cint, (
-                     Ptr{Void},
+                     Ptr{Cvoid},
                      Cint,
                      Ptr{Cint}),
-                     model, convert(Cint,numdel), ivec(idx-1) )
+                     model, convert(Cint,numdel), ivec(idx.-1) )
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -247,18 +247,17 @@ end
 
 get_sos_matrix(model::Model) = get_sos(model::Model, 1, num_sos(model))
 function get_sos(model::Model, start::Integer, len::Integer)
-    numnzP = Array{Cint}(1)
     m = num_sos(model)
-    sostype = Array{Cint}(m)
+    sostype = Array{Cint}(undef, m)
     @assert m > 0
     @assert start <= m
     @assert len <= m
     n = num_vars(model)
-    numnzP = Array{Cint}(1)
-    cbeg = Array{Cint}(len+1)
+    numnzP = Ref{Cint}()
+    cbeg = Array{Cint}(undef, len+1)
 
     ret = @grb_ccall(getsos, Cint, (
-        Ptr{Void},
+        Ptr{Cvoid},
         Ptr{Cint},
         Ptr{Cint},
         Ptr{Cint},
@@ -269,12 +268,12 @@ function get_sos(model::Model, start::Integer, len::Integer)
         ),
         model, numnzP, sostype, cbeg, C_NULL, C_NULL, Cint(start-1), Cint(len))
 
-    nnz = numnzP[1]
+    nnz = numnzP[]
 
-    cind = Array{Cint}(nnz)
-    cval = Array{Cdouble}(nnz)
+    cind = Array{Cint}(undef, nnz)
+    cval = Array{Cdouble}(undef, nnz)
     ret = @grb_ccall(getsos, Cint, (
-                     Ptr{Void},
+                     Ptr{Cvoid},
                      Ptr{Cint},
                      Ptr{Cint},
                      Ptr{Cint},
@@ -288,9 +287,9 @@ function get_sos(model::Model, start::Integer, len::Integer)
         throw(GurobiError(model.env, ret))
     end
     cbeg[end] = nnz
-    I = Array{Int64}(nnz)
-    J = Array{Int64}(nnz)
-    V = Array{Float64}(nnz)
+    I = Array{Int64}(undef, nnz)
+    J = Array{Int64}(undef, nnz)
+    V = Array{Float64}(undef, nnz)
     for i in 1:length(cbeg)-1
         for j in (cbeg[i]+1):cbeg[i+1]
             I[j] = i
@@ -306,10 +305,10 @@ del_constrs!(model::Model, idx::Vector{T}) where {T<:Real} = del_constrs!(model,
 function del_constrs!(model::Model, idx::Vector{Cint})
     numdel = length(idx)
     ret = @grb_ccall(delconstrs, Cint, (
-                     Ptr{Void},
+                     Ptr{Cvoid},
                      Cint,
                      Ptr{Cint}),
-                     model, convert(Cint,numdel), idx-Cint(1))
+                     model, convert(Cint,numdel), idx .- Cint(1))
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -317,7 +316,7 @@ end
 
 function chg_coeffs!(model::Model, cidx::Real, vidx::Real, val::Real)
     ret = @grb_ccall(chgcoeffs, Cint, (
-                     Ptr{Void},
+                     Ptr{Cvoid},
                      Cint,
                      Ref{Cint},
                      Ref{Cint},
@@ -336,12 +335,12 @@ function chg_coeffs!(model::Model, cidx::IVec, vidx::IVec, val::FVec)
 
     numchgs = length(cidx)
     ret = @grb_ccall(chgcoeffs, Cint, (
-                     Ptr{Void},
+                     Ptr{Cvoid},
                      Cint,
                      Ptr{Cint},
                      Ptr{Cint},
                      Ptr{Float64}),
-                     model, convert(Cint,numchgs), cidx-Cint(1), vidx-Cint(1), val)
+                     model, convert(Cint,numchgs), cidx .- Cint(1), vidx .- Cint(1), val)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -351,7 +350,7 @@ function getcoeff!(val::FVec, model::Model, cidx::Integer, vidx::Integer)
     Base.depwarn("getcoeff!(val, model, cidx, vidx) is deprecated. Instead you can retrieve a coefficient without allocating a vector by doing `val = getcoeff(model, cidx, vidx)`", :grb_getcoeff)
     @assert length(val) == 1
     ret = @grb_ccall(getcoeff, Cint, (
-        Ptr{Void},
+        Ptr{Cvoid},
         Cint,
         Cint,
         Ptr{Float64}),
@@ -364,7 +363,7 @@ end
 function getcoeff(model::Model, cidx::Integer, vidx::Integer)
     out = Ref{Float64}()
     ret = @grb_ccall(getcoeff, Cint, (
-        Ptr{Void},
+        Ptr{Cvoid},
         Cint,
         Cint,
         Ref{Float64}),

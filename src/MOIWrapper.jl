@@ -39,7 +39,7 @@ mutable struct Optimizer <: LQOI.LinQuadOptimizer
     LQOI.@LinQuadOptimizerBase(Model)
     env::Env
     params::Dict{String,Any}
-    Optimizer(::Void) = new()
+    Optimizer(::Nothing) = new()
 end
 
 LQOI.LinearQuadraticModel(::Type{Optimizer}, env) = Model(env::Env,"defaultname")
@@ -137,7 +137,7 @@ function LQOI.get_rhs(model::Optimizer, row::Int)
 end
 
 function LQOI.get_linear_constraint(model::Optimizer, row::Int)
-    A = get_constrs(model.inner, row, 1)'
+    A = sparse(get_constrs(model.inner, row, 1)')
     # note: we return 1-index columns
     return A.rowval, A.nzval
 end
@@ -229,7 +229,7 @@ end
 function LQOI.get_quadratic_constraint(model::Optimizer, row::Int)
     affine_cols, affine_coefficients, I, J, V = getqconstr(model.inner, row)
     # note: we return 1-index columns here
-    return affine_cols+1, affine_coefficients, sparse(I+1, J+1, V)
+    return affine_cols .+ 1, affine_coefficients, sparse(I .+ 1, J .+ 1, V)
 end
 
 function LQOI.get_quadratic_rhs(model::Optimizer, row::Int)
@@ -255,7 +255,7 @@ function LQOI.set_linear_objective!(model::Optimizer, columns::Vector{Int}, coef
     update_model!(model.inner)
 end
 
-function LQOI.set_constant_objective!(model::Gurobi, value::Real)
+function LQOI.set_constant_objective!(model::Optimizer, value::Real)
     set_dblattr!(model.inner, "ObjCon", value)
     if num_vars(model.inner) > 0
         # Work-around for https://github.com/JuliaOpt/LinQuadOptInterface.jl/pull/44#issuecomment-409373755
@@ -276,8 +276,8 @@ function LQOI.change_objective_sense!(model::Optimizer, sense::Symbol)
     update_model!(model.inner)
 end
 
-function LQOI.get_linear_objective!(model::Optimizer, x)
-    copy!(x, get_dblattrarray(model.inner, "Obj", 1, num_vars(model.inner)))
+function LQOI.get_linear_objective!(model::Optimizer, dest)
+    get_dblattrarray!(dest, model.inner, "Obj", 1)
 end
 
 function LQOI.get_constant_objective(model::Optimizer)
@@ -523,7 +523,7 @@ You must have the option `LazyConstraints` set  via `Optimizer(LazyConstraint=1)
 This can only be called in a callback from `CB_MIPSOL`.
 """
 function cblazy!(cb_data::CallbackData, m::Optimizer, func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
-    columns      = [Cint(LQOI.getcol(m, term.variable_index)) for term in func.terms]
+    columns      = [Cint(LQOI.get_column(m, term.variable_index)) for term in func.terms]
     coefficients = [term.coefficient for term in func.terms]
     sense        = Char(LQOI.backend_type(m, set))
     rhs          = MOI.Utilities.getconstant(set)

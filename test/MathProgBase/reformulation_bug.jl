@@ -3,7 +3,7 @@ using Gurobi, MathProgBase
 # This problem should error out on Gurobi Versions 6.5.2 and earlier,
 # but pass on later versions
 
-m = MathProgBase.LinearQuadraticModel(GurobiSolver())
+m = MathProgBase.LinearQuadraticModel(GurobiSolver(OutputFlag=0))
 
 # Max           z
 # s.t.  x + y     >= 0

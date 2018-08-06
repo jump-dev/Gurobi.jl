@@ -6,11 +6,12 @@
 #           x +   y       >= 1
 #
 
-using Gurobi, Base.Test
+using Gurobi, Compat.Test
 
 @testset "QP2" begin
 
 	env = Gurobi.Env()
+	setparam!(env, "OutputFlag", 0)
 
 	model = gurobi_model(env;
 		name = "qp_02",

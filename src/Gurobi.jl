@@ -8,11 +8,13 @@ module Gurobi
         error("Gurobi not properly installed. Please run Pkg.build(\"Gurobi\")")
     end
 
+    using Compat
+    using Compat.SparseArrays
+    using Compat.LinearAlgebra
+
     ### imports
 
     import Base.show, Base.copy, Base.read
-
-    using Compat
 
     # Standard LP interface
     importall MathProgBase.SolverInterface

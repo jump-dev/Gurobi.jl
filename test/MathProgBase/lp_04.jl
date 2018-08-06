@@ -15,10 +15,11 @@
 #
 #   solution: x = 1.3333333, y = 1.3333333, objv = 2.66666666
 
-using Gurobi, Base.Test
+using Gurobi, Compat.Test, Compat.GC
 
 @testset "LP 04" begin
     env = Gurobi.Env()
+    setparam!(env, "OutputFlag", 0)
     setparams!(env, Method=2)  # using barrier method
 
     method = getparam(env, "Method")
@@ -102,5 +103,5 @@ using Gurobi, Base.Test
     @test isapprox(get_solution(model), [2.0], atol=1e-4)
     @test isapprox(get_objval(model), 2.0, atol=1e-4)
 
-    gc()  # test finalizers
+    GC.gc()  # test finalizers
 end

@@ -10,7 +10,7 @@
 #         z is binary
 #
 
-using Gurobi, Base.Test
+using Gurobi, Compat.Test
 
 @testset "GRB Attributes" begin
     env = Gurobi.Env()

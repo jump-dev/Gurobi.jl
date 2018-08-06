@@ -10,10 +10,11 @@
 #         z is binary
 #
 
-using Gurobi, Base.Test
+using Gurobi, Compat.Test
 
 @testset "MIP 01" begin
     env = Gurobi.Env()
+    setparam!(env, "OutputFlag", 0)
 
     model = Gurobi.Model(env, "mip_01", :maximize)
 
@@ -24,8 +25,6 @@ using Gurobi, Base.Test
 
     add_constr!(model, ones(3), '<', 10.)
     add_constr!(model, [1., 2., 1.], '<', 15.)
-
-    println(model)
 
     optimize(model)
     @test get_solution(model) == [0.0, 7.0, 1.0]

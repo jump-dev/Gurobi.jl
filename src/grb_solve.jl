@@ -2,7 +2,7 @@
 
 function optimize(model::Model)
     @assert model.ptr_model != C_NULL
-    ret = @grb_ccall(optimize, Cint, (Ptr{Void},), model)
+    ret = @grb_ccall(optimize, Cint, (Ptr{Cvoid},), model)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -11,7 +11,7 @@ end
 
 function computeIIS(model::Model)
     @assert model.ptr_model != C_NULL
-    ret = @grb_ccall(computeIIS, Cint, (Ptr{Void},), model)
+    ret = @grb_ccall(computeIIS, Cint, (Ptr{Cvoid},), model)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -42,7 +42,7 @@ const GRB_INPROGRESS      = 14
 const GRB_USER_OBJ_LIMIT  = 15
 
 const status_symbols = [
-    :loaded, 
+    :loaded,
     :optimal,
     :infeasible,
     :inf_or_unbd,
@@ -77,7 +77,7 @@ get_node_count(model::Model) = convert(Int, get_dblattr(model, "NodeCount"))
 mutable struct OptimInfo
     status::Symbol
     runtime::Float64
-    
+
     sol_count::Int
     iter_count::Int
     barrier_iter_count::Int
@@ -88,7 +88,7 @@ function get_optiminfo(model::Model)
     OptimInfo(
         get_status(model),
         get_runtime(model),
-        
+
         get_sol_count(model),
         get_iter_count(model),
         get_barrier_iter_count(model),
@@ -134,17 +134,17 @@ const basicmap_rev = Dict(
 )
 
 function get_basis(model::Model)
-    cval = Array{Cint}(num_vars(model))
-    cbasis = Array{Symbol}(num_vars(model))
+    cval = Array{Cint}(undef, num_vars(model))
+    cbasis = Array{Symbol}(undef, num_vars(model))
     get_intattrarray!(cval, model, "VBasis", 1)
     for it in 1:length(cval)
         cbasis[it] = varmap[cval[it]]
     end
-    
-    rval = Array{Cint}(num_constrs(model))
-    rbasis = Array{Symbol}(num_constrs(model))
+
+    rval = Array{Cint}(undef, num_constrs(model))
+    rbasis = Array{Symbol}(undef, num_constrs(model))
     get_intattrarray!(rval, model, "CBasis", 1)
-    rsense = Array{Cchar}(num_constrs(model))
+    rsense = Array{Cchar}(undef, num_constrs(model))
     get_charattrarray!(rsense, model, "Sense", 1)
     for it in 1:length(rval)
         rbasis[it] = conmap[rval[it]]
@@ -166,9 +166,9 @@ Load basis to a problem in form of primal solution.
 
     loadbasis(model::Model, rval::Vector{Symbol}, cval::Vector{Symbol})
 
-Load basis to a problem in terms of basicness description
-Variables\columns (in `cval`) can be: `:Basic`, `:NonbasicAtLower`, `:NonbasicAtUpper` and `:Superbasic`
-Constraints\rows (in `rval`) can be: `:Basic`, `:Nonbasic`
+Load basis to a problem in terms of basicness description Variables columns (in
+`cval`) can be: `:Basic`, `:NonbasicAtLower`, `:NonbasicAtUpper` and
+`:Superbasic` Constraints rows (in `rval`) can be: `:Basic`, `:Nonbasic`
 """
 function loadbasis(model::Model, x::Vector)
 
@@ -177,8 +177,8 @@ function loadbasis(model::Model, x::Vector)
 
     length(x) != ncols && error("solution candidate size is different from the number of columns")
 
-    cvals = Array{Cint}( ncols)
-    rvals = Array{Cint}( nrows)
+    cvals = Array{Cint}(undef, ncols)
+    rvals = Array{Cint}(undef, nrows)
 
     # obtain situation of columns
 
@@ -239,4 +239,3 @@ function loadbasis(model::Model, rval::Vector{Cint}, cval::Vector{Cint})
 
     return nothing
 end
-

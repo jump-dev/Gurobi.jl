@@ -10,7 +10,7 @@
 #         p1 is integer: 0 <= p3
 #         z is binary
 
-using Gurobi, Base.Test
+using Gurobi, Compat.Test
 
 @testset "test_read" begin
 # The function read() is used to produce a MIP start vector
@@ -21,6 +21,7 @@ using Gurobi, Base.Test
     #-------------
 
     simple_model_env = Gurobi.Env()
+    setparam!(simple_model_env, "OutputFlag", 0)
 
     simple_model = Gurobi.Model(simple_model_env, "simple_mip", :maximize)
 

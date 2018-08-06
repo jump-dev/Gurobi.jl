@@ -1,4 +1,4 @@
-using Gurobi, MathProgBase, Base.Test
+using Gurobi, MathProgBase, Compat.Test
 
 @testset "Env" begin
     env = Gurobi.Env()

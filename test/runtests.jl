@@ -1,4 +1,7 @@
-using Gurobi, Base.Test
+using Gurobi
+
+using Compat
+using Compat.Test, Compat.SparseArrays, Compat.Random
 
 @testset "C API" begin
     include("c_wrapper.jl")
@@ -25,10 +28,8 @@ const mpb_tests = [
 ]
 
 @testset "MathProgBase Tests" begin
-    for t in mpb_tests
-        fp = "$(t).jl"
-        println("running $(fp) ...")
-        evalfile(joinpath("MathProgBase", fp))
+    for file in mpb_tests
+        evalfile(joinpath("MathProgBase", "$(file).jl"))
     end
 end
 

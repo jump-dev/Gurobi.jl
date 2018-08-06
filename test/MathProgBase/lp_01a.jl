@@ -8,13 +8,13 @@
 #
 #   solution: x = 45, y = 6.25, objv = 51.25
 
-using Gurobi, Base.Test
+using Gurobi, Compat.Test, Compat.GC
 
 @testset "LP 01a" begin
     env = Gurobi.Env()
+    setparam!(env, "OutputFlag", 0)
 
     method = getparam(env, "Method")
-    println("method = $method")
 
     model = Gurobi.Model(env, "lp_01", :maximize)
 
@@ -28,18 +28,14 @@ using Gurobi, Base.Test
     add_constr!(model, [30., 33.], '<', 2100.)
     update_model!(model)
 
-    println(model)
-
     # perform optimization
     optimize(model)
 
     # show results
     info = get_optiminfo(model)
-    println()
-    println(info)
 
     @test get_solution(model) == [45, 6.25]
     @test get_objval(model) == 51.25
 
-    gc()  # test finalizers
+    GC.gc()  # test finalizers
 end
