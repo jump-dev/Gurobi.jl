@@ -165,8 +165,9 @@ end
 function get_constrs(model::Model, start::Integer, len::Integer)
 
     m = num_constrs(model)
-    @assert start <= m
-    @assert len <= m
+    @assert start >= 1
+    @assert len >= 0
+    @assert start + len <= m + 1
     n = num_vars(model)
     numnzP = Array{Cint}(1)
     cbeg = Array{Cint}(len+1)
@@ -300,8 +301,8 @@ function get_sos(model::Model, start::Integer, len::Integer)
     return sparse(I, J, V, m, n), sostype#map(x-> x==Cint(1) ? :SOS1 : :SOS2 ,sostype)
 end
 
-del_constrs!{T<:Real}(model::Model, idx::T) = del_constrs!(model, Cint[idx])
-del_constrs!{T<:Real}(model::Model, idx::Vector{T}) = del_constrs!(model, convert(Vector{Cint},idx))
+del_constrs!(model::Model, idx::T) where {T<:Real} = del_constrs!(model, Cint[idx])
+del_constrs!(model::Model, idx::Vector{T}) where {T<:Real} = del_constrs!(model, convert(Vector{Cint},idx))
 function del_constrs!(model::Model, idx::Vector{Cint})
     numdel = length(idx)
     ret = @grb_ccall(delconstrs, Cint, (

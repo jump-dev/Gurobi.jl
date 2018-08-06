@@ -33,3 +33,18 @@ end
 end
 
 include("constraint_modification.jl")
+
+@testset "Empty constraints (Issue #142)" begin
+    @testset "No variables, no constraints" begin
+        model = Gurobi.Model(Gurobi.Env(), "model")
+        A = Gurobi.get_constrmatrix(model)
+        @test size(A) == (0, 0)
+    end
+    @testset "One variable, no constraints" begin
+        model = Gurobi.Model(Gurobi.Env(), "model")
+        Gurobi.add_cvar!(model, 0.0)
+        Gurobi.update_model!(model)
+        A = Gurobi.get_constrmatrix(model)
+        @test size(A) == (0, 1)
+    end
+end

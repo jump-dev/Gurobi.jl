@@ -6,7 +6,7 @@
 #
 #################################################
 
-type Model
+mutable struct Model
     env::Env
     ptr_model::Ptr{Void}
     callback::Any
