@@ -36,7 +36,7 @@ const SUPPORTED_CONSTRAINTS = [
 ]
 
 mutable struct GurobiOptimizer <: LQOI.LinQuadOptimizer
-    LQOI.@LinQuadOptimizerBase
+    LQOI.@LinQuadOptimizerBase(Model)
     env::Env
     params::Dict{String,Any}
     GurobiOptimizer(::Void) = new()

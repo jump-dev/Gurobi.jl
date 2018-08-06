@@ -190,6 +190,12 @@ end
     end
 end
 
+@testset "LQOI Issue #38" begin
+    # https://github.com/JuliaOpt/LinQuadOptInterface.jl/issues/38#issuecomment-407625187
+    _getinner(opt::GurobiOptimizer) = opt.inner
+    @inferred _getinner(GurobiOptimizer())
+end
+
 @testset "User limit handling (issue #140)" begin
     # Verify that we return the correct status codes when a mixed-integer
     # problem has been solved to a *feasible* but not necessarily optimal
