@@ -41,20 +41,23 @@ fvecx(v::Vector{T}, n::Integer) where {T<:Real} = (_chklen(v, n); convert(Vector
 
 # empty vector & matrix (for the purpose of supplying default arguments)
 
-const emptyfvec = Array{Float64}(0)
-const emptyfmat = Array{Float64}(0, 0)
+const emptyfvec = Array{Float64}(undef, 0)
+const emptyfmat = Array{Float64}(undef, 0, 0)
 
 # macro to call a Gurobi C function
 macro grb_ccall(func, args...)
     f = "GRB$(func)"
     args = map(esc,args)
-    is_unix() && return quote
-        ccall(($f,libgurobi), $(args...))
+    if Compat.Sys.isunix()
+        return quote
+            ccall(($f,libgurobi), $(args...))
+        end
+    elseif Compat.Sys.iswindows()
+        return quote
+            ccall(($f,libgurobi), $(esc(:stdcall)), $(args...))
+        end
     end
-    false
-    is_windows() && return quote
-        ccall(($f,libgurobi), $(esc(:stdcall)), $(args...))
-    end
+    error("System not recognised.s")
 end
 
 
@@ -63,7 +66,7 @@ function getlibversion()
     _major = Cint[0]
     _minor = Cint[0]
     _tech = Cint[0]
-    @grb_ccall(version, Void, (Ptr{Cint}, Ptr{Cint}, Ptr{Cint}), _major, _minor, _tech)
+    @grb_ccall(version, Nothing, (Ptr{Cint}, Ptr{Cint}, Ptr{Cint}), _major, _minor, _tech)
     return VersionNumber(_major[1], _minor[1], _tech[1])
 end
 
@@ -78,10 +81,11 @@ function checkvalue(x::Real, bound)
 end
 checkvalue(x::Vector, bound) = any(checkvalue(c, bound) for c in x)
 
-_objwarning(c) = warn("""Gurobi will silently silently truncate objective coefficients >$(GRB_INFINITY) or <-$(GRB_INFINITY).
-Current objective coefficient extrema: $(extrema(c))""")
+_objwarning(c) = Compat.@warn("Gurobi will silently silently truncate " *
+    "objective coefficients >$(GRB_INFINITY) or <-$(GRB_INFINITY). Current " *
+    "objective coefficient extrema: $(extrema(c))")
 
-_boundwarning(lb, ub) = warn("""Gurobi has implicit variable bounds of [-1e30, 1e30].
-Settings variable bounds outside this can cause infeasibility or unboundedness.
-Current lower bound extrema: $(extrema(lb))
-Current upper bound extrema: $(extrema(ub))""")
+_boundwarning(lb, ub) = Compat.@warn("Gurobi has implicit variable bounds of " *
+    "[-1e30, 1e30]. Settings variable bounds outside this can cause " *
+    "infeasibility or unboundedness. Current lower bound extrema: " *
+    "$(extrema(lb)). Current upper bound extrema: $(extrema(ub))")

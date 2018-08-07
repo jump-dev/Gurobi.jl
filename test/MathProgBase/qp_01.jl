@@ -8,11 +8,12 @@
 #    solution: (0.25, 0.75), objv = 1.875
 #
 
-using Gurobi, Base.Test
+using Gurobi, Compat.Test
 
 @testset "QP1" begin
 
     env = Gurobi.Env()
+    setparam!(env, "OutputFlag", 0)
 
     model = Gurobi.Model(env, "qp_01")
 
@@ -22,8 +23,6 @@ using Gurobi, Base.Test
     add_qpterms!(model, [1, 1, 2], [1, 2, 2], [2., 1., 1.])
     add_constr!(model, [1., 1.], '=', 1.)
     update_model!(model)
-
-    println(model)
 
     optimize(model)
 

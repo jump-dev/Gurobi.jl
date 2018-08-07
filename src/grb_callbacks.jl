@@ -1,11 +1,11 @@
 # Gurobi callbacks
 
 mutable struct CallbackData
-    cbdata::Ptr{Void}
+    cbdata::Ptr{Cvoid}
     model::Model
 end
 
-function gurobi_callback_wrapper(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, userdata::Ptr{Void})
+function gurobi_callback_wrapper(ptr_model::Ptr{Cvoid}, cbdata::Ptr{Cvoid}, where::Cint, userdata::Ptr{Cvoid})
     (callback,model) = unsafe_pointer_to_objref(userdata)::Tuple{Function,Model}
     callback(CallbackData(cbdata,model), where)
     return convert(Cint,0)
@@ -16,9 +16,9 @@ end
 
 function set_callback_func!(model::Model, callback::Function)
 
-    grbcallback = cfunction(gurobi_callback_wrapper, Cint, (Ptr{Void}, Ptr{Void}, Cint, Ptr{Void}))
+    grbcallback = @cfunction(gurobi_callback_wrapper, Cint, (Ptr{Cvoid}, Ptr{Cvoid}, Cint, Ptr{Cvoid}))
     usrdata = (callback,model)
-    ret = @grb_ccall(setcallbackfunc, Cint, (Ptr{Void}, Ptr{Void}, Any), model.ptr_model, grbcallback, usrdata)
+    ret = @grb_ccall(setcallbackfunc, Cint, (Ptr{Cvoid}, Ptr{Cvoid}, Any), model.ptr_model, grbcallback, usrdata)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -37,8 +37,8 @@ for f in (:cbcut, :cblazy)
         len = length(ind)
         @assert length(val) == len
 
-        ret = @grb_ccall($f, Cint, (Ptr{Void},Cint,Ptr{Cint},Ptr{Float64},
-            Char,Float64), cbdata.cbdata, len, ind-Cint(1), val, sense, rhs)
+        ret = @grb_ccall($f, Cint, (Ptr{Cvoid},Cint,Ptr{Cint},Ptr{Float64},
+            Cchar,Float64), cbdata.cbdata, len, ind.-Cint(1), val, sense, rhs)
         if ret != 0
             throw(GurobiError(cbdata.model.env, ret))
         end
@@ -53,10 +53,10 @@ function cbsolution(cbdata::CallbackData, sol::Vector{Float64})
     objP = Ref{Float64}()
 
     if version >= v"7.0.0"
-        ret = @grb_ccall(cbsolution, Cint, (Ptr{Void},Ptr{Float64},Ref{Float64}),
+        ret = @grb_ccall(cbsolution, Cint, (Ptr{Cvoid},Ptr{Float64},Ref{Float64}),
             cbdata.cbdata, sol, objP)
     else
-        ret = @grb_ccall(cbsolution, Cint, (Ptr{Void},Ptr{Float64}),
+        ret = @grb_ccall(cbsolution, Cint, (Ptr{Cvoid},Ptr{Float64}),
             cbdata.cbdata, sol)
     end
     if ret != 0
@@ -67,13 +67,13 @@ end
 
 function cbget(::Type{T},cbdata::CallbackData, where::Cint, what::Integer) where T
 
-    out = Array{T}(1)
-    ret = @grb_ccall(cbget, Cint, (Ptr{Void}, Cint, Cint, Ptr{T}),
+    out = Ref{T}()
+    ret = @grb_ccall(cbget, Cint, (Ptr{Cvoid}, Cint, Cint, Ptr{T}),
         cbdata.cbdata, where, convert(Cint,what), out)
     if ret != 0
         throw(GurobiError(cbdata.model.env, ret))
     end
-    return out[1]
+    return out[]
 end
 
 
@@ -143,7 +143,7 @@ for (fname, what) in ((:cbget_mipsol_sol, 4001), (:cbget_mipnode_rel, 5002))
     @eval function ($fname)(cbdata::CallbackData, where::Cint, out::Vector{Float64})
         nvar = num_vars(cbdata.model)
         @assert length(out) >= nvar
-        ret = @grb_ccall(cbget, Cint, (Ptr{Void}, Cint, Cint, Ptr{Float64}),
+        ret = @grb_ccall(cbget, Cint, (Ptr{Cvoid}, Cint, Cint, Ptr{Float64}),
                          cbdata.cbdata, where, $what, out)
         if ret != 0
             throw(GurobiError(cbdata.model.env, ret))
@@ -151,7 +151,7 @@ for (fname, what) in ((:cbget_mipsol_sol, 4001), (:cbget_mipnode_rel, 5002))
     end
     @eval function ($fname)(cbdata::CallbackData, where::Cint)
         nvar = num_vars(cbdata.model)
-        out = Array{Float64}(nvar)
+        out = Array{Float64}(undef, nvar)
         ($fname)(cbdata, where, out)
         return out
     end

@@ -15,7 +15,7 @@ function add_var!(model::Model, numnz::Integer, vind::Vector, vval::Vector{Float
         _boundwarning(lb, ub)
     end
     ret = @grb_ccall(addvar, Cint, (
-        Ptr{Void},    # model
+        Ptr{Cvoid},    # model
         Cint,         # numnz
         Ptr{Cint},    # vind
         Ptr{Float64}, # vval
@@ -25,7 +25,7 @@ function add_var!(model::Model, numnz::Integer, vind::Vector, vval::Vector{Float
         UInt8,        # vtype
         Ptr{UInt8}    # name
         ),
-        model, numnz, ivec(vind-1), vval, c, lb, ub, vtype, C_NULL)
+        model, numnz, ivec(vind.-1), vval, c, lb, ub, vtype, C_NULL)
 
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -41,7 +41,7 @@ function add_var!(model::Model, vtype::Cchar, c::Float64, lb::Float64, ub::Float
         _boundwarning(lb, ub)
     end
     ret = @grb_ccall(addvar, Cint, (
-        Ptr{Void},    # model
+        Ptr{Cvoid},    # model
         Cint,         # numnz
         Ptr{Cint},    # vind
         Ptr{Float64}, # vval
@@ -88,7 +88,7 @@ function add_vars!(model::Model, vtypes::CVec, c::FVec, lb::FVec, ub::FVec)
 
     # main call
     ret = @grb_ccall(addvars, Cint, (
-        Ptr{Void},  # model
+        Ptr{Cvoid},  # model
         Cint,       # numvars
         Cint,       # numnz
         Ptr{Cint},  # vbeg
@@ -126,10 +126,10 @@ del_vars!(model::Model, idx::Vector{T}) where {T<:Real} = del_vars!(model, conve
 function del_vars!(model::Model, idx::Vector{Cint})
     numdel = length(idx)
     ret = @grb_ccall(delvars, Cint, (
-                     Ptr{Void},
+                     Ptr{Cvoid},
                      Cint,
                      Ptr{Cint}),
-                     model, convert(Cint,numdel), idx-Cint(1))
+                     model, convert(Cint,numdel), idx.-Cint(1))
     if ret != 0
         throw(GurobiError(model.env, ret))
     end

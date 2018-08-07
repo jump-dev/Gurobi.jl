@@ -1,4 +1,4 @@
-using Gurobi, Base.Test
+using Gurobi, Compat.Test
 
 @testset "GRB String Attributes" begin
     # enviroment and problem

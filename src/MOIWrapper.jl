@@ -1,10 +1,10 @@
-export GurobiOptimizer
-
 using LinQuadOptInterface
+
 const LQOI = LinQuadOptInterface
 const MOI  = LQOI.MOI
 
 const SUPPORTED_OBJECTIVES = [
+    LQOI.SinVar,
     LQOI.Linear,
     LQOI.Quad
 ]
@@ -35,157 +35,161 @@ const SUPPORTED_CONSTRAINTS = [
     (LQOI.VecLin, MOI.Zeros)
 ]
 
-mutable struct GurobiOptimizer <: LQOI.LinQuadOptimizer
+mutable struct Optimizer <: LQOI.LinQuadOptimizer
     LQOI.@LinQuadOptimizerBase(Model)
     env::Env
     params::Dict{String,Any}
-    GurobiOptimizer(::Void) = new()
+    Optimizer(::Nothing) = new()
 end
 
-LQOI.LinearQuadraticModel(::Type{GurobiOptimizer},env) = Model(env::Env,"defaultname")
+LQOI.LinearQuadraticModel(::Type{Optimizer}, env) = Model(env::Env,"defaultname")
 
-function GurobiOptimizer(;kwargs...)
-    env = Env()
-    m = GurobiOptimizer(nothing)
-    m.env = env
-    m.params = Dict{String,Any}()
-    MOI.empty!(m)
-    for (name,value) in kwargs
-        m.params[string(name)] = value
-        setparam!(m.inner, string(name), value)
+"""
+    Optimizer(;kwargs...)
+
+Create a new Optimizer object.
+
+Note that we set the parameter `InfUnbdInfo` to `1` rather than the default of
+`0` so that we can query infeasibility certificates. Users are, however, free to
+overide this as follows `Gurobi.Optimizer(InfUndbInfo=0)`.
+"""
+function Optimizer(;kwargs...)
+    model = Optimizer(nothing)
+    model.env = Env()
+    model.params = Dict{String,Any}()
+    MOI.empty!(model)
+    for (name, value) in kwargs
+        model.params[string(name)] = value
+        setparam!(model.inner, string(name), value)
     end
-    return m
+    return model
 end
 
-function MOI.empty!(m::GurobiOptimizer)
-    MOI.empty!(m,m.env)
-    for (name,value) in m.params
-        setparam!(m.inner, name, value)
+function MOI.empty!(model::Optimizer)
+    MOI.empty!(model, model.env)
+    setparam!(model.inner, "InfUnbdInfo", 1)
+    for (name, value) in model.params
+        setparam!(model.inner, name, value)
     end
 end
 
-LQOI.supported_constraints(s::GurobiOptimizer) = SUPPORTED_CONSTRAINTS
-LQOI.supported_objectives(s::GurobiOptimizer)  = SUPPORTED_OBJECTIVES
+LQOI.supported_constraints(::Optimizer) = SUPPORTED_CONSTRAINTS
+LQOI.supported_objectives(::Optimizer)  = SUPPORTED_OBJECTIVES
 
-LQOI.backend_type(m::GurobiOptimizer, ::MOI.EqualTo{Float64})     = Cchar('=')
-LQOI.backend_type(m::GurobiOptimizer, ::MOI.LessThan{Float64})    = Cchar('<')
-LQOI.backend_type(m::GurobiOptimizer, ::MOI.GreaterThan{Float64}) = Cchar('>')
-LQOI.backend_type(m::GurobiOptimizer, ::MOI.Zeros)                = Cchar('=')
-LQOI.backend_type(m::GurobiOptimizer, ::MOI.Nonpositives)         = Cchar('<')
-LQOI.backend_type(m::GurobiOptimizer, ::MOI.Nonnegatives)         = Cchar('>')
+LQOI.backend_type(::Optimizer, ::MOI.EqualTo{Float64})     = Cchar('=')
+LQOI.backend_type(::Optimizer, ::MOI.LessThan{Float64})    = Cchar('<')
+LQOI.backend_type(::Optimizer, ::MOI.GreaterThan{Float64}) = Cchar('>')
+LQOI.backend_type(::Optimizer, ::MOI.Zeros)                = Cchar('=')
+LQOI.backend_type(::Optimizer, ::MOI.Nonpositives)         = Cchar('<')
+LQOI.backend_type(::Optimizer, ::MOI.Nonnegatives)         = Cchar('>')
 
-# TODO - improve single type
-function LQOI.change_variable_bounds!(instance::GurobiOptimizer, colvec, valvec, sensevec)
-    lb_len = count(x->x==Cchar('L'), sensevec)
-    LB_val = Array{Float64}(0)
-    sizehint!(LB_val, lb_len)
-    LB_col = Array{Cint}(0)
-    sizehint!(LB_col, lb_len)
-
-    ub_len = count(x->x==Cchar('U'), sensevec)
-    UB_val = Array{Float64}(0)
-    sizehint!(UB_val, ub_len)
-    UB_col = Array{Cint}(0)
-    sizehint!(UB_col, ub_len)
-
-    for i in eachindex(valvec)
-        if sensevec[i] == Cchar('L')
-            push!(LB_col, colvec[i])
-            push!(LB_val, valvec[i])
-        elseif sensevec[i] == Cchar('U')
-            push!(UB_col, colvec[i])
-            push!(UB_val, valvec[i])
+function LQOI.change_variable_bounds!(model::Optimizer,
+          columns::Vector{Int}, new_bounds::Vector{Float64},
+          senses::Vector{Cchar})
+    number_lower_bounds = count(x->x==Cchar('L'), senses)
+    lower_cols   = fill(0, number_lower_bounds)
+    lower_values = fill(0.0, number_lower_bounds)
+    number_upper_bounds = count(x->x==Cchar('U'), senses)
+    upper_cols   = fill(0, number_upper_bounds)
+    upper_values = fill(0.0, number_upper_bounds)
+    lower_index = 1
+    upper_index = 1
+    for (column, bound, sense) in zip(columns, new_bounds, senses)
+        if sense == Cchar('L')
+            lower_cols[lower_index]   = column
+            lower_values[lower_index] = bound
+            lower_index += 1
+        elseif sense == Cchar('U')
+            upper_cols[upper_index]   = column
+            upper_values[upper_index] = bound
+            upper_index += 1
         end
     end
-
-    if lb_len > 0
-        set_dblattrlist!(instance.inner, "LB", LB_col, LB_val)
+    if number_lower_bounds > 0
+        set_dblattrlist!(model.inner, "LB", lower_cols, lower_values)
     end
-
-    if ub_len > 0
-        set_dblattrlist!(instance.inner, "UB", UB_col, UB_val)
+    if number_upper_bounds > 0
+        set_dblattrlist!(model.inner, "UB", upper_cols, upper_values)
     end
-
-    update_model!(instance.inner)
-    nothing
+    update_model!(model.inner)
 end
 
-function LQOI.get_variable_lowerbound(instance::GurobiOptimizer, column::Int)
-    get_dblattrlist(instance.inner, "LB", Cint[column])[1]
+function LQOI.get_variable_lowerbound(model::Optimizer, column::Int)
+    get_dblattrelement(model.inner, "LB", column)
 end
 
-function LQOI.get_variable_upperbound(instance::GurobiOptimizer, column::Int)
-    get_dblattrlist(instance.inner, "UB", Cint[column])[1]
+function LQOI.get_variable_upperbound(model::Optimizer, column::Int)
+    get_dblattrelement(model.inner, "UB", column)
 end
 
-function LQOI.get_number_linear_constraints(instance::GurobiOptimizer)
-    num_constrs(instance.inner)
+function LQOI.get_number_linear_constraints(model::Optimizer)
+    num_constrs(model.inner)
 end
 
-function LQOI.add_linear_constraints!(instance::GurobiOptimizer,
+function LQOI.add_linear_constraints!(model::Optimizer,
         A::LQOI.CSRMatrix{Float64}, sense::Vector{Cchar}, rhs::Vector{Float64})
-    add_constrs!(instance.inner, A.row_pointers, A.columns, A.coefficients, sense, rhs)
-    update_model!(instance.inner)
+    add_constrs!(model.inner, A.row_pointers, A.columns, A.coefficients, sense, rhs)
+    update_model!(model.inner)
 end
 
-function LQOI.get_rhs(instance::GurobiOptimizer, row::Int)
-    get_dblattrlist( instance.inner, "RHS", Cint[row])[1]
+function LQOI.get_rhs(model::Optimizer, row::Int)
+    get_dblattrelement(model.inner, "RHS", row)
 end
 
-function LQOI.get_linear_constraint(instance::GurobiOptimizer, row::Int)
-    A = get_constrs(instance.inner, row, 1)'
+function LQOI.get_linear_constraint(model::Optimizer, row::Int)
+    A = sparse(get_constrs(model.inner, row, 1)')
     # note: we return 1-index columns
     return A.rowval, A.nzval
 end
 
-function LQOI.change_matrix_coefficient!(instance::GurobiOptimizer, row::Int, col::Int, coef::Float64)
-    chg_coeffs!(instance.inner, row, col, coef)
-    update_model!(instance.inner)
+function LQOI.change_matrix_coefficient!(model::Optimizer, row::Int, col::Int, coef::Float64)
+    chg_coeffs!(model.inner, row, col, coef)
+    update_model!(model.inner)
 end
 
-function LQOI.change_objective_coefficient!(instance::GurobiOptimizer, col::Int, coef::Float64)
-    set_dblattrlist!(instance.inner, "Obj", Cint[col], Float64[coef])
-    update_model!(instance.inner)
+function LQOI.change_objective_coefficient!(model::Optimizer, col::Int, coef::Float64)
+    set_dblattrelement!(model.inner, "Obj", col, coef)
+    update_model!(model.inner)
 end
 
-function LQOI.change_rhs_coefficient!(instance::GurobiOptimizer, row::Int, coef::Float64)
-    set_dblattrlist!(instance.inner, "RHS", Cint[row], Float64[coef])
-    update_model!(instance.inner)
+function LQOI.change_rhs_coefficient!(model::Optimizer, row::Int, coef::Float64)
+    set_dblattrelement!(model.inner, "RHS", row, coef)
+    update_model!(model.inner)
 end
 
-function LQOI.delete_linear_constraints!(instance::GurobiOptimizer, first_row::Int, last_row::Int)
-    del_constrs!(instance.inner, collect(first_row:last_row))
-    update_model!(instance.inner)
+function LQOI.delete_linear_constraints!(model::Optimizer, first_row::Int, last_row::Int)
+    del_constrs!(model.inner, collect(first_row:last_row))
+    update_model!(model.inner)
 end
 
-function LQOI.delete_quadratic_constraints!(instance::GurobiOptimizer, first_row::Int, last_row::Int)
-    delqconstrs!(instance.inner, collect(first_row:last_row))
-    update_model!(instance.inner)
+function LQOI.delete_quadratic_constraints!(model::Optimizer, first_row::Int, last_row::Int)
+    delqconstrs!(model.inner, collect(first_row:last_row))
+    update_model!(model.inner)
 end
 
-function LQOI.change_variable_types!(instance::GurobiOptimizer, columns::Vector{Int}, vtypes::Vector{Cchar})
-    set_charattrlist!(instance.inner, "VType", Cint.(columns), vtypes)
-    update_model!(instance.inner)
+function LQOI.change_variable_types!(model::Optimizer, columns::Vector{Int}, vtypes::Vector{Cchar})
+    set_charattrlist!(model.inner, "VType", Cint.(columns), vtypes)
+    update_model!(model.inner)
 end
 
-function LQOI.change_linear_constraint_sense!(instance::GurobiOptimizer, rows::Vector{Int}, senses::Vector{Cchar})
-    set_charattrlist!(instance.inner, "Sense", Cint.(rows), senses)
-    update_model!(instance.inner)
+function LQOI.change_linear_constraint_sense!(model::Optimizer, rows::Vector{Int}, senses::Vector{Cchar})
+    set_charattrlist!(model.inner, "Sense", Cint.(rows), senses)
+    update_model!(model.inner)
 end
 
-function LQOI.add_sos_constraint!(instance::GurobiOptimizer, columns::Vector{Int}, weights::Vector{Float64}, sos_type)
-    add_sos!(instance.inner, sos_type, columns, weights)
-    update_model!(instance.inner)
+function LQOI.add_sos_constraint!(model::Optimizer, columns::Vector{Int}, weights::Vector{Float64}, sos_type)
+    add_sos!(model.inner, sos_type, columns, weights)
+    update_model!(model.inner)
 end
 
-function LQOI.delete_sos!(instance::GurobiOptimizer, first_row::Int, last_row::Int)
-    del_sos!(instance.inner, Cint.(first_row:last_row))
-    update_model!(instance.inner)
+function LQOI.delete_sos!(model::Optimizer, first_row::Int, last_row::Int)
+    del_sos!(model.inner, Cint.(first_row:last_row))
+    update_model!(model.inner)
 end
 
 # TODO improve getting processes
-function LQOI.get_sos_constraint(instance::GurobiOptimizer, idx)
-    A, types = get_sos_matrix(instance.inner)
+function LQOI.get_sos_constraint(model::Optimizer, idx)
+    A, types = get_sos_matrix(model.inner)
     line = A[idx,:] #sparse vec
     cols = line.nzind
     vals = line.nzval
@@ -193,8 +197,8 @@ function LQOI.get_sos_constraint(instance::GurobiOptimizer, idx)
     return cols, vals, typ
 end
 
-function LQOI.get_number_quadratic_constraints(instance::GurobiOptimizer)
-    num_qconstrs(instance.inner)
+function LQOI.get_number_quadratic_constraints(model::Optimizer)
+    num_qconstrs(model.inner)
 end
 
 function scalediagonal!(V, I, J, scale)
@@ -211,122 +215,126 @@ function scalediagonal!(V, I, J, scale)
         end
     end
 end
-function LQOI.add_quadratic_constraint!(instance::GurobiOptimizer,
+function LQOI.add_quadratic_constraint!(model::Optimizer,
         affine_columns::Vector{Int}, affine_coefficients::Vector{Float64},
         rhs::Float64, sense::Cchar,
         I::Vector{Int}, J::Vector{Int}, V::Vector{Float64})
     @assert length(I) == length(J) == length(V)
     scalediagonal!(V, I, J, 0.5)
-    add_qconstr!(instance.inner, affine_columns, affine_coefficients, I, J, V, sense, rhs)
+    add_qconstr!(model.inner, affine_columns, affine_coefficients, I, J, V, sense, rhs)
     scalediagonal!(V, I, J, 2.0)
-    update_model!(instance.inner)
+    update_model!(model.inner)
 end
 
-function LQOI.get_quadratic_constraint(instance::GurobiOptimizer, row::Int)
-    affine_cols, affine_coefficients, I, J, V = getqconstr(instance.inner, row)
+function LQOI.get_quadratic_constraint(model::Optimizer, row::Int)
+    affine_cols, affine_coefficients, I, J, V = getqconstr(model.inner, row)
     # note: we return 1-index columns here
-    return affine_cols+1, affine_coefficients, sparse(I+1, J+1, V)
+    return affine_cols .+ 1, affine_coefficients, sparse(I .+ 1, J .+ 1, V)
 end
 
-function LQOI.get_quadratic_rhs(instance::GurobiOptimizer, row::Int)
-    get_dblattrelement(instance.inner, "QCRHS", row)
+function LQOI.get_quadratic_rhs(model::Optimizer, row::Int)
+    get_dblattrelement(model.inner, "QCRHS", row)
 end
 
-function LQOI.set_quadratic_objective!(instance::GurobiOptimizer, I::Vector{Int}, J::Vector{Int}, V::Vector{Float64})
+function LQOI.set_quadratic_objective!(model::Optimizer, I::Vector{Int}, J::Vector{Int}, V::Vector{Float64})
     @assert length(I) == length(J) == length(V)
-    delq!(instance.inner)
+    delq!(model.inner)
     scalediagonal!(V, I, J, 0.5)
-    add_qpterms!(instance.inner, I, J, V)
+    add_qpterms!(model.inner, I, J, V)
     scalediagonal!(V, I, J, 2.0)
-    update_model!(instance.inner)
+    update_model!(model.inner)
 end
 
-function LQOI.set_linear_objective!(instance::GurobiOptimizer, columns::Vector{Int}, coefficients::Vector{Float64})
-    nvars = num_vars(instance.inner)
+function LQOI.set_linear_objective!(model::Optimizer, columns::Vector{Int}, coefficients::Vector{Float64})
+    nvars = num_vars(model.inner)
     obj = zeros(Float64, nvars)
     for (col, coef) in zip(columns, coefficients)
         obj[col] += coef
     end
-    set_dblattrarray!(instance.inner, "Obj", 1, num_vars(instance.inner), obj)
-    update_model!(instance.inner)
+    set_dblattrarray!(model.inner, "Obj", 1, num_vars(model.inner), obj)
+    update_model!(model.inner)
 end
 
-function LQOI.set_constant_objective!(instance::GurobiOptimizer, value::Real)
-    set_dblattr!(instance.inner, "ObjCon", value)
-    if num_vars(instance.inner) > 0
+function LQOI.set_constant_objective!(model::Optimizer, value::Real)
+    set_dblattr!(model.inner, "ObjCon", value)
+    if num_vars(model.inner) > 0
         # Work-around for https://github.com/JuliaOpt/LinQuadOptInterface.jl/pull/44#issuecomment-409373755
-        set_dblattrarray!(instance.inner, "Obj", 1, 1,
-            get_dblattrarray(instance.inner, "Obj", 1, 1))
+        set_dblattrarray!(model.inner, "Obj", 1, 1,
+            get_dblattrarray(model.inner, "Obj", 1, 1))
     end
-    update_model!(instance.inner)
+    update_model!(model.inner)
 end
 
-function LQOI.change_objective_sense!(instance::GurobiOptimizer, symbol)
-    if symbol == :min
-        set_sense!(instance.inner, :minimize)
+function LQOI.change_objective_sense!(model::Optimizer, sense::Symbol)
+    if sense == :min
+        set_sense!(model.inner, :minimize)
+    elseif sense == :max
+        set_sense!(model.inner, :maximize)
     else
-        set_sense!(instance.inner, :maximize)
+        error("Invalid objective sense: $(sense)")
     end
-    update_model!(instance.inner)
+    update_model!(model.inner)
 end
 
-function LQOI.get_linear_objective!(instance::GurobiOptimizer, x)
-    copy!(x, get_dblattrarray(instance.inner, "Obj", 1, num_vars(instance.inner)))
+function LQOI.get_linear_objective!(model::Optimizer, dest)
+    get_dblattrarray!(dest, model.inner, "Obj", 1)
 end
 
-function LQOI.get_constant_objective(instance::GurobiOptimizer)
-    get_dblattr(instance.inner, "ObjCon")
+function LQOI.get_constant_objective(model::Optimizer)
+    get_dblattr(model.inner, "ObjCon")
 end
 
-function LQOI.get_objectivesense(instance::GurobiOptimizer)
-    s = model_sense(instance.inner)
-    if s == :maximize
+function LQOI.get_objectivesense(model::Optimizer)
+    sense = model_sense(model.inner)
+    if sense == :maximize
         return MOI.MaxSense
-    else
+    elseif sense == :minimize
         return MOI.MinSense
+    else
+        error("Invalid objective sense: $(sense)")
     end
 end
 
-function LQOI.get_number_variables(instance::GurobiOptimizer)
-    update_model!(instance.inner)
-    num_vars(instance.inner)
+function LQOI.get_number_variables(model::Optimizer)
+    num_vars(model.inner)
 end
 
-function LQOI.add_variables!(instance::GurobiOptimizer, N::Int)
-    add_cvars!(instance.inner, zeros(N))
-    update_model!(instance.inner)
+function LQOI.add_variables!(model::Optimizer, N::Int)
+    add_cvars!(model.inner, zeros(N))
+    update_model!(model.inner)
 end
 
-function LQOI.delete_variables!(instance::GurobiOptimizer, first_col::Int, last_col::Int)
-    del_vars!(instance.inner, Cint.(first_col:last_col))
-    update_model!(instance.inner)
+function LQOI.delete_variables!(model::Optimizer, first_col::Int, last_col::Int)
+    del_vars!(model.inner, Cint.(first_col:last_col))
+    update_model!(model.inner)
 end
 
-function LQOI.add_mip_starts!(instance::GurobiOptimizer, columns::Vector{Int}, starts::Vector{Float64})
-    x = zeros(num_vars(instance.inner))
+function LQOI.add_mip_starts!(model::Optimizer, columns::Vector{Int}, starts::Vector{Float64})
+    x = zeros(num_vars(model.inner))
     for (col, val) in zip(columns, starts)
         x[col] = val
     end
-    loadbasis(instance.inner, x)
+    loadbasis(model.inner, x)
+    update_model!(model.inner)
 end
 
-LQOI.solve_mip_problem!(instance::GurobiOptimizer) = LQOI.solve_linear_problem!(instance)
+LQOI.solve_mip_problem!(model::Optimizer) = LQOI.solve_linear_problem!(model)
 
-LQOI.solve_quadratic_problem!(instance::GurobiOptimizer) = LQOI.solve_linear_problem!(instance)
+LQOI.solve_quadratic_problem!(model::Optimizer) = LQOI.solve_linear_problem!(model)
 
-function LQOI.solve_linear_problem!(instance::GurobiOptimizer)
-    update_model!(instance.inner)
-    optimize(instance.inner)
+function LQOI.solve_linear_problem!(model::Optimizer)
+    update_model!(model.inner)
+    optimize(model.inner)
 end
 
-function LQOI.get_termination_status(instance::GurobiOptimizer)
-    stat = get_status(instance.inner)
+function LQOI.get_termination_status(model::Optimizer)
+    stat = get_status(model.inner)
     if stat == :loaded
         return MOI.OtherError
     elseif stat == :optimal
         return MOI.Success
     elseif stat == :infeasible
-        if hasdualray(instance)
+        if hasdualray(model)
             return MOI.Success
         else
             return MOI.InfeasibleNoResult
@@ -334,7 +342,7 @@ function LQOI.get_termination_status(instance::GurobiOptimizer)
     elseif stat == :inf_or_unbd
         return MOI.InfeasibleOrUnbounded
     elseif stat == :unbounded
-        if hasprimalray(instance)
+        if hasprimalray(model)
             return MOI.Success
         else
             return MOI.UnboundedNoResult
@@ -363,36 +371,33 @@ function LQOI.get_termination_status(instance::GurobiOptimizer)
     return MOI.OtherError
 end
 
-function LQOI.get_primal_status(instance::GurobiOptimizer)
-
-    stat = get_status(instance.inner)
-
+function LQOI.get_primal_status(model::Optimizer)
+    stat = get_status(model.inner)
     if stat == :optimal
         return MOI.FeasiblePoint
     elseif stat == :solution_limit
         return MOI.FeasiblePoint
-    elseif stat in [:inf_or_unbd, :unbounded] && hasprimalray(instance)
+    elseif stat in [:inf_or_unbd, :unbounded] && hasprimalray(model)
         return MOI.InfeasibilityCertificate
     elseif stat == :suboptimal
         return MOI.FeasiblePoint
-    elseif is_mip(instance.inner) && get_sol_count(instance.inner) > 0
+    elseif is_mip(model.inner) && get_sol_count(model.inner) > 0
         return MOI.FeasiblePoint
     else
         return MOI.UnknownResultStatus
     end
 end
 
-function LQOI.get_dual_status(instance::GurobiOptimizer)
-    stat = get_status(instance.inner)
-
-    if is_mip(instance.inner) || is_qcp(instance.inner)
+function LQOI.get_dual_status(model::Optimizer)
+    stat = get_status(model.inner)
+    if is_mip(model.inner) || is_qcp(model.inner)
         return MOI.UnknownResultStatus
     else
         if stat == :optimal
             return MOI.FeasiblePoint
         elseif stat == :solution_limit
             return MOI.FeasiblePoint
-        elseif stat in [:inf_or_unbd, :infeasible] && hasdualray(instance)
+        elseif stat in [:inf_or_unbd, :infeasible] && hasdualray(model)
             return MOI.InfeasibilityCertificate
         elseif stat == :suboptimal
             return MOI.FeasiblePoint
@@ -402,89 +407,107 @@ function LQOI.get_dual_status(instance::GurobiOptimizer)
     end
 end
 
-function LQOI.get_variable_primal_solution!(instance::GurobiOptimizer, result)
-    get_dblattrarray!(result, instance.inner, "X", 1)
+function LQOI.get_variable_primal_solution!(model::Optimizer, result)
+    get_dblattrarray!(result, model.inner, "X", 1)
 end
 
-function LQOI.get_linear_primal_solution!(instance::GurobiOptimizer, result)
-    get_dblattrarray!(result, instance.inner, "Slack", 1)
-    rhs = get_dblattrarray(instance.inner, "RHS", 1, num_constrs(instance.inner))
+function LQOI.get_linear_primal_solution!(model::Optimizer, result)
+    get_dblattrarray!(result, model.inner, "Slack", 1)
+    rhs = get_dblattrarray(model.inner, "RHS", 1, num_constrs(model.inner))
     result .= rhs - result
 end
 
-function LQOI.get_quadratic_primal_solution!(instance::GurobiOptimizer, place)
-    get_dblattrarray!(place, instance.inner, "QCSlack", 1)
-    rhs = get_dblattrarray(instance.inner, "QCRHS", 1, num_qconstrs(instance.inner))
+function LQOI.get_quadratic_primal_solution!(model::Optimizer, place)
+    get_dblattrarray!(place, model.inner, "QCSlack", 1)
+    rhs = get_dblattrarray(model.inner, "QCRHS", 1, num_qconstrs(model.inner))
     place .= rhs - place
 end
 
-function LQOI.get_variable_dual_solution!(instance::GurobiOptimizer, place)
-    get_dblattrarray!(place, instance.inner, "RC", 1)
+function LQOI.get_variable_dual_solution!(model::Optimizer, place)
+    get_dblattrarray!(place, model.inner, "RC", 1)
 end
 
-function LQOI.get_linear_dual_solution!(instance::GurobiOptimizer, place)
-    get_dblattrarray!(place, instance.inner, "Pi", 1)
+function LQOI.get_linear_dual_solution!(model::Optimizer, place)
+    get_dblattrarray!(place, model.inner, "Pi", 1)
 end
 
-function LQOI.get_quadratic_dual_solution!(instance::GurobiOptimizer, place)
-    get_dblattrarray!(place, instance.inner, "QCPi", 1)
+function LQOI.get_quadratic_dual_solution!(model::Optimizer, place)
+    get_dblattrarray!(place, model.inner, "QCPi", 1)
 end
 
-LQOI.get_objective_value(instance::GurobiOptimizer) = get_objval(instance.inner)
-LQOI.get_objective_bound(instance::GurobiOptimizer) = get_objval(instance.inner)
+LQOI.get_objective_value(model::Optimizer) = get_objval(model.inner)
 
-function LQOI.get_relative_mip_gap(instance::GurobiOptimizer)
-    L = get_objval(instance.inner)
-    U = get_objbound(instance.inner)
-    return abs(U-L)/U
+function LQOI.get_objective_bound(model::Optimizer)
+    return get_objbound(model.inner)
 end
 
-LQOI.get_iteration_count(instance::GurobiOptimizer)    = get_iter_count(instance.inner)
-LQOI.get_barrier_iterations(instance::GurobiOptimizer) = get_barrier_iter_count(instance.inner)
-LQOI.get_node_count(instance::GurobiOptimizer)         = get_node_count(instance.inner)
-LQOI.get_farkas_dual!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "FarkasDual", 1)
+function LQOI.get_relative_mip_gap(model::Optimizer)
+    value = LQOI.get_objective_value(model)
+    bound = LQOI.get_objective_bound(model)
+    return abs(value - bound) / abs(bound)
+end
 
-function hasdualray(instance::GurobiOptimizer)
+function LQOI.get_iteration_count(instance::Optimizer)
+    return get_iter_count(instance.inner)
+end
+
+function LQOI.get_barrier_iterations(instance::Optimizer)
+    return get_barrier_iter_count(instance.inner)
+end
+
+function LQOI.get_node_count(instance::Optimizer)
+    return get_node_count(instance.inner)
+end
+
+function LQOI.get_farkas_dual!(instance::Optimizer, place)
+    get_dblattrarray!(place, instance.inner, "FarkasDual", 1)
+    place .*= -1.0
+end
+
+# TODO(odow): remove try/catch
+function hasdualray(model::Optimizer)
     try
-        get_dblattrarray(instance.inner, "FarkasDual", 1, num_constrs(instance.inner))
+        get_dblattrarray(model.inner, "FarkasDual", 1, num_constrs(model.inner))
         return true
     catch
         return false
     end
 end
 
-LQOI.get_unbounded_ray!(instance::GurobiOptimizer, place) = get_dblattrarray!(place, instance.inner, "UnbdRay", 1)
+function LQOI.get_unbounded_ray!(model::Optimizer, place)
+    get_dblattrarray!(place, model.inner, "UnbdRay", 1)
+end
 
-function hasprimalray(instance::GurobiOptimizer)
+# TODO(odow): remove try/catch
+function hasprimalray(model::Optimizer)
     try
-        get_dblattrarray(instance.inner, "UnbdRay", 1, num_vars(instance.inner))
+        get_dblattrarray(model.inner, "UnbdRay", 1, num_vars(model.inner))
         return true
     catch
         return false
     end
 end
 
-MOI.free!(m::GurobiOptimizer) = free_model(m.inner)
-
+MOI.free!(m::Optimizer) = free_model(m.inner)
 
 # ==============================================================================
 #    Callbacks in Gurobi
 # ==============================================================================
 struct CallbackFunction <: MOI.AbstractOptimizerAttribute end
-function MOI.set!(m::GurobiOptimizer, ::CallbackFunction, f::Function)
+function MOI.set!(m::Optimizer, ::CallbackFunction, f::Function)
     set_callback_func!(m.inner, f)
     update_model!(m.inner)
 end
 
 """
-    loadcbsolution!(m::GurobiOptimizer, cb_data::GurobiCallbackData, cb_where::Int)
+    loadcbsolution!(m::Optimizer, cb_data::GurobiCallbackData, cb_where::Int)
 
 Load the variable primal solution in a callback.
 
 This can only be called in a callback from `CB_MIPSOL`. After it is called, you
 can access the `VariablePrimal` attribute as usual.
 """
-function loadcbsolution!(m::GurobiOptimizer, cb_data::CallbackData, cb_where::Cint)
+function loadcbsolution!(m::Optimizer, cb_data::CallbackData, cb_where::Cint)
     if cb_where != CB_MIPSOL
         error("loadcbsolution! can only be called from CB_MIPSOL.")
     end
@@ -492,15 +515,15 @@ function loadcbsolution!(m::GurobiOptimizer, cb_data::CallbackData, cb_where::Ci
 end
 
 """
-    cblazy!(cb_data::Gurobi.CallbackData, m::GurobiOptimizer, func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
+    cblazy!(cb_data::Gurobi.CallbackData, m::Optimizer, func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
 
 Add a lazy cut to the model `m`.
 
-You must have the option `LazyConstraints` set  via `GurobiOptimizer(LazyConstraint=1)`.
+You must have the option `LazyConstraints` set  via `Optimizer(LazyConstraint=1)`.
 This can only be called in a callback from `CB_MIPSOL`.
 """
-function cblazy!(cb_data::CallbackData, m::GurobiOptimizer, func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
-    columns      = [Cint(LQOI.getcol(m, term.variable_index)) for term in func.terms]
+function cblazy!(cb_data::CallbackData, m::Optimizer, func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
+    columns      = [Cint(LQOI.get_column(m, term.variable_index)) for term in func.terms]
     coefficients = [term.coefficient for term in func.terms]
     sense        = Char(LQOI.backend_type(m, set))
     rhs          = MOI.Utilities.getconstant(set)

@@ -1,9 +1,10 @@
 # Test get/set objective coefficients in LP
 
-using Gurobi, Base.Test
+using Gurobi, Compat.Test, Compat.GC
 
 @testset "LP 03" begin
 	env = Gurobi.Env()
+	setparam!(env, "OutputFlag", 0)
 
 	# original model
 	#
@@ -18,8 +19,6 @@ using Gurobi, Base.Test
 		f=[2.0, 2.0],
 		lb=[0.2, 0.2],
 		ub=[1.0, 1.0])
-
-	println(model)
 
 	lb_ = lowerbounds(model)
 	ub_ = upperbounds(model)
@@ -52,5 +51,5 @@ using Gurobi, Base.Test
 	@test get_solution(model) == [1.0, 0.2]
 	@test get_objval(model) == 0.8
 
-	gc()
+	GC.gc()
 end

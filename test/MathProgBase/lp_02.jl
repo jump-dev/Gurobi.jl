@@ -11,11 +11,12 @@
 #   objv: 71818.1818
 #
 
-using MathProgBase, Gurobi, Base.Test
+using MathProgBase, Gurobi, Compat.Test
 
 @testset "LP 02" begin
 
 	env = Gurobi.Env()
+	setparam!(env, "OutputFlag", 0)
 
 	model = gurobi_model(env;
 		name="lp_02",
@@ -24,8 +25,6 @@ using MathProgBase, Gurobi, Base.Test
 		A = [-1. 1.5; 12. 8.; 1000. 300.],
 		b = [0., 1000., 70000.],
 		lb = [0., 30.])
-
-	println(model)
 
 	optimize(model)
 

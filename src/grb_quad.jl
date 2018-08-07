@@ -7,13 +7,13 @@ function add_qpterms!(model::Model, qr::IVec, qc::IVec, qv::FVec)
 
     if nnz > 0
         ret = @grb_ccall(addqpterms, Cint, (
-            Ptr{Void},    # model
+            Ptr{Cvoid},    # model
             Cint,         # nnz
             Ptr{Cint},    # qrow
             Ptr{Cint},    # qcol
             Ptr{Float64}, # qval
             ),
-            model, nnz, qr-Cint(1), qc-Cint(1), qv)
+            model, nnz, qr.-Cint(1), qc.-Cint(1), qv)
 
         if ret != 0
             throw(GurobiError(model.env, ret))
@@ -32,9 +32,9 @@ function add_qpterms!(model, H::SparseMatrixCSC{Float64}) # H must be symmetric
     (H.m == n && H.n == n) || error("H must be an n-by-n symmetric matrix.")
 
     nnz_h = nnz(H)
-    qr = Array{Cint}(nnz_h)
-    qc = Array{Cint}(nnz_h)
-    qv = Array{Float64}(nnz_h)
+    qr = Array{Cint}(undef, nnz_h)
+    qc = Array{Cint}(undef, nnz_h)
+    qv = Array{Float64}(undef, nnz_h)
     k = 0
 
     colptr::Vector{Int} = H.colptr
@@ -67,9 +67,9 @@ function add_qpterms!(model, H::Matrix{Float64}) # H must be symmetric
     size(H) == (n, n) || error("H must be an n-by-n symmetric matrix.")
 
     nmax = round(Int,n * (n + 1) / 2)
-    qr = Array{Cint}(nmax)
-    qc = Array{Cint}(nmax)
-    qv = Array{Float64}(nmax)
+    qr = Array{Cint}(undef, nmax)
+    qc = Array{Cint}(undef, nmax)
+    qv = Array{Float64}(undef, nmax)
     k::Int = 0
 
     for i = 1 : n
@@ -112,7 +112,7 @@ end
 
 function delq!(model::Model)
     ret = @grb_ccall(delq, Cint, (
-        Ptr{Void},    # model
+        Ptr{Cvoid},    # model
         ),
         model)
 
@@ -123,13 +123,13 @@ end
 
 function getq(model::Model)
     nz = get_intattr(model, "NumQNZs")
-    rowidx = Array{Cint}(nz)
-    colidx = Array{Cint}(nz)
-    val = Array{Float64}(nz)
-    nzout = Array{Cint}(1)
+    rowidx = Array{Cint}(undef, nz)
+    colidx = Array{Cint}(undef, nz)
+    val = Array{Float64}(undef, nz)
+    nzout = Ref{Cint}()
 
     ret = @grb_ccall(getq, Cint, (
-        Ptr{Void},  # model
+        Ptr{Cvoid},  # model
         Ptr{Cint},  # numqnzP
         Ptr{Cint},  # qrow
         Ptr{Cint},  # qcol
@@ -155,7 +155,7 @@ function add_qconstr!(model::Model, lind::IVec, lval::FVec, qr::IVec, qc::IVec, 
 
     if qnnz > 0 || lnnz > 0
         ret = @grb_ccall(addqconstr, Cint, (
-            Ptr{Void},    # model
+            Ptr{Cvoid},    # model
             Cint,         # lnnz
             Ptr{Cint},    # lind
             Ptr{Float64}, # lval
@@ -167,7 +167,7 @@ function add_qconstr!(model::Model, lind::IVec, lval::FVec, qr::IVec, qc::IVec, 
             Float64,      # rhs
             Ptr{UInt8}    # name
             ),
-            model, lnnz, lind-Cint(1), lval, qnnz, qr-Cint(1), qc-Cint(1), qv, rel, rhs, C_NULL)
+            model, lnnz, lind.-Cint(1), lval, qnnz, qr.-Cint(1), qc.-Cint(1), qv, rel, rhs, C_NULL)
 
         if ret != 0
             throw(GurobiError(model.env, ret))
@@ -183,7 +183,7 @@ function add_qconstr!(model::Model, lind::Vector, lval::Vector, qr::Vector, qc::
 end
 
 function delqconstrs!(model::Model, indices::Vector{Int})
-    ret = @grb_ccall(delqconstrs, Cint, (Ptr{Void}, Cint, Ptr{Cint}), model, length(indices), Cint.(indices-1))
+    ret = @grb_ccall(delqconstrs, Cint, (Ptr{Cvoid}, Cint, Ptr{Cint}), model, length(indices), Cint.(indices.-1))
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -196,7 +196,7 @@ function getqconstr(model::Model, index::Int)
     # arguments.
     affine_nnz    = Cint[0]
     quadratic_nnz = Cint[0]
-    ret = @grb_ccall(getqconstr, Cint, (Ptr{Void}, Cint,  # model, constraint
+    ret = @grb_ccall(getqconstr, Cint, (Ptr{Cvoid}, Cint,  # model, constraint
         Ptr{Cint}, Ptr{Cint}, Ptr{Float64},                  # affine terms
         Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Float64}        # quadratic terms
         ),
@@ -213,7 +213,7 @@ function getqconstr(model::Model, index::Int)
     quadratic_cols  = fill(Cint(0), quadratic_nnz[1])
     quadratic_coefs = fill(0.0, quadratic_nnz[1])
 
-    ret = @grb_ccall(getqconstr, Cint, (Ptr{Void}, Cint,  # model, constraint
+    ret = @grb_ccall(getqconstr, Cint, (Ptr{Cvoid}, Cint,  # model, constraint
         Ptr{Cint}, Ptr{Cint}, Ptr{Float64},                  # affine terms
         Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Float64}        # quadratic terms
         ),

@@ -112,6 +112,13 @@ function loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
     m.ub = getconstrUB(m)
 end
 
+if VERSION >= v"0.7-"
+    function loadproblem!(m::GurobiMathProgModel, A::Compat.LinearAlgebra.Adjoint{T, Array{T, 2}},
+                          collb, colub, obj, rowlb, rowub, sense) where T
+        loadproblem!(m, collect(A), collb, colub, obj, rowlb, rowub, sense)
+    end
+end
+
 function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
   # throw away old model but keep env and finalize_env
   env = m.inner.env
@@ -133,14 +140,15 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   # slack variables automatically added by gurobi.
   rangeconstrs = sum((rowlb .!= rowub) .& (rowlb .> neginf) .& (rowub .< posinf))
   if rangeconstrs > 0
-      warn("Julia Gurobi interface doesn't properly support range (two-sided) constraints. See Gurobi.jl issue #14")
+      Compat.@warn("Julia Gurobi interface doesn't properly support range " *
+                   "(two-sided) constraints. See Gurobi.jl issue #14")
       add_rangeconstrs!(m.inner, float(A), float(rowlb), float(rowub))
       # A work around for the additional slack variables introduced and the
       # reformulation bug warning
       append!(obj, zeros(rangeconstrs))
   else
-      b = Array{Float64}(length(rowlb))
-      senses = Array{Cchar}(length(rowlb))
+      b = Array{Float64}(undef, length(rowlb))
+      senses = Array{Cchar}(undef, length(rowlb))
       for i in 1:length(rowlb)
           if rowlb[i] == rowub[i]
               senses[i] = '='
@@ -338,7 +346,7 @@ changecoeffs!(m::GurobiMathProgModel, cidx, vidx, val) = chg_coeffs!(m.inner, ci
 function updatemodel!(m::GurobiMathProgModel)
     update_model!(m.inner)
     if Gurobi.version < v"7.0" && m.obj != getobj(m)
-        warn("""
+        Compat.@warn("""
             You have encountered a known bug in Gurobi. Any information you query from the model may be incorrect.
             This bug has existed since the first version of Gurobi but is fixed in Gurobi v7.0.
 
@@ -649,7 +657,7 @@ end
 # breaking abstraction, define our low-level callback to eliminatate
 # a level of indirection
 
-function mastercallback(ptr_model::Ptr{Void}, cbdata::Ptr{Void}, where::Cint, userdata::Ptr{Void})
+function mastercallback(ptr_model::Ptr{Cvoid}, cbdata::Ptr{Cvoid}, where::Cint, userdata::Ptr{Cvoid})
 
     model = unsafe_pointer_to_objref(userdata)::GurobiMathProgModel
     grbrawcb = CallbackData(cbdata,model.inner)
@@ -706,10 +714,11 @@ end
 # return :Exit to indicate an error
 
 function setmathprogcallback!(model::GurobiMathProgModel)
-
-    is_windows() && (Sys.WORD_SIZE == 64 || error("Callbacks not currently supported on Win32. Use 64-bit Julia with 64-bit Gurobi."))
-    grbcallback = cfunction(mastercallback, Cint, (Ptr{Void}, Ptr{Void}, Cint, Ptr{Void}))
-    ret = @grb_ccall(setcallbackfunc, Cint, (Ptr{Void}, Ptr{Void}, Any), model.inner.ptr_model, grbcallback, model)
+    if Compat.Sys.is_windows() && Sys.WORD_SIZE != 64
+        error("Callbacks not currently supported on Win32. Use 64-bit Julia with 64-bit Gurobi.")
+    end
+    grbcallback = cfunction(mastercallback, Cint, (Ptr{Cvoid}, Ptr{Cvoid}, Cint, Ptr{Cvoid}))
+    ret = @grb_ccall(setcallbackfunc, Cint, (Ptr{Cvoid}, Ptr{Cvoid}, Any), model.inner.ptr_model, grbcallback, model)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end

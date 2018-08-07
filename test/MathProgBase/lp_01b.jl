@@ -8,15 +8,15 @@
 #
 #   solution: x = 45, y = 6.25, objv = 51.25
 
-using Gurobi, Base.Test
+using Gurobi, Compat.Test, Compat.GC
 
 @testset "LP 01b" begin
 
     env = Gurobi.Env()
+    setparam!(env, "OutputFlag", 0)
     setparams!(env, Method=2)  # using barrier method
 
     method = getparam(env, "Method")
-    println("method = $method")
 
     model = Gurobi.Model(env, "lp_01", :maximize)
 
@@ -29,15 +29,11 @@ using Gurobi, Base.Test
         [50., 24., 30., 33.], '<', [2400., 2100.])
     update_model!(model)
 
-    println(model)
-
     # perform optimization
     optimize(model)
 
     # show results
     info = get_optiminfo(model)
-    println()
-    println(info)
 
     sol = get_solution(model)
     @test sol == [45, 6.25]
@@ -45,5 +41,5 @@ using Gurobi, Base.Test
     objv = get_objval(model)
     @test objv == 51.25
 
-    gc()  # test finalizers
+    GC.gc()  # test finalizers
 end

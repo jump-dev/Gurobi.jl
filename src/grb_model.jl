@@ -8,13 +8,22 @@
 
 mutable struct Model
     env::Env
-    ptr_model::Ptr{Void}
+    ptr_model::Ptr{Cvoid}
     callback::Any
     finalize_env::Bool
 
-    function Model(env::Env, p::Ptr{Void}; finalize_env::Bool=false)
+    function Model(env::Env, p::Ptr{Cvoid}; finalize_env::Bool=false)
         model = new(env, p, nothing, finalize_env)
-        finalizer(model, m -> (free_model(m); if m.finalize_env; free_env(m.env); end))
+        if VERSION >= v"0.7-"
+            finalizer(model) do m
+                free_model(m)
+                if m.finalize_env
+                    free_env(m.env)
+                end
+            end
+        else
+            finalizer(model, m -> (free_model(m); if m.finalize_env; free_env(m.env); end))
+        end
         model
     end
 end
@@ -26,10 +35,10 @@ function Model(env::Env, name::String; finalize_env::Bool=false)
     @assert is_valid(env)
     @assert isascii(name)
 
-    a = Array{Ptr{Void}}(1)
+    a = Ref{Ptr{Cvoid}}()
     ret = @grb_ccall(newmodel, Cint, (
-        Ptr{Void},  # env
-        Ptr{Ptr{Void}},  # pointer to model pointer
+        Ptr{Cvoid},  # env
+        Ptr{Ptr{Cvoid}},  # pointer to model pointer
         Ptr{UInt8},  # name
         Cint,  # numvars
         Ptr{Float64}, # obj coeffs
@@ -46,7 +55,7 @@ function Model(env::Env, name::String; finalize_env::Bool=false)
         throw(GurobiError(env, ret))
     end
 
-    Model(env, a[1]; finalize_env=finalize_env)
+    Model(env, a[]; finalize_env=finalize_env)
 end
 
 
@@ -66,19 +75,19 @@ end
 #
 #################################################
 
-Base.unsafe_convert(ty::Type{Ptr{Void}}, model::Model) = model.ptr_model::Ptr{Void}
+Base.unsafe_convert(ty::Type{Ptr{Cvoid}}, model::Model) = model.ptr_model::Ptr{Cvoid}
 
 function free_model(model::Model)
     if model.ptr_model != C_NULL
-        @grb_ccall(freemodel, Void, (Ptr{Void},), model.ptr_model)
+        @grb_ccall(freemodel, Nothing, (Ptr{Cvoid},), model.ptr_model)
         model.ptr_model = C_NULL
     end
 end
 
 function copy(model::Model)
-    pm::Ptr{Void} = C_NULL
+    pm::Ptr{Cvoid} = C_NULL
     if model.ptr_model != C_NULL
-        pm = @grb_ccall(copymodel, Ptr{Void}, (Ptr{Void},), model.ptr_model)
+        pm = @grb_ccall(copymodel, Ptr{Cvoid}, (Ptr{Cvoid},), model.ptr_model)
         if pm == C_NULL
             error("Failed to copy a Gurobi model.")
         end
@@ -88,7 +97,7 @@ end
 
 function update_model!(model::Model)
     @assert model.ptr_model != C_NULL
-    ret = @grb_ccall(updatemodel, Cint, (Ptr{Void},), model.ptr_model)
+    ret = @grb_ccall(updatemodel, Cint, (Ptr{Cvoid},), model.ptr_model)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -97,7 +106,7 @@ end
 
 function reset_model!(model::Model)
     @assert model.ptr_model != C_NULL
-    ret = @grb_ccall(resetmodel, Cint, (Ptr{Void},), model.ptr_model)
+    ret = @grb_ccall(resetmodel, Cint, (Ptr{Cvoid},), model.ptr_model)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -109,7 +118,7 @@ end
 function read(model::Model, filename::String)
     @assert isascii(filename) # TODO: support non-ascii file names
         ret = @grb_ccall(read, Cint,
-        (Ptr{Void}, Ptr{UInt8}),
+        (Ptr{Cvoid}, Ptr{UInt8}),
         model.ptr_model, filename)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -120,20 +129,20 @@ end
 function read_model(model::Model, filename::String)
     @assert isascii(filename) # TODO: support non-ascii file names
     @assert is_valid(model.env)
-    a = Array{Ptr{Void}}(1)
+    a = Ref{Ptr{Cvoid}}()
     ret = @grb_ccall(readmodel, Cint,
-        (Ptr{Void}, Ptr{UInt8}, Ptr{Ptr{Void}}),
+        (Ptr{Cvoid}, Ptr{UInt8}, Ptr{Ptr{Cvoid}}),
         model.env, filename, a)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
-    model.ptr_model = a[1]
+    model.ptr_model = a[]
     nothing
 end
 
 function write_model(model::Model, filename::String)
     @assert isascii(filename) # TODO: support non-ascii file names
-    ret = @grb_ccall(write, Cint, (Ptr{Void}, Ptr{UInt8}),
+    ret = @grb_ccall(write, Cint, (Ptr{Cvoid}, Ptr{UInt8}),
         model.ptr_model, filename)
     if ret != 0
         throw(GurobiError(model.env, ret))
@@ -142,7 +151,7 @@ function write_model(model::Model, filename::String)
 end
 
 function tune_model(model::Model)
-    ret = @grb_ccall(tunemodel, Cint, (Ptr{Void},), model.ptr_model)
+    ret = @grb_ccall(tunemodel, Cint, (Ptr{Cvoid},), model.ptr_model)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
@@ -150,20 +159,20 @@ function tune_model(model::Model)
 end
 
 function get_tune_result!(model::Model,i::Int)
-    ret = @grb_ccall(gettuneresult, Cint, (Ptr{Void}, Cint), model.ptr_model, i)
+    ret = @grb_ccall(gettuneresult, Cint, (Ptr{Cvoid}, Cint), model.ptr_model, i)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
     nothing
 end
 
-terminate(model::Model) = @grb_ccall(terminate, Void, (Ptr{Void},), model.ptr_model)
+terminate(model::Model) = @grb_ccall(terminate, Nothing, (Ptr{Cvoid},), model.ptr_model)
 
 # Presolve the model but don't solve. For some reason this is not
 # documented for the C interface, but is for all the other interfaces.
 # Source: https://twitter.com/iaindunning/status/519620465992556544
 function presolve_model(model::Model)
-    ret = @grb_ccall(presolvemodel, Ptr{Void}, (Ptr{Void},), model.ptr_model)
+    ret = @grb_ccall(presolvemodel, Ptr{Cvoid}, (Ptr{Cvoid},), model.ptr_model)
     if ret == C_NULL
         # Presumably failed to return a model
         error("presolve_model did not return a model")
@@ -173,8 +182,8 @@ end
 
 function fixed_model(model::Model)
     @assert model.ptr_model != C_NULL
-    fixed::Ptr{Void} = C_NULL
-    fixed = @grb_ccall(fixedmodel, Ptr{Void}, (Ptr{Void},), model.ptr_model)
+    fixed::Ptr{Cvoid} = C_NULL
+    fixed = @grb_ccall(fixedmodel, Ptr{Cvoid}, (Ptr{Cvoid},), model.ptr_model)
     if fixed == C_NULL
         error("Unable to create fixed model")
     end
