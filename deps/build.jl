@@ -1,6 +1,6 @@
 using Compat
 @static if VERSION >= v"0.7"
-  using Libdl
+    using Libdl
 end
 
 depsfile = joinpath(dirname(@__FILE__),"deps.jl")
