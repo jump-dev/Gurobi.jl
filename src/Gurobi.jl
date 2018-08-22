@@ -17,7 +17,10 @@ module Gurobi
     import Base.show, Base.copy, Base.read
 
     # Standard LP interface
-    importall MathProgBase.SolverInterface
+    import MathProgBase.SolverInterface:
+        AbstractLinearQuadraticModel,
+        AbstractMathProgSolver,
+        MathProgCallbackData
 
     ### exports
     export
