@@ -1,4 +1,7 @@
-using Libdl
+using Compat
+@static if VERSION >= v"0.7"
+  using Libdl
+end
 
 depsfile = joinpath(dirname(@__FILE__),"deps.jl")
 if isfile(depsfile)
@@ -17,15 +20,15 @@ paths_to_try = copy(aliases)
 
 for a in aliases
     if haskey(ENV, "GUROBI_HOME")
-        if Sys.isunix()
+        if Compat.Sys.isunix()
             push!(paths_to_try, joinpath(ENV["GUROBI_HOME"],"lib",string("lib",a,".so")))
         end
-        if Sys.iswindows()
+        if Compat.Sys.iswindows()
             push!(paths_to_try, joinpath(ENV["GUROBI_HOME"],"bin",string(a,".",Libdl.dlext)))
         end
     end
     # gurobi uses .so on OS X for some reason
-    if Sys.isapple()
+    if Compat.Sys.isapple()
         push!(paths_to_try, string("lib$a.so"))
     end
 end
