@@ -3,7 +3,10 @@
 
 export GurobiSolver
 
-mutable struct GurobiMathProgModel <: AbstractLinearQuadraticModel
+import MathProgBase
+const MPB = MathProgBase
+
+mutable struct GurobiMathProgModel <: MPB.AbstractLinearQuadraticModel
     inner::Model
     last_op_type::Symbol  # To support arbitrary order of addVar/addCon
                           # Two possibilities :Var :Con
@@ -30,10 +33,10 @@ end
 
 function copy(m::GurobiMathProgModel)
 
-    m.lazycb == nothing || Base.warn_once("Callbacks can't be copied, lazy callback ignored")
-    m.cutcb == nothing || Base.warn_once("Callbacks can't be copied, cut callback ignored")
-    m.heuristiccb == nothing || Base.warn_once("Callbacks can't be copied, heuristic callback ignored")
-    m.infocb == nothing || Base.warn_once("Callbacks can't be copied, info callback ignored")
+    m.lazycb == nothing || @Compat.warn("Callbacks can't be copied, lazy callback ignored")
+    m.cutcb == nothing || @Compat.warn("Callbacks can't be copied, cut callback ignored")
+    m.heuristiccb == nothing || @Compat.warn("Callbacks can't be copied, heuristic callback ignored")
+    m.infocb == nothing || @Compat.warn("Callbacks can't be copied, info callback ignored")
 
     return GurobiMathProgModel(copy(m.inner),
                                m.last_op_type,
@@ -60,17 +63,17 @@ function setparams!(m::GurobiMathProgModel)
 end
 
 
-mutable struct GurobiSolver <: AbstractMathProgSolver
+mutable struct GurobiSolver <: MPB.AbstractMathProgSolver
     env
     options
 end
 GurobiSolver(env=nothing; kwargs...) = GurobiSolver(env, kwargs)
-LinearQuadraticModel(s::GurobiSolver) = GurobiMathProgModel(s.env; s.options...)
-ConicModel(s::GurobiSolver) = LPQPtoConicBridge(LinearQuadraticModel(s))
+MPB.LinearQuadraticModel(s::GurobiSolver) = GurobiMathProgModel(s.env; s.options...)
+MPB.ConicModel(s::GurobiSolver) = MPB.LPQPtoConicBridge(MPB.LinearQuadraticModel(s))
 
-supportedcones(::GurobiSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:SOCRotated]
+MPB.supportedcones(::GurobiSolver) = [:Free,:Zero,:NonNeg,:NonPos,:SOC,:SOCRotated]
 
-function setparameters!(s::GurobiSolver; mpboptions...)
+function MPB.setparameters!(s::GurobiSolver; mpboptions...)
     opts = collect(Any,s.options)
     for (optname, optval) in mpboptions
         if optname == :TimeLimit
@@ -87,7 +90,7 @@ function setparameters!(s::GurobiSolver; mpboptions...)
     return
 end
 
-function setparameters!(m::GurobiMathProgModel; mpboptions...)
+function MPB.setparameters!(m::GurobiMathProgModel; mpboptions...)
     for (optname, optval) in mpboptions
         if optname == :TimeLimit
             setparam!(m.inner, "TimeLimit", optval)
@@ -101,9 +104,9 @@ function setparameters!(m::GurobiMathProgModel; mpboptions...)
     end
 end
 
-function loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
+function MPB.loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
     read_model(m.inner, filename)
-    m.obj = getobj(m)
+    m.obj = MPB.getobj(m)
     if checkvalue(m.obj, GRB_INFINITY)
         _objwarning(m.obj)
     end
@@ -113,13 +116,13 @@ function loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
 end
 
 if VERSION >= v"0.7-"
-    function loadproblem!(m::GurobiMathProgModel, A::Compat.LinearAlgebra.Adjoint{T, Array{T, 2}},
+    function MPB.loadproblem!(m::GurobiMathProgModel, A::Compat.LinearAlgebra.Adjoint{T, Array{T, 2}},
                           collb, colub, obj, rowlb, rowub, sense) where T
-        loadproblem!(m, collect(A), collb, colub, obj, rowlb, rowub, sense)
+        MPB.loadproblem!(m, collect(A), collb, colub, obj, rowlb, rowub, sense)
     end
 end
 
-function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
+function MPB.loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
   # throw away old model but keep env and finalize_env
   env = m.inner.env
   finalize_env = m.inner.finalize_env
@@ -169,7 +172,7 @@ function loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub
   m.obj = copy(obj)
   _truncateobj!(m.obj)
   update_model!(m.inner)
-  setsense!(m,sense)
+  MPB.setsense!(m,sense)
 end
 
 function _truncateobj(v::Real)
@@ -185,25 +188,25 @@ function _truncateobj(v::Real)
 end
 _truncateobj!(obj::Vector) = map!(_truncateobj, obj, obj)
 
-writeproblem(m::GurobiMathProgModel, filename::AbstractString) = write_model(m.inner, filename)
+MPB.writeproblem(m::GurobiMathProgModel, filename::AbstractString) = write_model(m.inner, filename)
 
-getvarLB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "LB", 1, num_vars(m.inner))
-function setvarLB!(m::GurobiMathProgModel, l)
+MPB.getvarLB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "LB", 1, num_vars(m.inner))
+function MPB.setvarLB!(m::GurobiMathProgModel, l)
     if checkvalue(l, GRB_BOUNDMAX)
         _boundwarning(l, getvarUB(m))
     end
     set_dblattrarray!(m.inner, "LB", 1, num_vars(m.inner), l)
 end
 
-getvarUB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "UB", 1, num_vars(m.inner))
-function setvarUB!(m::GurobiMathProgModel, u)
+MPB.getvarUB(m::GurobiMathProgModel)     = get_dblattrarray( m.inner, "UB", 1, num_vars(m.inner))
+function MPB.setvarUB!(m::GurobiMathProgModel, u)
     if checkvalue(u, GRB_BOUNDMAX)
         _boundwarning(getvarLB(m), u)
     end
     set_dblattrarray!(m.inner, "UB", 1, num_vars(m.inner), u)
 end
 
-function getconstrLB(m::GurobiMathProgModel)
+function MPB.getconstrLB(m::GurobiMathProgModel)
     sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
     ret   = get_dblattrarray(m.inner, "RHS", 1, num_constrs(m.inner))
     for i = 1:num_constrs(m.inner)
@@ -217,7 +220,7 @@ function getconstrLB(m::GurobiMathProgModel)
      return ret
 end
 
-function getconstrUB(m::GurobiMathProgModel)
+function MPB.getconstrUB(m::GurobiMathProgModel)
     sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
     ret   = get_dblattrarray(m.inner, "RHS", 1, num_constrs(m.inner))
     for i = 1:num_constrs(m.inner)
@@ -233,11 +236,11 @@ end
 
 # setconstrLB!(m::GurobiMathProgModel, lb) = (m.changed_constr_bounds = true; m.last_op_type = :Con; m.lb = copy(lb))
 # setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.last_op_type = :Con; m.ub = copy(ub))
-setconstrLB!(m::GurobiMathProgModel, lb) = (m.changed_constr_bounds = true; m.lb = copy(lb))
-setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.ub = copy(ub))
+MPB.setconstrLB!(m::GurobiMathProgModel, lb) = (m.changed_constr_bounds = true; m.lb = copy(lb))
+MPB.setconstrUB!(m::GurobiMathProgModel, ub) = (m.changed_constr_bounds = true; m.ub = copy(ub))
 
-getobj(m::GurobiMathProgModel, i::Int=1) = get_dblattrarray( m.inner, "Obj", i, num_vars(m.inner))
-function setobj!(m::GurobiMathProgModel, c, i::Int=1)
+MPB.getobj(m::GurobiMathProgModel, i::Int=1) = get_dblattrarray( m.inner, "Obj", i, num_vars(m.inner))
+function MPB.setobj!(m::GurobiMathProgModel, c, i::Int=1)
     if checkvalue(c, GRB_INFINITY)
         _objwarning(c)
     end
@@ -305,7 +308,7 @@ function set_multiobj!(m::Model, i::Int, c::AbstractVector{Float64}, p::Int, w::
     set_multiobj_weight!(m, i, w)
 end
 
-function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
+function MPB.addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
     if m.last_op_type == :Con
         updatemodel!(m)
         m.last_op_type = :Var
@@ -313,14 +316,14 @@ function addvar!(m::GurobiMathProgModel, constridx, constrcoef, l, u, objcoef)
     push!(m.obj, _truncateobj(objcoef))
     add_var!(m.inner, length(constridx), constridx, float(constrcoef), float(objcoef), float(l), float(u), GRB_CONTINUOUS)
 end
-addvar!(m::GurobiMathProgModel, l, u, objcoef) = addvar!(m, Int[], Float64[], l, u, objcoef)
+MPB.addvar!(m::GurobiMathProgModel, l, u, objcoef) = MPB.addvar!(m, Int[], Float64[], l, u, objcoef)
 
-function delvars!(m::GurobiMathProgModel, idx)
+function MPB.delvars!(m::GurobiMathProgModel, idx)
     deleteat!(m.obj, idx)
     del_vars!(m.inner, idx)
 end
 
-function addconstr!(m::GurobiMathProgModel, varidx, coef, lb, ub)
+function MPB.addconstr!(m::GurobiMathProgModel, varidx, coef, lb, ub)
     if m.last_op_type == :Var
         updatemodel!(m)
         m.last_op_type = :Con
@@ -339,13 +342,13 @@ function addconstr!(m::GurobiMathProgModel, varidx, coef, lb, ub)
         error("Adding range constraints not supported yet.")
     end
 end
-delconstrs!(m::GurobiMathProgModel, idx) = del_constrs!(m.inner, idx)
+MPB.delconstrs!(m::GurobiMathProgModel, idx) = del_constrs!(m.inner, idx)
 
-changecoeffs!(m::GurobiMathProgModel, cidx, vidx, val) = chg_coeffs!(m.inner, cidx, vidx, val)
+MPB.changecoeffs!(m::GurobiMathProgModel, cidx, vidx, val) = chg_coeffs!(m.inner, cidx, vidx, val)
 
 function updatemodel!(m::GurobiMathProgModel)
     update_model!(m.inner)
-    if Gurobi.version < v"7.0" && m.obj != getobj(m)
+    if Gurobi.version < v"7.0" && m.obj != MPB.getobj(m)
         Compat.@warn("""
             You have encountered a known bug in Gurobi. Any information you query from the model may be incorrect.
             This bug has existed since the first version of Gurobi but is fixed in Gurobi v7.0.
@@ -386,7 +389,7 @@ end
 
 getconstrmatrix(m::GurobiMathProgModel) = get_constrmatrix(m.inner)
 
-function setsense!(m::GurobiMathProgModel, sense)
+function MPB.setsense!(m::GurobiMathProgModel, sense)
   if sense == :Min
     set_sense!(m.inner, :minimize)
   elseif sense == :Max
@@ -395,7 +398,7 @@ function setsense!(m::GurobiMathProgModel, sense)
     error("Unrecognized objective sense $sense")
   end
 end
-function getsense(m::GurobiMathProgModel)
+function MPB.getsense(m::GurobiMathProgModel)
   v = get_intattr(m.inner, "ModelSense")
   if v == -1
     return :Max
@@ -404,17 +407,17 @@ function getsense(m::GurobiMathProgModel)
   end
 end
 
-numvar(m::GurobiMathProgModel)    = (updatemodel!(m); num_vars(m.inner))
-numconstr(m::GurobiMathProgModel) = num_constrs(m.inner) + num_qconstrs(m.inner)
-numlinconstr(m::GurobiMathProgModel) = num_constrs(m.inner)
-numquadconstr(m::GurobiMathProgModel) = num_qconstrs(m.inner)
+MPB.numvar(m::GurobiMathProgModel)    = (updatemodel!(m); num_vars(m.inner))
+MPB.numconstr(m::GurobiMathProgModel) = num_constrs(m.inner) + num_qconstrs(m.inner)
+MPB.numlinconstr(m::GurobiMathProgModel) = num_constrs(m.inner)
+MPB.numquadconstr(m::GurobiMathProgModel) = num_qconstrs(m.inner)
 
-function optimize!(m::GurobiMathProgModel)
+function MPB.optimize!(m::GurobiMathProgModel)
     # set callbacks if present
     if m.lazycb != nothing || m.cutcb != nothing || m.heuristiccb != nothing || m.infocb != nothing
         updatemodel!(m)
         if !is_mip(m.inner)
-            Base.warn_once("Gurobi ignores branch-and-bound callbacks when no discrete elements are present in the model.")
+            @Compat.warn("Gurobi ignores branch-and-bound callbacks when no discrete elements are present in the model.")
         end
         setmathprogcallback!(m)
     end
@@ -425,7 +428,7 @@ function optimize!(m::GurobiMathProgModel)
     optimize(m.inner)
 end
 
-function status(m::GurobiMathProgModel)
+function MPB.status(m::GurobiMathProgModel)
   s = get_status(m.inner)
   if s == :optimal
     return :Optimal
@@ -434,7 +437,7 @@ function status(m::GurobiMathProgModel)
   elseif s == :unbounded
     return :Unbounded
   elseif s == :inf_or_unbd
-    Base.warn_once("Gurobi reported infeasible or unbounded. Set InfUnbdInfo=1 for more specific status.")
+    @Compat.warn("Gurobi reported infeasible or unbounded. Set InfUnbdInfo=1 for more specific status.")
     return :InfeasibleOrUnbounded
   elseif s == :iteration_limit || s == :node_limit || s == :time_limit || s == :solution_limit
     return :UserLimit
@@ -455,11 +458,11 @@ function status(m::GurobiMathProgModel)
   end
 end
 
-getobjval(m::GurobiMathProgModel)   = get_objval(m.inner)
-getobjbound(m::GurobiMathProgModel) = get_objbound(m.inner)
-getsolution(m::GurobiMathProgModel) = get_solution(m.inner)
+MPB.getobjval(m::GurobiMathProgModel)   = get_objval(m.inner)
+MPB.getobjbound(m::GurobiMathProgModel) = get_objbound(m.inner)
+MPB.getsolution(m::GurobiMathProgModel) = get_solution(m.inner)
 
-function getconstrsolution(m::GurobiMathProgModel)
+function MPB.getconstrsolution(m::GurobiMathProgModel)
     sense = get_charattrarray(m.inner, "Sense", 1, num_constrs(m.inner))
     rhs   = get_dblattrarray( m.inner, "RHS",   1, num_constrs(m.inner))
     slack = get_dblattrarray( m.inner, "Slack", 1, num_constrs(m.inner))
@@ -476,7 +479,7 @@ function getconstrsolution(m::GurobiMathProgModel)
     return ret
 end
 
-function getreducedcosts(m::GurobiMathProgModel)
+function MPB.getreducedcosts(m::GurobiMathProgModel)
     if is_qcp(m.inner) && get_int_param(m.inner, "QCPDual") == 0
         return fill(NaN, num_vars(m.inner))
     else
@@ -484,7 +487,7 @@ function getreducedcosts(m::GurobiMathProgModel)
     end
 end
 
-function getconstrduals(m::GurobiMathProgModel)
+function MPB.getconstrduals(m::GurobiMathProgModel)
     if is_qcp(m.inner) && get_int_param(m.inner, "QCPDual") == 0
         return fill(NaN, num_constrs(m.inner))
     else
@@ -492,7 +495,7 @@ function getconstrduals(m::GurobiMathProgModel)
     end
 end
 
-function getquadconstrduals(m::GurobiMathProgModel)
+function MPB.getquadconstrduals(m::GurobiMathProgModel)
     if is_qcp(m.inner) && get_int_param(m.inner, "QCPDual") == 0
         return fill(NaN, num_qconstrs(m.inner))
     else
@@ -500,12 +503,12 @@ function getquadconstrduals(m::GurobiMathProgModel)
     end
 end
 
-getinfeasibilityray(m::GurobiMathProgModel) = -get_dblattrarray(m.inner, "FarkasDual", 1, num_constrs(m.inner)) # note sign is flipped
-getunboundedray(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "UnbdRay", 1, num_vars(m.inner))
+MPB.getinfeasibilityray(m::GurobiMathProgModel) = -get_dblattrarray(m.inner, "FarkasDual", 1, num_constrs(m.inner)) # note sign is flipped
+MPB.getunboundedray(m::GurobiMathProgModel) = get_dblattrarray(m.inner, "UnbdRay", 1, num_vars(m.inner))
 
-getbasis(m::GurobiMathProgModel) = get_basis(m.inner)
+MPB.getbasis(m::GurobiMathProgModel) = get_basis(m.inner)
 
-getrawsolver(m::GurobiMathProgModel) = m.inner
+MPB.getrawsolver(m::GurobiMathProgModel) = m.inner
 
 const var_type_map = Dict(
   'C' => :Cont,
@@ -523,7 +526,7 @@ const rev_var_type_map = Dict(
   :SemiInt => 'N'
 )
 
-function setvartype!(m::GurobiMathProgModel, vartype::Vector{Symbol})
+function MPB.setvartype!(m::GurobiMathProgModel, vartype::Vector{Symbol})
     # do this to make sure we deal with new columns
     updatemodel!(m)
     nvartype = map(x->rev_var_type_map[x], vartype)
@@ -531,12 +534,12 @@ function setvartype!(m::GurobiMathProgModel, vartype::Vector{Symbol})
     updatemodel!(m) # otherwise getvartype! will return old values
 end
 
-function getvartype(m::GurobiMathProgModel)
+function MPB.getvartype(m::GurobiMathProgModel)
     ret = get_charattrarray(m.inner, "VType", 1, num_vars(m.inner))
     map(x->var_type_map[x], ret)
 end
 
-function setwarmstart!(m::GurobiMathProgModel, v)
+function MPB.setwarmstart!(m::GurobiMathProgModel, v)
     for j = 1:length(v)
         if isnan(v[j])
             v[j] = 1e101  # GRB_UNDEFINED
@@ -545,18 +548,18 @@ function setwarmstart!(m::GurobiMathProgModel, v)
     set_dblattrarray!(m.inner, "Start", 1, num_vars(m.inner), v)
 end
 
-addsos1!(m::GurobiMathProgModel, idx, weight) = add_sos!(m.inner, :SOS1, idx, weight)
-addsos2!(m::GurobiMathProgModel, idx, weight) = add_sos!(m.inner, :SOS2, idx, weight)
+MPB.addsos1!(m::GurobiMathProgModel, idx, weight) = add_sos!(m.inner, :SOS1, idx, weight)
+MPB.addsos2!(m::GurobiMathProgModel, idx, weight) = add_sos!(m.inner, :SOS2, idx, weight)
 
 # Callbacks
 
 
-setlazycallback!(m::GurobiMathProgModel,f) = (m.lazycb = f)
-setcutcallback!(m::GurobiMathProgModel,f) = (m.cutcb = f)
-setheuristiccallback!(m::GurobiMathProgModel,f) = (m.heuristiccb = f)
-setinfocallback!(m::GurobiMathProgModel,f) = (m.infocb = f)
+MPB.setlazycallback!(m::GurobiMathProgModel,f) = (m.lazycb = f)
+MPB.setcutcallback!(m::GurobiMathProgModel,f) = (m.cutcb = f)
+MPB.setheuristiccallback!(m::GurobiMathProgModel,f) = (m.heuristiccb = f)
+MPB.setinfocallback!(m::GurobiMathProgModel,f) = (m.infocb = f)
 
-mutable struct GurobiCallbackData <: MathProgCallbackData
+mutable struct GurobiCallbackData <: MPB.MathProgCallbackData
     cbdata::CallbackData
     state::Symbol
     where::Cint
@@ -710,7 +713,7 @@ function mastercallback(ptr_model::Ptr{Cvoid}, cbdata::Ptr{Cvoid}, where::Cint, 
 end
 
 # User callback function should be of the form:
-# callback(cbdata::MathProgCallbackData)
+# callback(cbdata::MPB.MathProgCallbackData)
 # return :Exit to indicate an error
 
 function setmathprogcallback!(model::GurobiMathProgModel)
@@ -728,7 +731,7 @@ end
 
 # QCQP
 
-function setquadobj!(m::GurobiMathProgModel, rowidx, colidx, quadval)
+function MPB.setquadobj!(m::GurobiMathProgModel, rowidx, colidx, quadval)
     delq!(m.inner)
     update_model!(m.inner)
     scaledvals = similar(quadval)
@@ -744,7 +747,7 @@ function setquadobj!(m::GurobiMathProgModel, rowidx, colidx, quadval)
     update_model!(m.inner)
 end
 
-function addquadconstr!(m::GurobiMathProgModel, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
+function MPB.addquadconstr!(m::GurobiMathProgModel, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
     if m.last_op_type == :Var
         updatemodel!(m)
         m.last_op_type = :Con

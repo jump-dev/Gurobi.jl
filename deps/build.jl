@@ -1,4 +1,7 @@
 using Compat
+@static if VERSION >= v"0.7"
+    using Libdl
+end
 
 depsfile = joinpath(dirname(@__FILE__),"deps.jl")
 if isfile(depsfile)
@@ -34,7 +37,7 @@ found = false
 for l in paths_to_try
     d = Libdl.dlopen_e(l)
     if d != C_NULL
-        found = true
+        global found = true
         write_depsfile(l)
         break
     end
