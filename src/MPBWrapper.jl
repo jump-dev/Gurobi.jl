@@ -106,7 +106,7 @@ end
 
 function MPB.loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
     read_model(m.inner, filename)
-    m.obj = getobj(m)
+    m.obj = MPB.getobj(m)
     if checkvalue(m.obj, GRB_INFINITY)
         _objwarning(m.obj)
     end
@@ -348,7 +348,7 @@ MPB.changecoeffs!(m::GurobiMathProgModel, cidx, vidx, val) = chg_coeffs!(m.inner
 
 function updatemodel!(m::GurobiMathProgModel)
     update_model!(m.inner)
-    if Gurobi.version < v"7.0" && m.obj != getobj(m)
+    if Gurobi.version < v"7.0" && m.obj != MPB.getobj(m)
         Compat.@warn("""
             You have encountered a known bug in Gurobi. Any information you query from the model may be incorrect.
             This bug has existed since the first version of Gurobi but is fixed in Gurobi v7.0.
