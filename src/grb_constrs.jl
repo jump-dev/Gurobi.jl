@@ -1,3 +1,10 @@
+# work around for julia issue #28948, Gurobi.jl issue #152
+if VERSION ≤ v"0.7-"
+    sparse_transpose(A) = sparse(transpose(A))
+else
+    sparse_transpose(A) = SparseMatrixCSC(transpose(A))
+end
+
 ## Add Linear constraints
 
 # add single constraint
@@ -78,7 +85,7 @@ end
 function add_constrs!(model::Model, A::CoeffMat, rel::GCharOrVec, b::Vector{Float64})
     m, n = size(A)
     (m == length(b) && n == num_vars(model)) || error("Incompatible argument dimensions.")
-    add_constrs_t!(model, sparse(transpose(A)), rel, b)
+    add_constrs_t!(model, sparse_transpose(A), rel, b)
 end
 
 
@@ -156,7 +163,7 @@ function add_rangeconstrs!(model::Model, A::CoeffMat, lb::Vector, ub::Vector)
     m, n = size(A)
     (m == length(lb) == length(ub) && n == num_vars(model)) || error("Incompatible argument dimensions.")
 
-    add_rangeconstrs_t!(model, sparse(transpose(A)), lb, ub)
+    add_rangeconstrs_t!(model, sparse_transpose(A), lb, ub)
 end
 
 function get_constrmatrix(model::Model)
