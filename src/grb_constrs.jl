@@ -1,4 +1,4 @@
-# work around for julia issue #28948
+# work around for julia issue #28948, Gurobi.jl issue #152
 if VERSION ≤ v"0.7-"
     sparse_transpose(A) = sparse(transpose(A))
 else
