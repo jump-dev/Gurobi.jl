@@ -99,9 +99,9 @@ end
 @testset "Gurobi Callback" begin
     @testset "Generic callback" begin
         m = Gurobi.Optimizer(OutputFlag=0)
-        x = MOI.addvariable!(m)
-        MOI.addconstraint!(m, MOI.SingleVariable(x), MOI.GreaterThan(1.0))
-        MOI.set!(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        x = MOI.add_variable(m)
+        MOI.add_constraint(m, MOI.SingleVariable(x), MOI.GreaterThan(1.0))
+        MOI.set(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
             MOI.ScalarAffineFunction{Float64}(
                 [MOI.ScalarAffineTerm{Float64}(1.0, x)],
                 0.0
@@ -114,7 +114,7 @@ end
             nothing
         end
 
-        MOI.set!(m, Gurobi.CallbackFunction(), callback_function)
+        MOI.set(m, Gurobi.CallbackFunction(), callback_function)
         MOI.optimize!(m)
 
         @test length(cb_calls) > 0
@@ -178,7 +178,7 @@ end
             end
         end
 
-        MOI.set!(m, Gurobi.CallbackFunction(), callback_function)
+        MOI.set(m, Gurobi.CallbackFunction(), callback_function)
         MOI.optimize!(m)
 
         @test MOI.get(m, MOI.VariablePrimal(), x) == 1
@@ -211,10 +211,10 @@ end
                         Heuristics=0.0,
                         Presolve=0)
     N = 100
-    x = MOI.addvariables!(m, N)
+    x = MOI.add_variables(m, N)
     for xi in x
-        MOI.addconstraint!(m, MOI.SingleVariable(xi), MOI.ZeroOne())
-        MOI.set!(m, MOI.VariablePrimalStart(), xi, 0.0)
+        MOI.add_constraint(m, MOI.SingleVariable(xi), MOI.ZeroOne())
+        MOI.set(m, MOI.VariablePrimalStart(), xi, 0.0)
     end
     # Given a collection of items with individual weights and values,
     # maximize the total value carried subject to the constraint that
@@ -226,10 +226,10 @@ end
     end
     item_weights = rand(N)
     item_values = rand(N)
-    MOI.addconstraint!(m,
+    MOI.add_constraint(m,
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(item_weights, x), 0.0),
         MOI.LessThan(10.0))
-    MOI.set!(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+    MOI.set(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(.-item_values, x), 0.0))
     MOI.optimize!(m)
 
@@ -242,13 +242,13 @@ end
 
 @testset "Constant objective (issue #111)" begin
     m = Gurobi.Optimizer()
-    x = MOI.addvariable!(m)
-    MOI.set!(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+    x = MOI.add_variable(m)
+    MOI.set(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 2.0))
     @test MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()).constant == 2.0
     @test Gurobi.get_dblattr(m.inner, "ObjCon") == 2.0
 
-    MOI.modify!(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarConstantChange(3.0))
+    MOI.modify(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarConstantChange(3.0))
     @test MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()).constant == 3.0
     @test Gurobi.get_dblattr(m.inner, "ObjCon") == 3.0
 end

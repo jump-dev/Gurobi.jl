@@ -384,7 +384,7 @@ function LQOI.get_primal_status(model::Optimizer)
     elseif is_mip(model.inner) && get_sol_count(model.inner) > 0
         return MOI.FeasiblePoint
     else
-        return MOI.UnknownResultStatus
+        return MOI.NoSolution
     end
 end
 
@@ -488,13 +488,13 @@ function hasprimalray(model::Optimizer)
     end
 end
 
-MOI.free!(m::Optimizer) = free_model(m.inner)
+Base.finalize(m::Optimizer) = free_model(m.inner)
 
 # ==============================================================================
 #    Callbacks in Gurobi
 # ==============================================================================
 struct CallbackFunction <: MOI.AbstractOptimizerAttribute end
-function MOI.set!(m::Optimizer, ::CallbackFunction, f::Function)
+function MOI.set(m::Optimizer, ::CallbackFunction, f::Function)
     set_callback_func!(m.inner, f)
     update_model!(m.inner)
 end
