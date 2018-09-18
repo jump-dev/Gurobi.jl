@@ -488,8 +488,6 @@ function hasprimalray(model::Optimizer)
     end
 end
 
-Base.finalize(m::Optimizer) = free_model(m.inner)
-
 # ==============================================================================
 #    Callbacks in Gurobi
 # ==============================================================================
