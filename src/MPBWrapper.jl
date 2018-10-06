@@ -717,7 +717,7 @@ end
 # return :Exit to indicate an error
 
 function setmathprogcallback!(model::GurobiMathProgModel)
-    if Compat.Sys.is_windows() && Sys.WORD_SIZE != 64
+    if Compat.Sys.iswindows() && Sys.WORD_SIZE != 64
         error("Callbacks not currently supported on Win32. Use 64-bit Julia with 64-bit Gurobi.")
     end
     grbcallback = cfunction(mastercallback, Cint, (Ptr{Cvoid}, Ptr{Cvoid}, Cint, Ptr{Cvoid}))
