@@ -31,7 +31,7 @@ function GurobiMathProgModel(env=nothing;options...)
    return m
 end
 
-function copy(m::GurobiMathProgModel)
+function Base.copy(m::GurobiMathProgModel)
 
     m.lazycb == nothing || @Compat.warn("Callbacks can't be copied, lazy callback ignored")
     m.cutcb == nothing || @Compat.warn("Callbacks can't be copied, cut callback ignored")
@@ -387,7 +387,7 @@ function updatemodel!(m::GurobiMathProgModel)
     end
 end
 
-getconstrmatrix(m::GurobiMathProgModel) = get_constrmatrix(m.inner)
+MPB.getconstrmatrix(m::GurobiMathProgModel) = get_constrmatrix(m.inner)
 
 function MPB.setsense!(m::GurobiMathProgModel, sense)
   if sense == :Min
@@ -567,29 +567,29 @@ mutable struct GurobiCallbackData <: MPB.MathProgCallbackData
 #    model::GurobiMathProgModel # not needed?
 end
 
-function cbgetmipsolution(d::GurobiCallbackData)
+function MPB.cbgetmipsolution(d::GurobiCallbackData)
     @assert d.state == :MIPSol
     return cbget_mipsol_sol(d.cbdata, d.where)
 end
 
-function cbgetmipsolution(d::GurobiCallbackData,output)
+function MPB.cbgetmipsolution(d::GurobiCallbackData,output)
     @assert d.state == :MIPSol
     return cbget_mipsol_sol(d.cbdata, d.where, output)
 end
 
-function cbgetlpsolution(d::GurobiCallbackData)
+function MPB.cbgetlpsolution(d::GurobiCallbackData)
     @assert d.state == :MIPNode
     return cbget_mipnode_rel(d.cbdata, d.where)
 end
 
-function cbgetlpsolution(d::GurobiCallbackData, output)
+function MPB.cbgetlpsolution(d::GurobiCallbackData, output)
     @assert d.state == :MIPNode
     return cbget_mipnode_rel(d.cbdata, d.where, output)
 end
 
 
 # TODO: macro for these getters?
-function cbgetobj(d::GurobiCallbackData)
+function MPB.cbgetobj(d::GurobiCallbackData)
     if d.state == :MIPNode
         return cbget_mipnode_objbst(d.cbdata, d.where)
     elseif d.state == :Intermediate
@@ -605,7 +605,7 @@ function cbgetobj(d::GurobiCallbackData)
     end
 end
 
-function cbgetbestbound(d::GurobiCallbackData)
+function MPB.cbgetbestbound(d::GurobiCallbackData)
     if d.state == :MIPNode
         return cbget_mipnode_objbnd(d.cbdata, d.where)
     elseif d.state == :MIPSol
@@ -617,7 +617,7 @@ function cbgetbestbound(d::GurobiCallbackData)
     end
 end
 
-function cbgetexplorednodes(d::GurobiCallbackData)
+function MPB.cbgetexplorednodes(d::GurobiCallbackData)
     if d.state == :MIPNode
         return cbget_mipnode_nodcnt(d.cbdata, d.where)
     elseif d.state == :MIPSol
@@ -630,19 +630,19 @@ function cbgetexplorednodes(d::GurobiCallbackData)
 end
 
 # returns :MIPNode :MIPSol :Intermediate
-cbgetstate(d::GurobiCallbackData) = d.state
+MPB.cbgetstate(d::GurobiCallbackData) = d.state
 
-function cbaddcut!(d::GurobiCallbackData,varidx,varcoef,sense,rhs)
+function MPB.cbaddcut!(d::GurobiCallbackData,varidx,varcoef,sense,rhs)
     @assert d.state == :MIPNode
     cbcut(d.cbdata, convert(Vector{Cint}, varidx), float(varcoef), sense, float(rhs))
 end
 
-function cbaddlazy!(d::GurobiCallbackData,varidx,varcoef,sense,rhs)
+function MPB.cbaddlazy!(d::GurobiCallbackData,varidx,varcoef,sense,rhs)
     @assert d.state == :MIPNode || d.state == :MIPSol
     cblazy(d.cbdata, convert(Vector{Cint}, varidx), float(varcoef), sense, float(rhs))
 end
 
-function cbaddsolution!(d::GurobiCallbackData)
+function MPB.cbaddsolution!(d::GurobiCallbackData)
     # Gurobi doesn't support adding solutions on MIPSol.
     # TODO: support this anyway
     @assert d.state == :MIPNode
@@ -653,7 +653,7 @@ function cbaddsolution!(d::GurobiCallbackData)
     end
 end
 
-function cbsetsolutionvalue!(d::GurobiCallbackData,varidx,value)
+function MPB.cbsetsolutionvalue!(d::GurobiCallbackData,varidx,value)
     d.sol[varidx] = value
 end
 
@@ -717,7 +717,7 @@ end
 # return :Exit to indicate an error
 
 function setmathprogcallback!(model::GurobiMathProgModel)
-    if Compat.Sys.is_windows() && Sys.WORD_SIZE != 64
+    if Compat.Sys.iswindows() && Sys.WORD_SIZE != 64
         error("Callbacks not currently supported on Win32. Use 64-bit Julia with 64-bit Gurobi.")
     end
     grbcallback = cfunction(mastercallback, Cint, (Ptr{Cvoid}, Ptr{Cvoid}, Cint, Ptr{Cvoid}))
@@ -755,5 +755,5 @@ function MPB.addquadconstr!(m::GurobiMathProgModel, linearidx, linearval, quadro
     add_qconstr!(m.inner, linearidx, linearval, quadrowidx, quadcolidx, quadval, sense, rhs)
 end
 
-getsolvetime(m::GurobiMathProgModel) = get_runtime(m.inner)
-getnodecount(m::GurobiMathProgModel) = get_node_count(m.inner)
+MPB.getsolvetime(m::GurobiMathProgModel) = get_runtime(m.inner)
+MPB.getnodecount(m::GurobiMathProgModel) = get_node_count(m.inner)
