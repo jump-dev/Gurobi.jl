@@ -720,7 +720,7 @@ function setmathprogcallback!(model::GurobiMathProgModel)
     if Compat.Sys.iswindows() && Sys.WORD_SIZE != 64
         error("Callbacks not currently supported on Win32. Use 64-bit Julia with 64-bit Gurobi.")
     end
-    grbcallback = cfunction(mastercallback, Cint, (Ptr{Cvoid}, Ptr{Cvoid}, Cint, Ptr{Cvoid}))
+    grbcallback = @cfunction(mastercallback, Cint, (Ptr{Cvoid}, Ptr{Cvoid}, Cint, Ptr{Cvoid}))
     ret = @grb_ccall(setcallbackfunc, Cint, (Ptr{Cvoid}, Ptr{Cvoid}, Any), model.inner.ptr_model, grbcallback, model)
     if ret != 0
         throw(GurobiError(model.env, ret))
