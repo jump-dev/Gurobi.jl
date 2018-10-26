@@ -696,7 +696,7 @@ function mastercallback(ptr_model::Ptr{Cvoid}, cbdata::Ptr{Cvoid}, where::Cint, 
         end
     end
     if model.heuristiccb != nothing && state == :MIPNode
-        grbcb.sol = fill(1e101, numvar(model))  # GRB_UNDEFINED
+        grbcb.sol = fill(1e101, MPB.numvar(model))  # GRB_UNDEFINED
         ret = model.heuristiccb(grbcb)
         if ret == :Exit
             terminate(model.inner)
