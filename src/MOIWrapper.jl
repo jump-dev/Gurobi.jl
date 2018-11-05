@@ -112,28 +112,30 @@ function LQOI.change_variable_bounds!(model::Optimizer,
         set_dblattrlist!(model.inner, "UB", upper_cols, upper_values)
     end
     update_model!(model.inner)
+    return
 end
 
 function LQOI.get_variable_lowerbound(model::Optimizer, column::Int)
-    get_dblattrelement(model.inner, "LB", column)
+    return get_dblattrelement(model.inner, "LB", column)
 end
 
 function LQOI.get_variable_upperbound(model::Optimizer, column::Int)
-    get_dblattrelement(model.inner, "UB", column)
+    return get_dblattrelement(model.inner, "UB", column)
 end
 
 function LQOI.get_number_linear_constraints(model::Optimizer)
-    num_constrs(model.inner)
+    return num_constrs(model.inner)
 end
 
 function LQOI.add_linear_constraints!(model::Optimizer,
         A::LQOI.CSRMatrix{Float64}, sense::Vector{Cchar}, rhs::Vector{Float64})
     add_constrs!(model.inner, A.row_pointers, A.columns, A.coefficients, sense, rhs)
     update_model!(model.inner)
+    return
 end
 
 function LQOI.get_rhs(model::Optimizer, row::Int)
-    get_dblattrelement(model.inner, "RHS", row)
+    return get_dblattrelement(model.inner, "RHS", row)
 end
 
 function LQOI.get_linear_constraint(model::Optimizer, row::Int)
@@ -145,46 +147,55 @@ end
 function LQOI.change_matrix_coefficient!(model::Optimizer, row::Int, col::Int, coef::Float64)
     chg_coeffs!(model.inner, row, col, coef)
     update_model!(model.inner)
+    return
 end
 
 function LQOI.change_objective_coefficient!(model::Optimizer, col::Int, coef::Float64)
     set_dblattrelement!(model.inner, "Obj", col, coef)
     update_model!(model.inner)
+    return
 end
 
 function LQOI.change_rhs_coefficient!(model::Optimizer, row::Int, coef::Float64)
     set_dblattrelement!(model.inner, "RHS", row, coef)
     update_model!(model.inner)
+    return
 end
 
 function LQOI.delete_linear_constraints!(model::Optimizer, first_row::Int, last_row::Int)
     del_constrs!(model.inner, collect(first_row:last_row))
     update_model!(model.inner)
+    return
 end
 
 function LQOI.delete_quadratic_constraints!(model::Optimizer, first_row::Int, last_row::Int)
     delqconstrs!(model.inner, collect(first_row:last_row))
     update_model!(model.inner)
+    return
 end
 
 function LQOI.change_variable_types!(model::Optimizer, columns::Vector{Int}, vtypes::Vector{Cchar})
     set_charattrlist!(model.inner, "VType", Cint.(columns), vtypes)
     update_model!(model.inner)
+    return
 end
 
 function LQOI.change_linear_constraint_sense!(model::Optimizer, rows::Vector{Int}, senses::Vector{Cchar})
     set_charattrlist!(model.inner, "Sense", Cint.(rows), senses)
     update_model!(model.inner)
+    return
 end
 
 function LQOI.add_sos_constraint!(model::Optimizer, columns::Vector{Int}, weights::Vector{Float64}, sos_type)
     add_sos!(model.inner, sos_type, columns, weights)
     update_model!(model.inner)
+    return
 end
 
 function LQOI.delete_sos!(model::Optimizer, first_row::Int, last_row::Int)
     del_sos!(model.inner, Cint.(first_row:last_row))
     update_model!(model.inner)
+    return
 end
 
 # TODO improve getting processes
@@ -198,7 +209,7 @@ function LQOI.get_sos_constraint(model::Optimizer, idx)
 end
 
 function LQOI.get_number_quadratic_constraints(model::Optimizer)
-    num_qconstrs(model.inner)
+    return num_qconstrs(model.inner)
 end
 
 function scalediagonal!(V, I, J, scale)
@@ -214,6 +225,7 @@ function scalediagonal!(V, I, J, scale)
             V[i] *= scale
         end
     end
+    return
 end
 function LQOI.add_quadratic_constraint!(model::Optimizer,
         affine_columns::Vector{Int}, affine_coefficients::Vector{Float64},
@@ -224,6 +236,7 @@ function LQOI.add_quadratic_constraint!(model::Optimizer,
     add_qconstr!(model.inner, affine_columns, affine_coefficients, I, J, V, sense, rhs)
     scalediagonal!(V, I, J, 2.0)
     update_model!(model.inner)
+    return
 end
 
 function LQOI.get_quadratic_constraint(model::Optimizer, row::Int)
@@ -236,7 +249,7 @@ function LQOI.get_quadratic_constraint(model::Optimizer, row::Int)
 end
 
 function LQOI.get_quadratic_rhs(model::Optimizer, row::Int)
-    get_dblattrelement(model.inner, "QCRHS", row)
+    return get_dblattrelement(model.inner, "QCRHS", row)
 end
 
 function LQOI.set_quadratic_objective!(model::Optimizer, I::Vector{Int}, J::Vector{Int}, V::Vector{Float64})
@@ -246,6 +259,7 @@ function LQOI.set_quadratic_objective!(model::Optimizer, I::Vector{Int}, J::Vect
     add_qpterms!(model.inner, I, J, V)
     scalediagonal!(V, I, J, 2.0)
     update_model!(model.inner)
+    return
 end
 
 function LQOI.set_linear_objective!(model::Optimizer, columns::Vector{Int}, coefficients::Vector{Float64})
@@ -256,6 +270,7 @@ function LQOI.set_linear_objective!(model::Optimizer, columns::Vector{Int}, coef
     end
     set_dblattrarray!(model.inner, "Obj", 1, num_vars(model.inner), obj)
     update_model!(model.inner)
+    return
 end
 
 function LQOI.set_constant_objective!(model::Optimizer, value::Real)
@@ -266,6 +281,7 @@ function LQOI.set_constant_objective!(model::Optimizer, value::Real)
             get_dblattrarray(model.inner, "Obj", 1, 1))
     end
     update_model!(model.inner)
+    return
 end
 
 function LQOI.change_objective_sense!(model::Optimizer, sense::Symbol)
@@ -277,14 +293,16 @@ function LQOI.change_objective_sense!(model::Optimizer, sense::Symbol)
         error("Invalid objective sense: $(sense)")
     end
     update_model!(model.inner)
+    return
 end
 
 function LQOI.get_linear_objective!(model::Optimizer, dest)
     get_dblattrarray!(dest, model.inner, "Obj", 1)
+    return dest
 end
 
 function LQOI.get_constant_objective(model::Optimizer)
-    get_dblattr(model.inner, "ObjCon")
+    return get_dblattr(model.inner, "ObjCon")
 end
 
 function LQOI.get_objectivesense(model::Optimizer)
@@ -299,17 +317,19 @@ function LQOI.get_objectivesense(model::Optimizer)
 end
 
 function LQOI.get_number_variables(model::Optimizer)
-    num_vars(model.inner)
+    return num_vars(model.inner)
 end
 
 function LQOI.add_variables!(model::Optimizer, N::Int)
     add_cvars!(model.inner, zeros(N))
     update_model!(model.inner)
+    return
 end
 
 function LQOI.delete_variables!(model::Optimizer, first_col::Int, last_col::Int)
     del_vars!(model.inner, Cint.(first_col:last_col))
     update_model!(model.inner)
+    return
 end
 
 function LQOI.add_mip_starts!(model::Optimizer, columns::Vector{Int}, starts::Vector{Float64})
@@ -319,6 +339,7 @@ function LQOI.add_mip_starts!(model::Optimizer, columns::Vector{Int}, starts::Ve
     end
     loadbasis(model.inner, x)
     update_model!(model.inner)
+    return
 end
 
 LQOI.solve_mip_problem!(model::Optimizer) = LQOI.solve_linear_problem!(model)
@@ -328,6 +349,7 @@ LQOI.solve_quadratic_problem!(model::Optimizer) = LQOI.solve_linear_problem!(mod
 function LQOI.solve_linear_problem!(model::Optimizer)
     update_model!(model.inner)
     optimize(model.inner)
+    return
 end
 
 function LQOI.get_termination_status(model::Optimizer)
@@ -404,38 +426,41 @@ function LQOI.get_dual_status(model::Optimizer)
             return MOI.InfeasibilityCertificate
         elseif stat == :suboptimal
             return MOI.FeasiblePoint
-        else
-            return MOI.UnknownResultStatus
         end
     end
+    return MOI.UnknownResultStatus
 end
 
-function LQOI.get_variable_primal_solution!(model::Optimizer, result)
-    get_dblattrarray!(result, model.inner, "X", 1)
+function LQOI.get_variable_primal_solution!(model::Optimizer, dest)
+    get_dblattrarray!(dest, model.inner, "X", 1)
+    return
 end
 
-function LQOI.get_linear_primal_solution!(model::Optimizer, result)
-    get_dblattrarray!(result, model.inner, "Slack", 1)
-    rhs = get_dblattrarray(model.inner, "RHS", 1, num_constrs(model.inner))
-    result .= rhs - result
+function LQOI.get_linear_primal_solution!(model::Optimizer, dest)
+    get_dblattrarray!(dest, model.inner, "RHS", 1)
+    dest .-= get_dblattrarray(model.inner, "Slack", 1, num_constrs(model.inner))
+    return
 end
 
-function LQOI.get_quadratic_primal_solution!(model::Optimizer, place)
-    get_dblattrarray!(place, model.inner, "QCSlack", 1)
-    rhs = get_dblattrarray(model.inner, "QCRHS", 1, num_qconstrs(model.inner))
-    place .= rhs - place
+function LQOI.get_quadratic_primal_solution!(model::Optimizer, dest)
+    get_dblattrarray!(dest, model.inner, "QCRHS", 1)
+    dest .-= get_dblattrarray(model.inner, "QCSlack", 1, num_qconstrs(model.inner))
+    return
 end
 
-function LQOI.get_variable_dual_solution!(model::Optimizer, place)
-    get_dblattrarray!(place, model.inner, "RC", 1)
+function LQOI.get_variable_dual_solution!(model::Optimizer, dest)
+    get_dblattrarray!(dest, model.inner, "RC", 1)
+    return
 end
 
-function LQOI.get_linear_dual_solution!(model::Optimizer, place)
-    get_dblattrarray!(place, model.inner, "Pi", 1)
+function LQOI.get_linear_dual_solution!(model::Optimizer, dest)
+    get_dblattrarray!(dest, model.inner, "Pi", 1)
+    return
 end
 
-function LQOI.get_quadratic_dual_solution!(model::Optimizer, place)
-    get_dblattrarray!(place, model.inner, "QCPi", 1)
+function LQOI.get_quadratic_dual_solution!(model::Optimizer, dest)
+    get_dblattrarray!(dest, model.inner, "QCPi", 1)
+    return
 end
 
 LQOI.get_objective_value(model::Optimizer) = get_objval(model.inner)
@@ -462,9 +487,10 @@ function LQOI.get_node_count(instance::Optimizer)
     return get_node_count(instance.inner)
 end
 
-function LQOI.get_farkas_dual!(instance::Optimizer, place)
-    get_dblattrarray!(place, instance.inner, "FarkasDual", 1)
-    place .*= -1.0
+function LQOI.get_farkas_dual!(instance::Optimizer, dest)
+    get_dblattrarray!(dest, instance.inner, "FarkasDual", 1)
+    dest .*= -1.0
+    return
 end
 
 function has_dual_ray(model::Optimizer)
@@ -481,8 +507,9 @@ function has_dual_ray(model::Optimizer)
     end
 end
 
-function LQOI.get_unbounded_ray!(model::Optimizer, place)
-    get_dblattrarray!(place, model.inner, "UnbdRay", 1)
+function LQOI.get_unbounded_ray!(model::Optimizer, dest)
+    get_dblattrarray!(dest, model.inner, "UnbdRay", 1)
+    return
 end
 
 function has_primal_ray(model::Optimizer)
@@ -503,9 +530,10 @@ end
 #    Callbacks in Gurobi
 # ==============================================================================
 struct CallbackFunction <: MOI.AbstractOptimizerAttribute end
-function MOI.set(m::Optimizer, ::CallbackFunction, f::Function)
-    set_callback_func!(m.inner, f)
-    update_model!(m.inner)
+function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
+    set_callback_func!(model.inner, f)
+    update_model!(model.inner)
+    return
 end
 
 """
@@ -516,11 +544,12 @@ Load the variable primal solution in a callback.
 This can only be called in a callback from `CB_MIPSOL`. After it is called, you
 can access the `VariablePrimal` attribute as usual.
 """
-function loadcbsolution!(m::Optimizer, cb_data::CallbackData, cb_where::Cint)
+function loadcbsolution!(model::Optimizer, cb_data::CallbackData, cb_where::Cint)
     if cb_where != CB_MIPSOL
         error("loadcbsolution! can only be called from CB_MIPSOL.")
     end
-    Gurobi.cbget_mipsol_sol(cb_data, cb_where, m.variable_primal_solution)
+    Gurobi.cbget_mipsol_sol(cb_data, cb_where, model.variable_primal_solution)
+    return
 end
 
 """
@@ -531,10 +560,12 @@ Add a lazy cut to the model `m`.
 You must have the option `LazyConstraints` set  via `Optimizer(LazyConstraint=1)`.
 This can only be called in a callback from `CB_MIPSOL`.
 """
-function cblazy!(cb_data::CallbackData, m::Optimizer, func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
-    columns      = [Cint(LQOI.get_column(m, term.variable_index)) for term in func.terms]
+function cblazy!(cb_data::CallbackData, model::Optimizer,
+        func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
+    columns = [
+        Cint(LQOI.get_column(model, term.variable_index)) for term in func.terms]
     coefficients = [term.coefficient for term in func.terms]
-    sense        = Char(LQOI.backend_type(m, set))
-    rhs          = MOI.Utilities.getconstant(set)
-    cblazy(cb_data, columns, coefficients, sense, rhs)
+    sense = Char(LQOI.backend_type(model, set))
+    rhs = MOI.Utilities.getconstant(set)
+    return cblazy(cb_data, columns, coefficients, sense, rhs)
 end
