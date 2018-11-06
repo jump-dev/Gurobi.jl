@@ -229,7 +229,10 @@ end
 function LQOI.get_quadratic_constraint(model::Optimizer, row::Int)
     affine_cols, affine_coefficients, I, J, V = getqconstr(model.inner, row)
     # note: we return 1-index columns here
-    return affine_cols .+ 1, affine_coefficients, sparse(I .+ 1, J .+ 1, V)
+    affine_cols .+= 1
+    I .+= 1
+    J .+= 1
+    return affine_cols, affine_coefficients, sparse(I, J, V)
 end
 
 function LQOI.get_quadratic_rhs(model::Optimizer, row::Int)
