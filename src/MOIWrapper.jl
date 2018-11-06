@@ -334,7 +334,7 @@ function LQOI.get_termination_status(model::Optimizer)
     elseif stat == :optimal
         return MOI.Success
     elseif stat == :infeasible
-        if hasdualray(model)
+        if has_dual_ray(model)
             return MOI.Success
         else
             return MOI.InfeasibleNoResult
@@ -342,7 +342,7 @@ function LQOI.get_termination_status(model::Optimizer)
     elseif stat == :inf_or_unbd
         return MOI.InfeasibleOrUnbounded
     elseif stat == :unbounded
-        if hasprimalray(model)
+        if has_primal_ray(model)
             return MOI.Success
         else
             return MOI.UnboundedNoResult
@@ -377,7 +377,7 @@ function LQOI.get_primal_status(model::Optimizer)
         return MOI.FeasiblePoint
     elseif stat == :solution_limit
         return MOI.FeasiblePoint
-    elseif stat in [:inf_or_unbd, :unbounded] && hasprimalray(model)
+    elseif stat in [:inf_or_unbd, :unbounded] && has_primal_ray(model)
         return MOI.InfeasibilityCertificate
     elseif stat == :suboptimal
         return MOI.FeasiblePoint
@@ -397,7 +397,7 @@ function LQOI.get_dual_status(model::Optimizer)
             return MOI.FeasiblePoint
         elseif stat == :solution_limit
             return MOI.FeasiblePoint
-        elseif stat in [:inf_or_unbd, :infeasible] && hasdualray(model)
+        elseif stat in [:inf_or_unbd, :infeasible] && has_dual_ray(model)
             return MOI.InfeasibilityCertificate
         elseif stat == :suboptimal
             return MOI.FeasiblePoint
@@ -464,13 +464,17 @@ function LQOI.get_farkas_dual!(instance::Optimizer, place)
     place .*= -1.0
 end
 
-# TODO(odow): remove try/catch
-function hasdualray(model::Optimizer)
+function has_dual_ray(model::Optimizer)
     try
-        get_dblattrarray(model.inner, "FarkasDual", 1, num_constrs(model.inner))
+        # Note: for performance reasons, we only try to get 0 elements.
+        Gurobi.get_dblattrarray(model.inner, "FarkasDual", 1, 0)
         return true
-    catch
-        return false
+    catch ex
+        if isa(ex, Gurobi.GurobiError)
+            return false
+        else
+            rethrow(ex)
+        end
     end
 end
 
@@ -478,13 +482,17 @@ function LQOI.get_unbounded_ray!(model::Optimizer, place)
     get_dblattrarray!(place, model.inner, "UnbdRay", 1)
 end
 
-# TODO(odow): remove try/catch
-function hasprimalray(model::Optimizer)
+function has_primal_ray(model::Optimizer)
     try
-        get_dblattrarray(model.inner, "UnbdRay", 1, num_vars(model.inner))
+        # Note: for performance reasons, we only try to get 0 elements.
+        Gurobi.get_dblattrarray(model.inner, "UnbdRay", 1, 0)
         return true
-    catch
-        return false
+    catch ex
+        if isa(ex, Gurobi.GurobiError)
+            return false
+        else
+            rethrow(ex)
+        end
     end
 end
 
