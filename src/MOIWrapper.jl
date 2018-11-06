@@ -377,7 +377,7 @@ function LQOI.get_primal_status(model::Optimizer)
         return MOI.FeasiblePoint
     elseif stat == :solution_limit
         return MOI.FeasiblePoint
-    elseif stat in [:inf_or_unbd, :unbounded] && has_primal_ray(model)
+    elseif (stat == :inf_or_unbd || stat == :unbounded) && has_primal_ray(model)
         return MOI.InfeasibilityCertificate
     elseif stat == :suboptimal
         return MOI.FeasiblePoint
@@ -397,7 +397,7 @@ function LQOI.get_dual_status(model::Optimizer)
             return MOI.FeasiblePoint
         elseif stat == :solution_limit
             return MOI.FeasiblePoint
-        elseif stat in [:inf_or_unbd, :infeasible] && has_dual_ray(model)
+        elseif (stat == :inf_or_unbd || stat == :infeasible) && has_dual_ray(model)
             return MOI.InfeasibilityCertificate
         elseif stat == :suboptimal
             return MOI.FeasiblePoint
