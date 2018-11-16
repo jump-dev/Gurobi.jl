@@ -21,10 +21,13 @@ paths_to_try = copy(aliases)
 for a in aliases
     if haskey(ENV, "GUROBI_HOME")
         if Compat.Sys.isunix()
-            push!(paths_to_try, joinpath(ENV["GUROBI_HOME"],"lib",string("lib",a,".so")))
+            push!(paths_to_try, joinpath(ENV["GUROBI_HOME"], "lib", string("lib", a, ".so")))
         end
         if Compat.Sys.iswindows()
-            push!(paths_to_try, joinpath(ENV["GUROBI_HOME"],"bin",string(a,".",Libdl.dlext)))
+            push!(paths_to_try, joinpath(ENV["GUROBI_HOME"], "bin", string(a, ".", Libdl.dlext)))
+        end
+        if Compat.Sys.isapple()
+            push!(paths_to_try, joinpath(ENV["GUROBI_HOME"], "lib", string("lib", a, ".dylib")))
         end
     end
     # gurobi uses .so on OS X for some reason
