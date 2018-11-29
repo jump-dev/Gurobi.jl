@@ -33,6 +33,7 @@ for a in aliases
     # gurobi uses .so on OS X for some reason
     if Compat.Sys.isapple()
         push!(paths_to_try, string("lib$a.so"))
+        push!(paths_to_try, string("lib$a.dylib"))
     end
 end
 
