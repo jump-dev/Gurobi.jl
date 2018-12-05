@@ -495,8 +495,9 @@ end
 
 function has_dual_ray(model::Optimizer)
     try
-        # Note: for performance reasons, we only try to get 0 elements.
-        Gurobi.get_dblattrarray(model.inner, "FarkasDual", 1, 0)
+        # Note: for performance reasons, we try to get 1 element because for
+        # some versions of Gurobi, we cannot query 0 elements without error.
+        Gurobi.get_dblattrarray(model.inner, "FarkasDual", 1, 1)
         return true
     catch ex
         if isa(ex, Gurobi.GurobiError)
@@ -514,8 +515,9 @@ end
 
 function has_primal_ray(model::Optimizer)
     try
-        # Note: for performance reasons, we only try to get 0 elements.
-        Gurobi.get_dblattrarray(model.inner, "UnbdRay", 1, 0)
+        # Note: for performance reasons, we try to get 1 element because for
+        # some versions of Gurobi, we cannot query 0 elements without error.
+        Gurobi.get_dblattrarray(model.inner, "UnbdRay", 1, 1)
         return true
     catch ex
         if isa(ex, Gurobi.GurobiError)
