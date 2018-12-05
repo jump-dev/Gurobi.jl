@@ -42,7 +42,7 @@ end
 
 # error
 
-mutable struct GurobiError
+mutable struct GurobiError <: Exception
     code::Int
     msg::String
 
