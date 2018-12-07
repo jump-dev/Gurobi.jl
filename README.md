@@ -29,9 +29,11 @@ Here is the procedure to setup this package:
 
 4. Now, you can start using it.
 
+By default, `build`ing *Gurobi.jl* will fail if the Gurobi library is not found. This may not be desirable in certain cases, for example when part of a package's test suite uses Gurobi as an optional test dependency, but Gurobi cannot be installed on a CI server running the test suite. To support this use case, the `GUROBI_JL_SKIP_LIB_CHECK` environment variable may be set (to any value) to make *Gurobi.jl* installable (but not usable).
+
 ## Use Other Packages
 
-We highly recommend that you use the *Gurobi.jl* package with higher level packages such as [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl) or [MathProgBase.jl](https://github.com/JuliaOpt/MathProgBase.jl). 
+We highly recommend that you use the *Gurobi.jl* package with higher level packages such as [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl) or [MathProgBase.jl](https://github.com/JuliaOpt/MathProgBase.jl).
 
 This can be done using the ``GurobiSolver`` object. Here is how to create a *JuMP* model that uses Gurobi as the solver. Parameters are passed as keyword arguments:
 ```julia
@@ -63,7 +65,7 @@ setparam!(env, name, v)   # set the value of a parameter
 setparams!(env, name1=value1, name2=value2, ...)  # set parameters using keyword arguments
 ```
 
-You may refer to Gurobi's [Parameter Reference](http://www.gurobi.com/documentation/5.0/reference-manual/node653) for the whole list of parameters. 
+You may refer to Gurobi's [Parameter Reference](http://www.gurobi.com/documentation/5.0/reference-manual/node653) for the whole list of parameters.
 
 Here are some simple examples
 ```julia
@@ -82,11 +84,11 @@ solver = GurobiSolver(Method=1, IterationLimit=100.)
 If the objective coefficients and the constraints have already been given, one may use a high-level function ``gurobi_model`` to construct a model:
 
 ```julia
-gurobi_model(env, ...) 
+gurobi_model(env, ...)
 ```
 One can use keyword arguments to specify the models:
 * ``name``:  the model name.
-* ``sense``: the sense of optimization (a symbol, which can be either ``:minimize`` (default) or ``:maximize``). 
+* ``sense``: the sense of optimization (a symbol, which can be either ``:minimize`` (default) or ``:maximize``).
 * ``f``:   the linear coefficient vector.
 * ``H``:   the quadratic coefficient matrix (can be dense or sparse).
 * ``A``:   the coefficient matrix of the linear inequality constraints.
@@ -105,28 +107,28 @@ objective:  (1/2) x' H x + f' x
          lb <= x <= ub
 ```
 
-The caller *must* specify ``f`` using a non-empty vector, while other keyword arguments are optional. When ``H`` is omitted, this reduces to an LP problem. When ``lb`` is omitted, the variables are not lower bounded, and when ``ub`` is omitted, the variables are not upper bounded. 
+The caller *must* specify ``f`` using a non-empty vector, while other keyword arguments are optional. When ``H`` is omitted, this reduces to an LP problem. When ``lb`` is omitted, the variables are not lower bounded, and when ``ub`` is omitted, the variables are not upper bounded.
 
 
 #### Low-level API
 
-This package also provides functions to build the model from scratch and gradually add variables and constraints. 
+This package also provides functions to build the model from scratch and gradually add variables and constraints.
 To construct an empty model, one can write:
 ```julia
 env = Gurobi.Env()    # creates a Gurobi environment
 
-model = Gurobi.Model(env, name)   # creates an empty model 
-model = Gurobi.Model(env, name, sense)  
+model = Gurobi.Model(env, name)   # creates an empty model
+model = Gurobi.Model(env, name, sense)
 ```
 
-Here, ``sense`` is a symbol, which can be either ``:minimize`` or ``:maximize`` (default to ``:minimize`` when omitted). 
+Here, ``sense`` is a symbol, which can be either ``:minimize`` or ``:maximize`` (default to ``:minimize`` when omitted).
 
 Then, the following functions can be used to add variables and constraints to the model:
 ```julia
 ## add variables
 
 add_var!(model, vtype, c)   # add an variable with coefficient c
-                            # vtype can be either of 
+                            # vtype can be either of
                             # - GRB_CONTINUOUS  (for continuous variable)
                             # - GRB_INTEGER (for integer variable)
                             # - GRB_BINARY (for binary variable, i.e. 0/1)
@@ -141,9 +143,9 @@ add_bvar!(model, c)            # add a binary variable
 
 ## add constraints
 
-# add a constraint with non-zero coefficients on specific variables. 
+# add a constraint with non-zero coefficients on specific variables.
 # rel can be '<', '>', or '='
-add_constr!(model, inds, coeffs, rel, rhs)  
+add_constr!(model, inds, coeffs, rel, rhs)
 
 # add a constraint with coefficient vector for all variables.
 add_constr!(model, coeffs, rel, rhs)
@@ -214,9 +216,9 @@ setparam!(env, "Presolve", 0)
 
  # construct the model
 model = gurobi_model(env;
-    name = "lp_01", 
-    f = ones(2), 
-    A = [50. 24.; 30. 33.], 
+    name = "lp_01",
+    f = ones(2),
+    A = [50. 24.; 30. 33.],
     b = [2400., 2100.],
     lb = [5., 45.])
 
@@ -249,7 +251,7 @@ model = Gurobi.Model(env, "lp_01", :maximize)
 add_cvar!(model, 1.0, 45., Inf)  # x: x >= 45
 add_cvar!(model, 1.0,  5., Inf)  # y: y >= 5
 
- # For Gurobi, you have to call update_model to have the 
+ # For Gurobi, you have to call update_model to have the
  # lastest changes take effect
 update_model!(model)
 
@@ -271,7 +273,7 @@ You may also add variables and constraints in batch, as:
  # add mutliple variables in batch
 add_cvars!(model, [1., 1.], [45., 5.], Inf)
 
- # add multiple constraints in batch 
+ # add multiple constraints in batch
 A = [50. 24.; 30. 33.]
 b = [2400., 2100.]
 add_constrs!(model, A, '<', b)
@@ -279,8 +281,8 @@ add_constrs!(model, A, '<', b)
 
 ##### Example 1.3: Linear programming (MATLAB-like style)
 
-You may also specify and solve the entire problem in one function call, using the 
-solver-independent [MathProgBase](https://github.com/JuliaOpt/MathProgBase.jl) package. 
+You may also specify and solve the entire problem in one function call, using the
+solver-independent [MathProgBase](https://github.com/JuliaOpt/MathProgBase.jl) package.
 
 Julia code:
 ```julia
@@ -290,7 +292,7 @@ f = [1., 1.]
 A = [50. 24.; 30. 33.]
 b = [2400., 2100.]
 lb = [5., 45.]
- 
+
 # pass params as keyword arguments to GurobiSolver
 solution = linprog(f, A, '<', b, lb, Inf, GurobiSolver(Presolve=0))
 ```
@@ -314,7 +316,7 @@ m = Model(solver=GurobiSolver(Presolve=0))
 @constraint(m, 30x + 33y <= 2100)
 
 status = solve(m)
-println("Optimal objective: ",getobjectivevalue(m), 
+println("Optimal objective: ",getobjectivevalue(m),
 	". x = ", getvalue(x), " y = ", getvalue(y))
 ```
 
@@ -336,11 +338,11 @@ using Gurobi
 
 env = Gurobi.Env()
 
-model = gurobi_model(env; 
-        name = "qp_01", 
-        H = [2. 1. 0.; 1. 2. 1.; 0. 1. 2.], 
-        f = [0., 0., 0.], 
-        A = -[1. 2. 3.; 1. 1. 0.], 
+model = gurobi_model(env;
+        name = "qp_01",
+        H = [2. 1. 0.; 1. 2. 1.; 0. 1. 2.],
+        f = [0., 0., 0.],
+        A = -[1. 2. 3.; 1. 1. 0.],
         b = -[4., 1.])
 optimize(model)
 ```
@@ -348,7 +350,7 @@ optimize(model)
 ##### Example 2.2: Low-level Quadratic Programming API
 
 ```julia
-using Gurobi 
+using Gurobi
 
 env = Gurobi.Env()
 
@@ -401,7 +403,7 @@ add_cvar!(model, 1., 0., 5.)  # x
  # add integer variable
 add_ivar!(model, 2., 0, 10)   # y
 
- # add binary variable 
+ # add binary variable
 add_bvar!(model, 5.)          # z
 
  # have the variables incorporated into the model
@@ -482,4 +484,3 @@ m1 = Model(solver=GurobiSolver(env))
 m2 = Model(solver=GurobiSolver(env, OutputFlag=0))
 ...
 ```
-
