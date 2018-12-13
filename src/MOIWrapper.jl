@@ -341,6 +341,11 @@ function LQOI.add_mip_starts!(model::Optimizer, columns::Vector{Int}, starts::Ve
     update_model!(model.inner)
     return
 end
+function MOI.supports(
+        ::Optimizer, ::MOI.VariablePrimalStart, ::Type{MOI.VariableIndex})
+    return true
+end
+
 
 LQOI.solve_mip_problem!(model::Optimizer) = LQOI.solve_linear_problem!(model)
 
@@ -357,21 +362,13 @@ function LQOI.get_termination_status(model::Optimizer)
     if stat == :loaded
         return MOI.OtherError
     elseif stat == :optimal
-        return MOI.Success
+        return MOI.Optimal
     elseif stat == :infeasible
-        if has_dual_ray(model)
-            return MOI.Success
-        else
-            return MOI.InfeasibleNoResult
-        end
+        return MOI.Infeasible
     elseif stat == :inf_or_unbd
         return MOI.InfeasibleOrUnbounded
     elseif stat == :unbounded
-        if has_primal_ray(model)
-            return MOI.Success
-        else
-            return MOI.UnboundedNoResult
-        end
+        return MOI.DualInfeasible
     elseif stat == :cutoff
         return MOI.ObjectiveLimit
     elseif stat == :iteration_limit
@@ -416,7 +413,7 @@ end
 function LQOI.get_dual_status(model::Optimizer)
     stat = get_status(model.inner)
     if is_mip(model.inner) || is_qcp(model.inner)
-        return MOI.UnknownResultStatus
+        return MOI.NoSolution
     else
         if stat == :optimal
             return MOI.FeasiblePoint
@@ -428,7 +425,7 @@ function LQOI.get_dual_status(model::Optimizer)
             return MOI.FeasiblePoint
         end
     end
-    return MOI.UnknownResultStatus
+    return MOI.NoSolution
 end
 
 function LQOI.get_variable_primal_solution!(model::Optimizer, dest)

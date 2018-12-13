@@ -79,6 +79,12 @@ end
 end
 @testset "ModelLike tests" begin
     solver = Gurobi.Optimizer()
+    @testset "default_objective_test" begin
+         MOIT.default_objective_test(solver)
+     end
+     @testset "default_status_test" begin
+         MOIT.default_status_test(solver)
+     end
     @testset "nametest" begin
         MOIT.nametest(solver)
     end
@@ -237,7 +243,7 @@ end
     # We should have a primal feasible solution:
     @test MOI.get(m, MOI.PrimalStatus()) == MOI.FeasiblePoint
     # But we have no dual status:
-    @test MOI.get(m, MOI.DualStatus()) == MOI.UnknownResultStatus
+    @test MOI.get(m, MOI.DualStatus()) == MOI.NoSolution
 end
 
 @testset "Constant objective (issue #111)" begin
