@@ -79,6 +79,7 @@ end
 end
 @testset "ModelLike tests" begin
     solver = Gurobi.Optimizer()
+    @test MOI.get(solver, MOI.SolverName()) == "Gurobi"
     @testset "default_objective_test" begin
          MOIT.default_objective_test(solver)
      end

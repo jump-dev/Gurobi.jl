@@ -65,6 +65,8 @@ function Optimizer(;kwargs...)
     return model
 end
 
+MOI.get(::Optimizer, ::MOI.SolverName) = "Gurobi"
+
 function MOI.empty!(model::Optimizer)
     MOI.empty!(model, model.env)
     setparam!(model.inner, "InfUnbdInfo", 1)
