@@ -240,11 +240,11 @@ end
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(.-item_values, x), 0.0))
     MOI.optimize!(m)
 
-    @test MOI.get(m, MOI.TerminationStatus()) == MOI.SolutionLimit
+    @test MOI.get(m, MOI.TerminationStatus()) == MOI.SOLUTION_LIMIT
     # We should have a primal feasible solution:
-    @test MOI.get(m, MOI.PrimalStatus()) == MOI.FeasiblePoint
+    @test MOI.get(m, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
     # But we have no dual status:
-    @test MOI.get(m, MOI.DualStatus()) == MOI.NoSolution
+    @test MOI.get(m, MOI.DualStatus()) == MOI.NO_SOLUTION
 end
 
 @testset "Constant objective (issue #111)" begin
