@@ -310,9 +310,9 @@ end
 function LQOI.get_objectivesense(model::Optimizer)
     sense = model_sense(model.inner)
     if sense == :maximize
-        return MOI.MaxSense
+        return MOI.MAX_SENSE
     elseif sense == :minimize
-        return MOI.MinSense
+        return MOI.MIN_SENSE
     else
         error("Invalid objective sense: $(sense)")
     end
@@ -362,72 +362,72 @@ end
 function LQOI.get_termination_status(model::Optimizer)
     stat = get_status(model.inner)
     if stat == :loaded
-        return MOI.OtherError
+        return MOI.OTHER_ERROR
     elseif stat == :optimal
-        return MOI.Optimal
+        return MOI.OPTIMAL
     elseif stat == :infeasible
-        return MOI.Infeasible
+        return MOI.INFEASIBLE
     elseif stat == :inf_or_unbd
-        return MOI.InfeasibleOrUnbounded
+        return MOI.INFEASIBLE_OR_UNBOUNDED
     elseif stat == :unbounded
-        return MOI.DualInfeasible
+        return MOI.DUAL_INFEASIBLE
     elseif stat == :cutoff
-        return MOI.ObjectiveLimit
+        return MOI.OBJECTIVE_LIMIT
     elseif stat == :iteration_limit
-        return MOI.IterationLimit
+        return MOI.ITERATION_LIMIT
     elseif stat == :node_limit
-        return MOI.NodeLimit
+        return MOI.NODE_LIMIT
     elseif stat == :time_limit
-        return MOI.TimeLimit
+        return MOI.TIME_LIMIT
     elseif stat == :solution_limit
-        return MOI.SolutionLimit
+        return MOI.SOLUTION_LIMIT
     elseif stat == :interrupted
-        return MOI.Interrupted
+        return MOI.INTERRUPTED
     elseif stat == :numeric
-        return MOI.NumericalError
+        return MOI.NUMERICAL_ERROR
     elseif stat == :suboptimal
-        return MOI.OtherLimit
+        return MOI.OTHER_LIMIT
     elseif stat == :inprogress
-        return MOI.OtherError
+        return MOI.OTHER_ERROR
     elseif stat == :user_obj_limit
-        return MOI.ObjectiveLimit
+        return MOI.OBJECTIVE_LIMIT
     end
-    return MOI.OtherError
+    return MOI.OTHER_ERROR
 end
 
 function LQOI.get_primal_status(model::Optimizer)
     stat = get_status(model.inner)
     if stat == :optimal
-        return MOI.FeasiblePoint
+        return MOI.FEASIBLE_POINT
     elseif stat == :solution_limit
-        return MOI.FeasiblePoint
+        return MOI.FEASIBLE_POINT
     elseif (stat == :inf_or_unbd || stat == :unbounded) && has_primal_ray(model)
-        return MOI.InfeasibilityCertificate
+        return MOI.INFEASIBILITY_CERTIFICATE
     elseif stat == :suboptimal
-        return MOI.FeasiblePoint
+        return MOI.FEASIBLE_POINT
     elseif is_mip(model.inner) && get_sol_count(model.inner) > 0
-        return MOI.FeasiblePoint
+        return MOI.FEASIBLE_POINT
     else
-        return MOI.NoSolution
+        return MOI.NO_SOLUTION
     end
 end
 
 function LQOI.get_dual_status(model::Optimizer)
     stat = get_status(model.inner)
     if is_mip(model.inner) || is_qcp(model.inner)
-        return MOI.NoSolution
+        return MOI.NO_SOLUTION
     else
         if stat == :optimal
-            return MOI.FeasiblePoint
+            return MOI.FEASIBLE_POINT
         elseif stat == :solution_limit
-            return MOI.FeasiblePoint
+            return MOI.FEASIBLE_POINT
         elseif (stat == :inf_or_unbd || stat == :infeasible) && has_dual_ray(model)
-            return MOI.InfeasibilityCertificate
+            return MOI.INFEASIBILITY_CERTIFICATE
         elseif stat == :suboptimal
-            return MOI.FeasiblePoint
+            return MOI.FEASIBLE_POINT
         end
     end
-    return MOI.NoSolution
+    return MOI.NO_SOLUTION
 end
 
 function LQOI.get_variable_primal_solution!(model::Optimizer, dest)
