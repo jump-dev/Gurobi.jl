@@ -11,7 +11,7 @@
 #   objv: 71818.1818
 #
 
-using MathProgBase, Gurobi, Compat.Test
+using Gurobi, Compat.Test
 
 @testset "LP 02" begin
 

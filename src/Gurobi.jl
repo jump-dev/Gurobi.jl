@@ -76,6 +76,6 @@ module Gurobi
     include("grb_solve.jl")
     include("grb_callbacks.jl")
 
-    include("MPBWrapper.jl")
-    include("MOIWrapper.jl")
+    include("MPB_wrapper.jl")
+    include("MOI_wrapper.jl")
 end
