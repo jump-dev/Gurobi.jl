@@ -56,7 +56,7 @@ end
 LQOI.LinearQuadraticModel(::Type{Optimizer}, env) = Model(env::Env,"defaultname")
 
 """
-    Optimizer(;kwargs...)
+    Optimizer(env::Gurobi.Env = Gurobi.Env(); kwargs...)
 
 Create a new Optimizer object.
 
@@ -64,9 +64,9 @@ Note that we set the parameter `InfUnbdInfo` to `1` rather than the default of
 `0` so that we can query infeasibility certificates. Users are, however, free to
 overide this as follows `Gurobi.Optimizer(InfUndbInfo=0)`.
 """
-function Optimizer(;kwargs...)
+function Optimizer(env::Env = Env(); kwargs...)
     model = Optimizer(nothing)
-    model.env = Env()
+    model.env = env
     model.params = Dict{String,Any}()
     MOI.empty!(model)
     for (name, value) in kwargs

@@ -259,3 +259,10 @@ end
     @test MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()).constant == 3.0
     @test Gurobi.get_dblattr(m.inner, "ObjCon") == 3.0
 end
+
+@testset "Test mutiple Env's" begin
+    env = Gurobi.Env()
+    model_1 = Gurobi.Optimizer(env)
+    model_2 = Gurobi.Optimizer(env)
+    @test model_1.inner.env.ptr_env == model_2.inner.env.ptr_env
+end
