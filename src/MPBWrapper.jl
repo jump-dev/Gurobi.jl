@@ -111,8 +111,8 @@ function MPB.loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
         _objwarning(m.obj)
     end
     _truncateobj!(m.obj)
-    m.lb = getconstrLB(m)
-    m.ub = getconstrUB(m)
+    m.lb = MPB.getconstrLB(m)
+    m.ub = MPB.getconstrUB(m)
 end
 
 if VERSION >= v"0.7-"
