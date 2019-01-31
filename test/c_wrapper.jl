@@ -1,5 +1,12 @@
 using Gurobi: getcoeff
 
+@testset "File Tests" begin
+    @testset for file in filter(
+            s -> endswith(s, ".jl"), readdir(joinpath(@__DIR__, "C")))
+        evalfile(joinpath(@__DIR__, "C", file))
+    end
+end
+
 @testset "Empty constraints (Issue #142)" begin
     @testset "No variables, no constraints" begin
         model = Gurobi.Model(Gurobi.Env(), "model")
