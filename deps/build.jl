@@ -24,7 +24,12 @@ for a in aliases
             push!(paths_to_try, joinpath(ENV["GUROBI_HOME"], "lib", string("lib", a, ".so")))
         end
         if Compat.Sys.iswindows()
-            push!(paths_to_try, joinpath(ENV["GUROBI_HOME"], "bin", string(a, ".", Libdl.dlext)))
+            path = joinpath(ENV["GUROBI_HOME"], "bin", string(a, ".", Libdl.dlext))
+            # When this path gets written out to a file, it will escape the
+            # backslashes, so we need to doubly escape them. If your environment variable is
+            # C:/gurobi, then the `joinpath` operation will use `/` and so this won't be affected.
+            path = replace(path, "\\" => "\\\\")
+            push!(paths_to_try, path)
         end
         if Compat.Sys.isapple()
             push!(paths_to_try, joinpath(ENV["GUROBI_HOME"], "lib", string("lib", a, ".dylib")))
