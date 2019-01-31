@@ -260,12 +260,38 @@ end
     @test Gurobi.get_dblattr(m.inner, "ObjCon") == 3.0
 end
 
-@testset "Test mutiple Env's" begin
-    env = Gurobi.Env()
-    model_1 = Gurobi.Optimizer(env)
-    model_2 = Gurobi.Optimizer(env)
-    @test model_1.inner.env.ptr_env == model_2.inner.env.ptr_env
-    # Check that emptying a model doesn't create a new Env.
-    MOI.empty!(model_1)
-    @test model_1.inner.env.ptr_env == model_2.inner.env.ptr_env
+@testset "Env" begin
+    @testset "User-provided" begin
+        env = Gurobi.Env()
+        model_1 = Gurobi.Optimizer(env)
+        @test model_1.inner.env === env
+        model_2 = Gurobi.Optimizer(env)
+        @test model_2.inner.env === env
+        # Check that finalizer doesn't touch env when manually provided.
+        finalize(model_1.inner)
+        @test Gurobi.is_valid(env)
+    end
+    @testset "Automatic" begin
+        model_1 = Gurobi.Optimizer()
+        model_2 = Gurobi.Optimizer()
+        @test model_1.inner.env !== model_2.inner.env
+        # Check that env is finalized with model when not supplied manually.
+        finalize(model_1.inner)
+        @test !Gurobi.is_valid(model_1.inner.env)
+    end
+    @testset "Env when emptied" begin
+        @testset "User-provided" begin
+            env = Gurobi.Env()
+            model = Gurobi.Optimizer(env)
+            @test model.inner.env === env
+            MOI.empty!(model)
+            @test model.inner.env === env
+        end
+        @testset "Automatic" begin
+            model = Gurobi.Optimizer()
+            env = model.inner.env
+            MOI.empty!(model)
+            @test model.inner.env !== env
+        end
+    end
 end
