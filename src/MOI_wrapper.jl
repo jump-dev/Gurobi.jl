@@ -96,6 +96,7 @@ function _update_if_necessary(model::Optimizer)
         update_model!(model.inner)
         model.needs_update = false
     end
+    return
 end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Gurobi"
