@@ -313,20 +313,21 @@ function LQOI.set_quadratic_objective!(model::Optimizer, I::Vector{Int}, J::Vect
 end
 
 function LQOI.set_linear_objective!(model::Optimizer, columns::Vector{Int}, coefficients::Vector{Float64})
-    nvars = num_vars(model.inner)
+    nvars = LQOI.get_number_variables(model)
     obj = zeros(Float64, nvars)
     for (col, coef) in zip(columns, coefficients)
         obj[col] += coef
     end
-    set_dblattrarray!(model.inner, "Obj", 1, num_vars(model.inner), obj)
+    set_dblattrarray!(model.inner, "Obj", 1, nvars, obj)
     _require_update(model)
     return
 end
 
 function LQOI.set_constant_objective!(model::Optimizer, value::Real)
     set_dblattr!(model.inner, "ObjCon", value)
-    if num_vars(model.inner) > 0
+    if LQOI.get_number_variables(model) > 0
         # Work-around for https://github.com/JuliaOpt/LinQuadOptInterface.jl/pull/44#issuecomment-409373755
+        _update_if_necessary(model)
         set_dblattrarray!(model.inner, "Obj", 1, 1,
             get_dblattrarray(model.inner, "Obj", 1, 1))
     end
@@ -390,7 +391,8 @@ function LQOI.delete_variables!(model::Optimizer, first_col::Int, last_col::Int)
 end
 
 function LQOI.add_mip_starts!(model::Optimizer, columns::Vector{Int}, starts::Vector{Float64})
-    x = zeros(num_vars(model.inner))
+    nvars = LQOI.get_number_variables(model)
+    x = zeros(nvars)
     for (col, val) in zip(columns, starts)
         x[col] = val
     end
