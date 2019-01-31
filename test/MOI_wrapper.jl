@@ -265,4 +265,7 @@ end
     model_1 = Gurobi.Optimizer(env)
     model_2 = Gurobi.Optimizer(env)
     @test model_1.inner.env.ptr_env == model_2.inner.env.ptr_env
+    # Check that emptying a model doesn't create a new Env.
+    MOI.empty!(model_1)
+    @test model_1.inner.env.ptr_env == model_2.inner.env.ptr_env
 end
