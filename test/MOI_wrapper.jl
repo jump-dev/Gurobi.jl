@@ -284,14 +284,17 @@ end
             env = Gurobi.Env()
             model = Gurobi.Optimizer(env)
             @test model.inner.env === env
+            @test Gurobi.is_valid(env)
             MOI.empty!(model)
             @test model.inner.env === env
+            @test Gurobi.is_valid(env)
         end
         @testset "Automatic" begin
             model = Gurobi.Optimizer()
             env = model.inner.env
             MOI.empty!(model)
             @test model.inner.env !== env
+            @test Gurobi.is_valid(model.inner.env)
         end
     end
 end
