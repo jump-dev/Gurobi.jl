@@ -1,35 +1,41 @@
 using Compat
+
 @static if VERSION >= v"0.7"
     using Libdl
 end
 
-depsfile = joinpath(dirname(@__FILE__),"deps.jl")
-if isfile(depsfile)
-    rm(depsfile)
+const DEPS_FILE = joinpath(@__DIR__, "deps.jl")
+
+if isfile(DEPS_FILE)
+    rm(DEPS_FILE)
 end
 
 function write_depsfile(path)
-    f = open(depsfile,"w")
-    println(f,"const libgurobi = \"$path\"")
-    close(f)
+    # When `path` gets written out to a file, it will escape any backslashes, so
+    # we need to doubly escape them. If your path uses forward slashes, this
+    # operation won't do anything.
+    path = replace(path, "\\" => "\\\\")
+    open(DEPS_FILE, "w") do io
+        println(io, "const libgurobi = \"$(path)\"")
+    end
 end
 
-aliases = ["gurobi81","gurobi80","gurobi75","gurobi70","gurobi65","gurobi60","gurobi56","gurobi55"]
+const ALIASES = [
+    "gurobi81", "gurobi80",
+    "gurobi75", "gurobi70",
+    "gurobi65", "gurobi60",
+    "gurobi56", "gurobi55"
+]
 
-paths_to_try = copy(aliases)
+paths_to_try = copy(ALIASES)
 
-for a in aliases
+for a in ALIASES
     if haskey(ENV, "GUROBI_HOME")
         if Compat.Sys.isunix()
             push!(paths_to_try, joinpath(ENV["GUROBI_HOME"], "lib", string("lib", a, ".so")))
         end
         if Compat.Sys.iswindows()
-            path = joinpath(ENV["GUROBI_HOME"], "bin", string(a, ".", Libdl.dlext))
-            # When this path gets written out to a file, it will escape the
-            # backslashes, so we need to doubly escape them. If your environment variable is
-            # C:/gurobi, then the `joinpath` operation will use `/` and so this won't be affected.
-            path = replace(path, "\\" => "\\\\")
-            push!(paths_to_try, path)
+            push!(paths_to_try, joinpath(ENV["GUROBI_HOME"], "bin", string(a, ".", Libdl.dlext)))
         end
         if Compat.Sys.isapple()
             push!(paths_to_try, joinpath(ENV["GUROBI_HOME"], "lib", string("lib", a, ".dylib")))
