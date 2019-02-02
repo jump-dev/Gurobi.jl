@@ -141,9 +141,9 @@ function LQOI.change_variable_bounds!(
         senses::Vector{Cchar})
     for (column, bound, sense) in zip(columns, new_bounds, senses)
         if sense == Cchar('L')
-            set_dblattrlist!(model.inner, "LB", column, bound)
+            set_dblattrelement!(model.inner, "LB", column, bound)
         else
-            set_dblattrlist!(model.inner, "UB", column, bound)
+            set_dblattrelement!(model.inner, "UB", column, bound)
         end
     end
     _require_update(model)
