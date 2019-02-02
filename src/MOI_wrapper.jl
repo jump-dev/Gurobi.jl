@@ -37,8 +37,8 @@ const SUPPORTED_CONSTRAINTS = [
 
 mutable struct Optimizer <: LQOI.LinQuadOptimizer
     LQOI.@LinQuadOptimizerBase(Model)
-    env::Env
-    params::Dict{String,Any}
+    env::Union{Nothing, Env}
+    params::Dict{String, Any}
     # The next two fields are used to cleverly manage calls to `update_model!`.
     # `needs_update` is used to record whether an update should be called before
     # accessing a model attribute (such as the value of a RHS term). One of the
@@ -50,30 +50,44 @@ mutable struct Optimizer <: LQOI.LinQuadOptimizer
     # to adjust this value.
     needs_update::Bool
     num_variables::Int
-    Optimizer(::Nothing) = new()
+
+    """
+        Optimizer(env = nothing; kwargs...)
+
+    Create a new Optimizer object.
+
+    You can share Gurobi `Env`s between models by passing an instance of `Env`
+    as the first argument. By default, a new environment is created for every
+    model.
+
+    Note that we set the parameter `InfUnbdInfo` to `1` rather than the default
+    of `0` so that we can query infeasibility certificates. Users are, however,
+    free to overide this as follows `Gurobi.Optimizer(InfUndbInfo=0)`.
+    """
+    function Optimizer(env::Union{Nothing, Env} = nothing; kwargs...)
+        model = new()
+        model.env = env
+        model.params = Dict{String, Any}()
+        MOI.empty!(model)
+        for (name, value) in kwargs
+            model.params[string(name)] = value
+            setparam!(model.inner, string(name), value)
+        end
+        return model
+    end
 end
 
-LQOI.LinearQuadraticModel(::Type{Optimizer}, env) = Model(env::Env,"defaultname")
+function LQOI.LinearQuadraticModel(::Type{Optimizer}, env::Nothing)
+    # The existing env is `Nothing`, so create a new one. Since we own this one,
+    # make sure to finalize it.
+    new_env = Env()
+    return Model(new_env, "", finalize_env = true)
+end
 
-"""
-    Optimizer(;kwargs...)
-
-Create a new Optimizer object.
-
-Note that we set the parameter `InfUnbdInfo` to `1` rather than the default of
-`0` so that we can query infeasibility certificates. Users are, however, free to
-overide this as follows `Gurobi.Optimizer(InfUndbInfo=0)`.
-"""
-function Optimizer(;kwargs...)
-    model = Optimizer(nothing)
-    model.env = Env()
-    model.params = Dict{String,Any}()
-    MOI.empty!(model)
-    for (name, value) in kwargs
-        model.params[string(name)] = value
-        setparam!(model.inner, string(name), value)
-    end
-    return model
+function LQOI.LinearQuadraticModel(::Type{Optimizer}, env::Env)
+    # The user has passed an existing Env. Don't finalize it because we don't
+    # own this one.
+    return Model(env, "", finalize_env = false)
 end
 
 """
