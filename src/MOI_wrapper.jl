@@ -39,6 +39,17 @@ mutable struct Optimizer <: LQOI.LinQuadOptimizer
     LQOI.@LinQuadOptimizerBase(Model)
     env::Env
     params::Dict{String,Any}
+    # The next two fields are used to cleverly manage calls to `update_model!`.
+    # `needs_update` is used to record whether an update should be called before
+    # accessing a model attribute (such as the value of a RHS term). One of the
+    # main pain-points when using Gurobi through JuMP is the need to access the
+    # number of variables. Unfortunately, in order to use the Gurobi API (i.e.
+    # `num_vars(model.inner)`), we need to call `update_model!`. To avoid
+    # frequent calls just for this case, we cache the number of variables in
+    # `num_variables`. There are calls in `add_variables` and `delete_variables`
+    # to adjust this value.
+    needs_update::Bool
+    num_variables::Int
     Optimizer(::Nothing) = new()
 end
 
@@ -65,6 +76,29 @@ function Optimizer(;kwargs...)
     return model
 end
 
+"""
+    _require_update(model::Optimizer)
+
+Sets the `model.needs_update` flag. Call this at the end of any mutating method.
+"""
+function _require_update(model::Optimizer)
+    model.needs_update = true
+    return
+end
+
+"""
+    _require_update(model::Optimizer)
+
+Calls `update_model!`, but only if the `model.needs_update` flag is set.
+"""
+function _update_if_necessary(model::Optimizer)
+    if model.needs_update
+        update_model!(model.inner)
+        model.needs_update = false
+    end
+    return
+end
+
 MOI.get(::Optimizer, ::MOI.SolverName) = "Gurobi"
 
 function MOI.empty!(model::Optimizer)
@@ -73,6 +107,9 @@ function MOI.empty!(model::Optimizer)
     for (name, value) in model.params
         setparam!(model.inner, name, value)
     end
+    model.needs_update = false
+    model.num_variables = 0
+    return
 end
 
 LQOI.supported_constraints(::Optimizer) = SUPPORTED_CONSTRAINTS
@@ -113,34 +150,39 @@ function LQOI.change_variable_bounds!(model::Optimizer,
     if number_upper_bounds > 0
         set_dblattrlist!(model.inner, "UB", upper_cols, upper_values)
     end
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.get_variable_lowerbound(model::Optimizer, column::Int)
+    _update_if_necessary(model)
     return get_dblattrelement(model.inner, "LB", column)
 end
 
 function LQOI.get_variable_upperbound(model::Optimizer, column::Int)
+    _update_if_necessary(model)
     return get_dblattrelement(model.inner, "UB", column)
 end
 
 function LQOI.get_number_linear_constraints(model::Optimizer)
+    _update_if_necessary(model)
     return num_constrs(model.inner)
 end
 
 function LQOI.add_linear_constraints!(model::Optimizer,
         A::LQOI.CSRMatrix{Float64}, sense::Vector{Cchar}, rhs::Vector{Float64})
     add_constrs!(model.inner, A.row_pointers, A.columns, A.coefficients, sense, rhs)
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.get_rhs(model::Optimizer, row::Int)
+    _update_if_necessary(model)
     return get_dblattrelement(model.inner, "RHS", row)
 end
 
 function LQOI.get_linear_constraint(model::Optimizer, row::Int)
+    _update_if_necessary(model)
     A = sparse(get_constrs(model.inner, row, 1)')
     # note: we return 1-index columns
     return A.rowval, A.nzval
@@ -148,60 +190,64 @@ end
 
 function LQOI.change_matrix_coefficient!(model::Optimizer, row::Int, col::Int, coef::Float64)
     chg_coeffs!(model.inner, row, col, coef)
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.change_objective_coefficient!(model::Optimizer, col::Int, coef::Float64)
     set_dblattrelement!(model.inner, "Obj", col, coef)
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.change_rhs_coefficient!(model::Optimizer, row::Int, coef::Float64)
     set_dblattrelement!(model.inner, "RHS", row, coef)
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.delete_linear_constraints!(model::Optimizer, first_row::Int, last_row::Int)
+    _update_if_necessary(model)
     del_constrs!(model.inner, collect(first_row:last_row))
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.delete_quadratic_constraints!(model::Optimizer, first_row::Int, last_row::Int)
+    _update_if_necessary(model)
     delqconstrs!(model.inner, collect(first_row:last_row))
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.change_variable_types!(model::Optimizer, columns::Vector{Int}, vtypes::Vector{Cchar})
     set_charattrlist!(model.inner, "VType", Cint.(columns), vtypes)
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.change_linear_constraint_sense!(model::Optimizer, rows::Vector{Int}, senses::Vector{Cchar})
     set_charattrlist!(model.inner, "Sense", Cint.(rows), senses)
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.add_sos_constraint!(model::Optimizer, columns::Vector{Int}, weights::Vector{Float64}, sos_type)
     add_sos!(model.inner, sos_type, columns, weights)
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.delete_sos!(model::Optimizer, first_row::Int, last_row::Int)
+    _update_if_necessary(model)
     del_sos!(model.inner, Cint.(first_row:last_row))
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 # TODO improve getting processes
 function LQOI.get_sos_constraint(model::Optimizer, idx)
+    _update_if_necessary(model)
     A, types = get_sos_matrix(model.inner)
     line = A[idx,:] #sparse vec
     cols = line.nzind
@@ -211,6 +257,7 @@ function LQOI.get_sos_constraint(model::Optimizer, idx)
 end
 
 function LQOI.get_number_quadratic_constraints(model::Optimizer)
+    _update_if_necessary(model)
     return num_qconstrs(model.inner)
 end
 
@@ -237,11 +284,12 @@ function LQOI.add_quadratic_constraint!(model::Optimizer,
     scalediagonal!(V, I, J, 0.5)
     add_qconstr!(model.inner, affine_columns, affine_coefficients, I, J, V, sense, rhs)
     scalediagonal!(V, I, J, 2.0)
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.get_quadratic_constraint(model::Optimizer, row::Int)
+    _update_if_necessary(model)
     affine_cols, affine_coefficients, I, J, V = getqconstr(model.inner, row)
     # note: we return 1-index columns here
     affine_cols .+= 1
@@ -251,6 +299,7 @@ function LQOI.get_quadratic_constraint(model::Optimizer, row::Int)
 end
 
 function LQOI.get_quadratic_rhs(model::Optimizer, row::Int)
+    _update_if_necessary(model)
     return get_dblattrelement(model.inner, "QCRHS", row)
 end
 
@@ -260,29 +309,30 @@ function LQOI.set_quadratic_objective!(model::Optimizer, I::Vector{Int}, J::Vect
     scalediagonal!(V, I, J, 0.5)
     add_qpterms!(model.inner, I, J, V)
     scalediagonal!(V, I, J, 2.0)
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.set_linear_objective!(model::Optimizer, columns::Vector{Int}, coefficients::Vector{Float64})
-    nvars = num_vars(model.inner)
+    nvars = LQOI.get_number_variables(model)
     obj = zeros(Float64, nvars)
     for (col, coef) in zip(columns, coefficients)
         obj[col] += coef
     end
-    set_dblattrarray!(model.inner, "Obj", 1, num_vars(model.inner), obj)
-    update_model!(model.inner)
+    set_dblattrarray!(model.inner, "Obj", 1, nvars, obj)
+    _require_update(model)
     return
 end
 
 function LQOI.set_constant_objective!(model::Optimizer, value::Real)
     set_dblattr!(model.inner, "ObjCon", value)
-    if num_vars(model.inner) > 0
+    if LQOI.get_number_variables(model) > 0
         # Work-around for https://github.com/JuliaOpt/LinQuadOptInterface.jl/pull/44#issuecomment-409373755
+        _update_if_necessary(model)
         set_dblattrarray!(model.inner, "Obj", 1, 1,
             get_dblattrarray(model.inner, "Obj", 1, 1))
     end
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
@@ -294,20 +344,23 @@ function LQOI.change_objective_sense!(model::Optimizer, sense::Symbol)
     else
         error("Invalid objective sense: $(sense)")
     end
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 
 function LQOI.get_linear_objective!(model::Optimizer, dest)
+    _update_if_necessary(model)
     get_dblattrarray!(dest, model.inner, "Obj", 1)
     return dest
 end
 
 function LQOI.get_constant_objective(model::Optimizer)
+    _update_if_necessary(model)
     return get_dblattr(model.inner, "ObjCon")
 end
 
 function LQOI.get_objectivesense(model::Optimizer)
+    _update_if_necessary(model)
     sense = model_sense(model.inner)
     if sense == :maximize
         return MOI.MAX_SENSE
@@ -319,28 +372,33 @@ function LQOI.get_objectivesense(model::Optimizer)
 end
 
 function LQOI.get_number_variables(model::Optimizer)
-    return num_vars(model.inner)
+    # See the comment in the definition of Optimizer.
+    return model.num_variables
 end
 
 function LQOI.add_variables!(model::Optimizer, N::Int)
     add_cvars!(model.inner, zeros(N))
-    update_model!(model.inner)
+    model.num_variables += N
+    _require_update(model)
     return
 end
 
 function LQOI.delete_variables!(model::Optimizer, first_col::Int, last_col::Int)
+    _update_if_necessary(model)
     del_vars!(model.inner, Cint.(first_col:last_col))
-    update_model!(model.inner)
+    model.num_variables -= length(first_col:last_col)
+    _require_update(model)
     return
 end
 
 function LQOI.add_mip_starts!(model::Optimizer, columns::Vector{Int}, starts::Vector{Float64})
-    x = zeros(num_vars(model.inner))
+    nvars = LQOI.get_number_variables(model)
+    x = zeros(nvars)
     for (col, val) in zip(columns, starts)
         x[col] = val
     end
     loadbasis(model.inner, x)
-    update_model!(model.inner)
+    _require_update(model)
     return
 end
 function MOI.supports(
@@ -354,7 +412,7 @@ LQOI.solve_mip_problem!(model::Optimizer) = LQOI.solve_linear_problem!(model)
 LQOI.solve_quadratic_problem!(model::Optimizer) = LQOI.solve_linear_problem!(model)
 
 function LQOI.solve_linear_problem!(model::Optimizer)
-    update_model!(model.inner)
+    # Note: Gurobi will call update regardless, so we don't have to.
     optimize(model.inner)
     return
 end
