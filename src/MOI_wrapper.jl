@@ -136,16 +136,64 @@ LQOI.backend_type(::Optimizer, ::MOI.Zeros)                = Cchar('=')
 LQOI.backend_type(::Optimizer, ::MOI.Nonpositives)         = Cchar('<')
 LQOI.backend_type(::Optimizer, ::MOI.Nonnegatives)         = Cchar('>')
 
-function LQOI.change_variable_bounds!(
-        model::Optimizer, columns::Vector{Int}, new_bounds::Vector{Float64},
-        senses::Vector{Cchar})
+function LQOI.change_variable_bounds!(model::Optimizer,
+          columns::Vector{Int}, new_bounds::Vector{Float64},
+          senses::Vector{Cchar})
+    number_lower_bounds = count(x->x==Cchar('L'), senses)
+    lower_cols   = fill(0, number_lower_bounds)
+    lower_values = fill(0.0, number_lower_bounds)
+    number_upper_bounds = count(x->x==Cchar('U'), senses)
+    upper_cols   = fill(0, number_upper_bounds)
+    upper_values = fill(0.0, number_upper_bounds)
+    lower_index = 1
+    upper_index = 1
     for (column, bound, sense) in zip(columns, new_bounds, senses)
         if sense == Cchar('L')
-            set_dblattrelement!(model.inner, "LB", column, bound)
-        else
-            set_dblattrelement!(model.inner, "UB", column, bound)
+            lower_cols[lower_index]   = column
+            lower_values[lower_index] = bound
+            lower_index += 1
+        elseif sense == Cchar('U')
+            upper_cols[upper_index]   = column
+            upper_values[upper_index] = bound
+            upper_index += 1
         end
     end
+    if number_lower_bounds > 0
+        set_dblattrlist!(model.inner, "LB", lower_cols, lower_values)
+    end
+    if number_upper_bounds > 0
+        set_dblattrlist!(model.inner, "UB", upper_cols, upper_values)
+    end
+    _require_update(model)
+    return
+end
+
+function LQOI.set_variable_bound(model::Optimizer, var::LQOI.SinVar, set::LQOI.LE)
+    column = LQOI.get_column(model, var)
+    set_dblattrelement!(model.inner, "UB", column, set.upper)
+    _require_update(model)
+    return
+end
+
+function LQOI.set_variable_bound(model::Optimizer, var::LQOI.SinVar, set::LQOI.GE)
+    column = LQOI.get_column(model, var)
+    set_dblattrelement!(model.inner, "LB", column, set.lower)
+    _require_update(model)
+    return
+end
+
+function LQOI.set_variable_bound(model::Optimizer, var::LQOI.SinVar, set::LQOI.EQ)
+    column = LQOI.get_column(model, var)
+    set_dblattrelement!(model.inner, "LB", column, set.value)
+    set_dblattrelement!(model.inner, "UB", column, set.value)
+    _require_update(model)
+    return
+end
+
+function LQOI.set_variable_bound(model::Optimizer, var::LQOI.SinVar, set::LQOI.IV)
+    column = LQOI.get_column(model, var)
+    set_dblattrelement!(model.inner, "LB", column, set.lower)
+    set_dblattrelement!(model.inner, "UB", column, set.upper)
     _require_update(model)
     return
 end
