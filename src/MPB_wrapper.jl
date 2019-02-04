@@ -757,3 +757,4 @@ end
 
 MPB.getsolvetime(m::GurobiMathProgModel) = get_runtime(m.inner)
 MPB.getnodecount(m::GurobiMathProgModel) = get_node_count(m.inner)
+MPB.getsimplexiter(m::GurobiMathProgModel) = get_dblattr(m.inner, "IterCount")
