@@ -11,10 +11,12 @@ if isfile(DEPS_FILE)
 end
 
 function write_depsfile(path)
-    # When `path` gets written out to a file, it will escape any backslashes, so
-    # we need to doubly escape them. If your path uses forward slashes, this
-    # operation won't do anything.
-    path = replace(path, "\\" => "\\\\")
+    if Compat.Sys.iswindows()
+        # When `path` gets written out to a file, it will escape any
+        # backslashes, so we need to doubly escape them. If your path uses
+        # forward slashes, this operation won't do anything.
+        path = replace(path, "\\" => "\\\\")
+    end
     open(DEPS_FILE, "w") do io
         println(io, "const libgurobi = \"$(path)\"")
     end
