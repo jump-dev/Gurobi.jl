@@ -121,7 +121,7 @@ end
             return
         end
 
-        MOI.set(m, Gurobi.CallbackFunction(callback_function))
+        MOI.set(m, Gurobi.CallbackFunction(), callback_function)
         MOI.optimize!(m)
 
         @test length(cb_calls) > 0
@@ -186,7 +186,7 @@ end
             return
         end
 
-        MOI.set(m, Gurobi.CallbackFunction(callback_function))
+        MOI.set(m, Gurobi.CallbackFunction(), callback_function)
         MOI.optimize!(m)
 
         @test MOI.get(m, MOI.VariablePrimal(), x) == 1
