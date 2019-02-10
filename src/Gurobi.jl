@@ -78,4 +78,22 @@ module Gurobi
 
     include("MPB_wrapper.jl")
     include("MOI_wrapper.jl")
+
+    function load_extensions(my_module::Module)
+        Base.include(my_module, joinpath(@__DIR__, "GurobiExtensions.jl"))
+    end
+
+    """
+        Gurobi.@load_extensions
+
+    Loads a module `GurobiExtensions` into the current workspace that contains
+    JuMP-related callback functionality.
+    """
+    macro load_extensions()
+        quote
+            load_extensions(@__MODULE__)
+            using .GurobiExtensions
+        end
+    end
+
 end
