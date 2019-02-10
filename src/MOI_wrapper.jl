@@ -406,6 +406,7 @@ function LQOI.delete_variables!(model::Optimizer, first_col::Int, last_col::Int)
 end
 
 function LQOI.add_mip_starts!(model::Optimizer, columns::Vector{Int}, starts::Vector{Float64})
+    _update_if_necessary(model)
     nvars = LQOI.get_number_variables(model)
     x = zeros(nvars)
     for (col, val) in zip(columns, starts)
