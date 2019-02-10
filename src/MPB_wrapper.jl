@@ -542,7 +542,7 @@ end
 function MPB.setwarmstart!(m::GurobiMathProgModel, v)
     for j = 1:length(v)
         if isnan(v[j])
-            v[j] = 1e101  # GRB_UNDEFINED
+            v[j] = GRB_UNDEFINED
         end
     end
     set_dblattrarray!(m.inner, "Start", 1, num_vars(m.inner), v)
@@ -649,7 +649,7 @@ function MPB.cbaddsolution!(d::GurobiCallbackData)
     cbsolution(d.cbdata, d.sol)
     # "Wipe" solution back to GRB_UNDEFINIED
     for i in 1:length(d.sol)
-        d.sol[i] = 1e101  # GRB_UNDEFINED
+        d.sol[i] = GRB_UNDEFINED
     end
 end
 
@@ -696,7 +696,7 @@ function mastercallback(ptr_model::Ptr{Cvoid}, cbdata::Ptr{Cvoid}, where::Cint, 
         end
     end
     if model.heuristiccb != nothing && state == :MIPNode
-        grbcb.sol = fill(1e101, MPB.numvar(model))  # GRB_UNDEFINED
+        grbcb.sol = fill(GRB_UNDEFINED, MPB.numvar(model))
         ret = model.heuristiccb(grbcb)
         if ret == :Exit
             terminate(model.inner)

@@ -74,6 +74,7 @@ end
 # one can write Gurobi.version to get the version numbers
 const version = getlibversion()
 
+const GRB_UNDEFINED = 1e101
 const GRB_INFINITY = 1e100
 const GRB_BOUNDMAX = 1e30
 function checkvalue(x::Real, bound)

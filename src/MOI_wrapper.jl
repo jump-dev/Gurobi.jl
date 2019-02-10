@@ -622,9 +622,27 @@ can access the `VariablePrimal` attribute as usual.
 """
 function cbget_mipsol_sol(model::Optimizer, cb_data::CallbackData, cb_where::Cint)
     if cb_where != CB_MIPSOL
-        error("loadcbsolution! can only be called from CB_MIPSOL.")
+        error("cbget_mipsol_sol can only be called from CB_MIPSOL.")
     end
     Gurobi.cbget_mipsol_sol(cb_data, cb_where, model.variable_primal_solution)
+    model.termination_status = MOI.SOLUTION_LIMIT
+    model.primal_status = MOI.FEASIBLE_POINT
+    return
+end
+
+"""
+    cbget_mipnode_rel(m::Optimizer, cb_data::GurobiCallbackData, cb_where::Int)
+
+Load the variable primal solution in a callback.
+
+This can only be called in a callback from `CB_MIPNODE`. After it is called, you
+can access the `VariablePrimal` attribute as usual.
+"""
+function cbget_mipnode_rel(model::Optimizer, cb_data::CallbackData, cb_where::Cint)
+    if cb_where != CB_MIPNODE
+        error("cbget_mipnode_rel can only be called from CB_MIPNODE.")
+    end
+    Gurobi.cbget_mipnode_rel(cb_data, cb_where, model.variable_primal_solution)
     model.termination_status = MOI.SOLUTION_LIMIT
     model.primal_status = MOI.FEASIBLE_POINT
     return
@@ -650,4 +668,25 @@ function cblazy(model::Optimizer, cb_data::CallbackData, func::LQOI.Linear,
         Char(LQOI.backend_type(model, set)),
         MOI.Utilities.getconstant(set)
     )
+end
+
+"""
+    cbsolution(model::Optimizer, cb_data::Gurobi.CallbackData,
+               solution::Dict{MOI.VariableIndex, Float64})
+
+Provide a new feasible solution to Gurobi via the `solution` dictionary, which
+maps a `MOI.VariableIndex` to its primal solution value.
+
+It is not necessary to provide a solution value for all variables.
+
+This function can only be called in a callback from `CB_MIPNODE`.
+"""
+function cbsolution(model::Optimizer, cb_data::CallbackData,
+                    sol::Dict{MOI.VariableIndex, Float64})
+    sol_vector = fill(GRB_UNDEFINED, MOI.get(model, MOI.NumberOfVariables()))
+    for (variable, value) in sol
+        column = LQOI.get_column(model, variable)
+        sol_vector[column] = value
+    end
+    cbsolution(cb_data, sol_vector)
 end
