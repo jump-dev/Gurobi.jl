@@ -603,43 +603,51 @@ end
 # ==============================================================================
 #    Callbacks in Gurobi
 # ==============================================================================
-struct CallbackFunction <: MOI.AbstractOptimizerAttribute end
-function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
-    set_callback_func!(model.inner, f)
+
+struct CallbackFunction <: MOI.AbstractModelAttribute end
+
+function MOI.set(model::Optimizer, ::CallbackFunction, callback::Function)
+    set_callback_func!(model.inner, callback)
     update_model!(model.inner)
     return
 end
 
 """
-    loadcbsolution!(m::Optimizer, cb_data::GurobiCallbackData, cb_where::Int)
+    cbget_mipsol_sol(m::Optimizer, cb_data::GurobiCallbackData, cb_where::Int)
 
 Load the variable primal solution in a callback.
 
 This can only be called in a callback from `CB_MIPSOL`. After it is called, you
 can access the `VariablePrimal` attribute as usual.
 """
-function loadcbsolution!(model::Optimizer, cb_data::CallbackData, cb_where::Cint)
+function cbget_mipsol_sol(model::Optimizer, cb_data::CallbackData, cb_where::Cint)
     if cb_where != CB_MIPSOL
         error("loadcbsolution! can only be called from CB_MIPSOL.")
     end
     Gurobi.cbget_mipsol_sol(cb_data, cb_where, model.variable_primal_solution)
+    model.termination_status = MOI.SOLUTION_LIMIT
+    model.primal_status = MOI.FEASIBLE_POINT
     return
 end
 
 """
-    cblazy!(cb_data::Gurobi.CallbackData, m::Optimizer, func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
+    cblazy(m::Optimizer, cb_data::Gurobi.CallbackData, func::LQOI.Linear,
+           set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
 
 Add a lazy cut to the model `m`.
 
-You must have the option `LazyConstraints` set  via `Optimizer(LazyConstraint=1)`.
-This can only be called in a callback from `CB_MIPSOL`.
+This function can only be called in a callback from `CB_MIPSOL`.
+
+Also note that you must have the option `LazyConstraints` set via
+`Optimizer(LazyConstraint=1)`.
 """
-function cblazy!(cb_data::CallbackData, model::Optimizer,
-        func::LQOI.Linear, set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
-    columns = [
-        Cint(LQOI.get_column(model, term.variable_index)) for term in func.terms]
-    coefficients = [term.coefficient for term in func.terms]
-    sense = Char(LQOI.backend_type(model, set))
-    rhs = MOI.Utilities.getconstant(set)
-    return cblazy(cb_data, columns, coefficients, sense, rhs)
+function cblazy(model::Optimizer, cb_data::CallbackData, func::LQOI.Linear,
+                set::S) where S <: Union{LQOI.LE, LQOI.GE, LQOI.EQ}
+    return cblazy(
+        cb_data,
+        [Cint(LQOI.get_column(model, term.variable_index)) for term in func.terms],
+        [term.coefficient for term in func.terms],
+        Char(LQOI.backend_type(model, set)),
+        MOI.Utilities.getconstant(set)
+    )
 end

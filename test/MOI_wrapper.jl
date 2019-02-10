@@ -118,10 +118,10 @@ end
         cb_calls = Int32[]
         function callback_function(cb_data::Gurobi.CallbackData, cb_where::Int32)
             push!(cb_calls, cb_where)
-            nothing
+            return
         end
 
-        MOI.set(m, Gurobi.CallbackFunction(), callback_function)
+        MOI.set(m, Gurobi.CallbackFunction(callback_function))
         MOI.optimize!(m)
 
         @test length(cb_calls) > 0
@@ -152,7 +152,7 @@ end
         function callback_function(cb_data::Gurobi.CallbackData, cb_where::Int32)
             push!(cb_calls, cb_where)
             if cb_where == Gurobi.CB_MIPSOL
-                Gurobi.loadcbsolution!(m, cb_data, cb_where)
+                Gurobi.cbget_mipsol_sol(m, cb_data, cb_where)
                 x_val = MOI.get(m, MOI.VariablePrimal(), x)
                 y_val = MOI.get(m, MOI.VariablePrimal(), y)
                 # We have two constraints, one cutting off the top
@@ -166,7 +166,7 @@ end
                 # (0,0) +---+---+ (2,0)
                 TOL = 1e-6  # Allow for some impreciseness in the solution
                 if y_val - x_val > 1 + TOL
-                    Gurobi.cblazy!(cb_data, m,
+                    Gurobi.cblazy(m, cb_data,
                         MOI.ScalarAffineFunction{Float64}(
                             MOI.ScalarAffineTerm.([-1.0, 1.0], [x, y]),
                             0.0
@@ -174,7 +174,7 @@ end
                         MOI.LessThan{Float64}(1.0)
                     )
                 elseif y_val + x_val > 3 + TOL
-                    Gurobi.cblazy!(cb_data, m,
+                    Gurobi.cblazy(m, cb_data,
                         MOI.ScalarAffineFunction{Float64}(
                             MOI.ScalarAffineTerm.([1.0, 1.0], [x, y]),
                             0.0
@@ -183,9 +183,10 @@ end
                     )
                 end
             end
+            return
         end
 
-        MOI.set(m, Gurobi.CallbackFunction(), callback_function)
+        MOI.set(m, Gurobi.CallbackFunction(callback_function))
         MOI.optimize!(m)
 
         @test MOI.get(m, MOI.VariablePrimal(), x) == 1
