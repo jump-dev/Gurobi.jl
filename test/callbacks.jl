@@ -1,9 +1,5 @@
 using JuMP, Gurobi, Test
 
-# This special macro loads a module called GurobiExtensions, which exports the
-# `@lazy_constraint` macro.
-Gurobi.@load_extensions
-
 # Create a JuMP model using Gurobi in direct-mode. We have to choose some
 # settings like `Presolve=0` to prevent Gurobi from trivially solving this
 # problem. Since we're using lazy constraints, we also have to set

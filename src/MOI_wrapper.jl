@@ -691,19 +691,26 @@ function cbsolution(model::Optimizer, cb_data::CallbackData,
     cbsolution(cb_data, sol_vector)
 end
 
-function load_extensions(my_module::Module)
-    Base.include(my_module, joinpath(@__DIR__, "GurobiExtensions.jl"))
+function MOI.set(optimizer::Gurobi.Optimizer, callbacks::MOI.Callbacks)
+    MOI.set(optimizer, Gurobi.CallbackFunction(), (cb_data, cb_where) -> begin
+        if callbacks.lazy_callback !== nothing && cb_where == Gurobi.CB_MIPSOL
+            Gurobi.cbget_mipsol_sol(optimizer, cb_data, cb_where)
+            callbacks.lazy_callback(cb_data)
+        elseif callbacks.heuristic_callback !== nothing && cb_where == Gurobi.CB_MIPNODE
+            Gurobi.cbget_mipnode_rel(optimizer, cb_data, cb_where)
+            callbacks.heuristic_callback(cb_data)
+        end
+        return
+    end)
 end
 
-"""
-    Gurobi.@load_extensions
+function MOI.add_lazy_constraint(
+        model::Gurobi.Optimizer, cb_data::Gurobi.CallbackData, func, set)
+    Gurobi.cblazy(model, cb_data, func, set)
+end
 
-Loads a module `GurobiExtensions` into the current workspace that contains
-JuMP-related callback functionality.
-"""
-macro load_extensions()
-    quote
-        load_extensions(@__MODULE__)
-        using .GurobiJuMPExtensions
-    end
+function MOI.add_heuristic_solution(
+        model::Gurobi.Optimizer, cb_data::Gurobi.CallbackData,
+        sol::Dict{MOI.VariableIndex, Float64})
+    Gurobi.cbsolution(model, cb_data, sol)
 end
