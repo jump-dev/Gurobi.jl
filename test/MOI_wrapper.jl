@@ -197,6 +197,62 @@ end
         @test Gurobi.CB_PRESOLVE in cb_calls
         @test Gurobi.CB_MIPSOL in cb_calls
     end
+
+    @testset "Solver-independent callbacks" begin
+        model = Gurobi.Optimizer(
+            OutputFlag=0, Cuts=0, Presolve=0, Heuristics=0, LazyConstraints=1)
+        MOI.Utilities.loadfromstring!(model, """
+            variables: x, y
+            maxobjective: y
+            c1: x in Integer()
+            c2: y in Integer()
+            c3: x in Interval(0.0, 2.0)
+            c4: y in Interval(0.0, 4.0)
+            c5: -1.0 * x + y <= 3.5
+            c6: 0.2 * x + y <= 4.1
+        """)
+        x = MOI.get(model, MOI.VariableIndex, "x")
+        y = MOI.get(model, MOI.VariableIndex, "y")
+        cb_calls = Symbol[]
+        function my_lazy_callback(cb_data)
+            push!(cb_calls, :lazy)
+            @assert MOI.get(model, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+            x_val = MOI.get(model, MOI.VariablePrimal(), x)
+            y_val = MOI.get(model, MOI.VariablePrimal(), y)
+            if y_val - x_val > 1.1 + 1e-6
+                MOI.add_lazy_constraint(
+                    model, cb_data,
+                    MOI.ScalarAffineFunction{Float64}(
+                        MOI.ScalarAffineTerm.([-1.0, 1.0], [x, y]),
+                        0.0),
+                    MOI.LessThan{Float64}(1.1)
+                )
+            elseif y_val + x_val > 3 + 1e-6
+                MOI.add_lazy_constraint(
+                    model, cb_data,
+                    MOI.ScalarAffineFunction{Float64}(
+                        MOI.ScalarAffineTerm.([1.0, 1.0], [x, y]),
+                        0.0),
+                    MOI.LessThan{Float64}(3.0)
+                )
+            end
+        end
+        function my_heuristic_callback(cb_data)
+            push!(cb_calls, :heuristic)
+            @assert MOI.get(model, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+            x_val = MOI.get(model, MOI.VariablePrimal(), x)
+            y_val = MOI.get(model, MOI.VariablePrimal(), y)
+            MOI.add_heuristic_solution(model, cb_data, Dict(x => 1.0, y => 2.0))
+        end
+        MOI.set(model, MOI.Callbacks(
+            lazy = my_lazy_callback, heuristic = my_heuristic_callback))
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), x) == 1
+        @test MOI.get(model, MOI.VariablePrimal(), y) == 2
+        @test length(cb_calls) > 0
+        @test :lazy in cb_calls
+        @test :heuristic in cb_calls
+    end
 end
 
 @testset "LQOI Issue #38" begin
