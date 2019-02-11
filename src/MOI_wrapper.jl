@@ -690,3 +690,20 @@ function cbsolution(model::Optimizer, cb_data::CallbackData,
     end
     cbsolution(cb_data, sol_vector)
 end
+
+function load_extensions(my_module::Module)
+    Base.include(my_module, joinpath(@__DIR__, "GurobiExtensions.jl"))
+end
+
+"""
+    Gurobi.@load_extensions
+
+Loads a module `GurobiExtensions` into the current workspace that contains
+JuMP-related callback functionality.
+"""
+macro load_extensions()
+    quote
+        load_extensions(@__MODULE__)
+        using .GurobiJuMPExtensions
+    end
+end
