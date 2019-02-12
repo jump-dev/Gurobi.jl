@@ -168,6 +168,36 @@ function LQOI.change_variable_bounds!(model::Optimizer,
     return
 end
 
+function LQOI.set_variable_bound(model::Optimizer, var::LQOI.SinVar, set::LQOI.LE)
+    column = LQOI.get_column(model, var)
+    set_dblattrelement!(model.inner, "UB", column, set.upper)
+    _require_update(model)
+    return
+end
+
+function LQOI.set_variable_bound(model::Optimizer, var::LQOI.SinVar, set::LQOI.GE)
+    column = LQOI.get_column(model, var)
+    set_dblattrelement!(model.inner, "LB", column, set.lower)
+    _require_update(model)
+    return
+end
+
+function LQOI.set_variable_bound(model::Optimizer, var::LQOI.SinVar, set::LQOI.EQ)
+    column = LQOI.get_column(model, var)
+    set_dblattrelement!(model.inner, "LB", column, set.value)
+    set_dblattrelement!(model.inner, "UB", column, set.value)
+    _require_update(model)
+    return
+end
+
+function LQOI.set_variable_bound(model::Optimizer, var::LQOI.SinVar, set::LQOI.IV)
+    column = LQOI.get_column(model, var)
+    set_dblattrelement!(model.inner, "LB", column, set.lower)
+    set_dblattrelement!(model.inner, "UB", column, set.upper)
+    _require_update(model)
+    return
+end
+
 function LQOI.get_variable_lowerbound(model::Optimizer, column::Int)
     _update_if_necessary(model)
     return get_dblattrelement(model.inner, "LB", column)
