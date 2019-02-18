@@ -363,6 +363,7 @@ function LQOI.set_linear_objective!(model::Optimizer, columns::Vector{Int}, coef
     for (col, coef) in zip(columns, coefficients)
         obj[col] += coef
     end
+    _update_if_necessary(model)
     set_dblattrarray!(model.inner, "Obj", 1, nvars, obj)
     _require_update(model)
     return
