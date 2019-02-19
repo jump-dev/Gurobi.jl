@@ -682,15 +682,31 @@ end
 function MOI.add_constraint(
         model::Optimizer, variable::MOI.SingleVariable, set::MOI.ZeroOne)
     variable_type = model.variable_type[variable.variable]
-    if variable_type != CONTINUOUS
+    if variable_type != LQOI.CONTINUOUS
         error("Cannot make variable binary because it is $(variable_type).")
     end
-    model.variable_type[variable.variable] = BINARY
+    model.variable_type[variable.variable] = LQOI.BINARY
     model.last_constraint_reference += 1
-    index = LQOI.SVCI{MOI.ZeroOne}(model.last_constraint_reference)
+    index = MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne}(
+        model.last_constraint_reference)
     dict = LQOI.constrdict(model, index)
     dict[index] = (variable.variable, -Inf, Inf)
-    set_charattrelemnt!(model.inner, "VType", column, CChar('B'))
+    column = LQOI.get_column(model, variable)
+    set_charattrelement!(model.inner, "VType", column, Char('B'))
     _require_update(model)
     return index
+end
+
+function MOI.delete(model::Optimizer,
+                    index::MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne})
+    LQOI.__assert_valid__(model, index)
+    LQOI.delete_constraint_name(model, index)
+    dict = LQOI.constrdict(model, index)
+    (variable, lower, upper) = dict[index]
+    model.variable_type[variable] = LQOI.CONTINUOUS
+    column = LQOI.get_column(model, variable)
+    set_charattrelement!(model.inner, "VType", column, Char('C'))
+    _require_update(model)
+    delete!(dict, index)
+    return
 end
