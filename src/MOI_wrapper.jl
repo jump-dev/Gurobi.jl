@@ -372,6 +372,7 @@ function LQOI.set_linear_objective!(model::Optimizer, columns::Vector{Int}, coef
     for (col, coef) in zip(columns, coefficients)
         obj[col] += coef
     end
+    _update_if_necessary(model)
     set_dblattrarray!(model.inner, "Obj", 1, nvars, obj)
     _require_update(model)
     return
@@ -681,4 +682,40 @@ function cblazy!(cb_data::CallbackData, model::Optimizer,
     sense = Char(LQOI.backend_type(model, set))
     rhs = MOI.Utilities.getconstant(set)
     return cblazy(cb_data, columns, coefficients, sense, rhs)
+end
+
+# The default implementation in LQOI is too slow for Gurobi since it has a
+# lookup of the variable bounds (calling _update_if_required), but it also sets
+# the variable bounds and the VType (calling _require_update). Thus, if you add
+# multiple ZeroOne constraints in sequence, you will call update every time!
+function MOI.add_constraint(
+        model::Optimizer, variable::MOI.SingleVariable, set::MOI.ZeroOne)
+    variable_type = model.variable_type[variable.variable]
+    if variable_type != LQOI.CONTINUOUS
+        error("Cannot make variable binary because it is $(variable_type).")
+    end
+    model.variable_type[variable.variable] = LQOI.BINARY
+    model.last_constraint_reference += 1
+    index = MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne}(
+        model.last_constraint_reference)
+    dict = LQOI.constrdict(model, index)
+    dict[index] = (variable.variable, -Inf, Inf)
+    column = LQOI.get_column(model, variable)
+    set_charattrelement!(model.inner, "VType", column, Char('B'))
+    _require_update(model)
+    return index
+end
+
+function MOI.delete(model::Optimizer,
+                    index::MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne})
+    LQOI.__assert_valid__(model, index)
+    LQOI.delete_constraint_name(model, index)
+    dict = LQOI.constrdict(model, index)
+    (variable, lower, upper) = dict[index]
+    model.variable_type[variable] = LQOI.CONTINUOUS
+    column = LQOI.get_column(model, variable)
+    set_charattrelement!(model.inner, "VType", column, Char('C'))
+    _require_update(model)
+    delete!(dict, index)
+    return
 end
