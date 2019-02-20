@@ -47,9 +47,12 @@ mutable struct Optimizer <: LQOI.LinQuadOptimizer
     # `num_vars(model.inner)`), we need to call `update_model!`. To avoid
     # frequent calls just for this case, we cache the number of variables in
     # `num_variables`. There are calls in `add_variables` and `delete_variables`
-    # to adjust this value.
+    # to adjust this value. In addition, we also cache the number of linear and
+    # quadratic constraints.
     needs_update::Bool
     num_variables::Int
+    num_linear_constraints::Int
+    num_quadratic_constraints::Int
 
     """
         Optimizer(env = nothing; kwargs...)
@@ -123,6 +126,8 @@ function MOI.empty!(model::Optimizer)
     end
     model.needs_update = false
     model.num_variables = 0
+    model.num_linear_constraints = 0
+    model.num_quadratic_constraints = 0
     return
 end
 
@@ -209,13 +214,14 @@ function LQOI.get_variable_upperbound(model::Optimizer, column::Int)
 end
 
 function LQOI.get_number_linear_constraints(model::Optimizer)
-    _update_if_necessary(model)
-    return num_constrs(model.inner)
+    # See the definition in Optimizer.
+    return model.num_linear_constraints
 end
 
 function LQOI.add_linear_constraints!(model::Optimizer,
         A::LQOI.CSRMatrix{Float64}, sense::Vector{Cchar}, rhs::Vector{Float64})
     add_constrs!(model.inner, A.row_pointers, A.columns, A.coefficients, sense, rhs)
+    model.num_linear_constraints += length(rhs)
     _require_update(model)
     return
 end
@@ -253,6 +259,7 @@ end
 function LQOI.delete_linear_constraints!(model::Optimizer, first_row::Int, last_row::Int)
     _update_if_necessary(model)
     del_constrs!(model.inner, collect(first_row:last_row))
+    model.num_linear_constraints -= last_row - first_row + 1
     _require_update(model)
     return
 end
@@ -260,6 +267,7 @@ end
 function LQOI.delete_quadratic_constraints!(model::Optimizer, first_row::Int, last_row::Int)
     _update_if_necessary(model)
     delqconstrs!(model.inner, collect(first_row:last_row))
+    model.num_quadratic_constraints -= last_row - first_row + 1
     _require_update(model)
     return
 end
@@ -301,8 +309,8 @@ function LQOI.get_sos_constraint(model::Optimizer, idx)
 end
 
 function LQOI.get_number_quadratic_constraints(model::Optimizer)
-    _update_if_necessary(model)
-    return num_qconstrs(model.inner)
+    # See the definition of Optimizer.
+    return model.num_quadratic_constraints
 end
 
 function scalediagonal!(V, I, J, scale)
@@ -328,6 +336,7 @@ function LQOI.add_quadratic_constraint!(model::Optimizer,
     scalediagonal!(V, I, J, 0.5)
     add_qconstr!(model.inner, affine_columns, affine_coefficients, I, J, V, sense, rhs)
     scalediagonal!(V, I, J, 2.0)
+    model.num_quadratic_constraints += 1
     _require_update(model)
     return
 end
