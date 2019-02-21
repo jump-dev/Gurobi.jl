@@ -25,13 +25,32 @@ Here is the procedure to setup this package:
 
    **The minimum version supported by *Gurobi.jl* is Gurobi v7.0.**
 
-2. Install this package using ``Pkg.add("Gurobi")``.
+2. Make sure the ``GUROBI_HOME`` environmental variable is set to the path of the Gurobi directory. This is part of a standard installation. The Gurobi library will be searched for in ``GUROBI_HOME/lib`` on unix platforms and ``GUROBI_HOME\bin`` on Windows. If the library is not found, check that your version is listed in ``deps/build.jl``.
 
-3. Make sure the ``GUROBI_HOME`` environmental variable is set to the path of the Gurobi directory. This is part of a standard installation. The Gurobi library will be searched for in ``GUROBI_HOME/lib`` on unix platforms and ``GUROBI_HOME\bin`` on Windows. If the library is not found, check that your version is listed in ``deps/build.jl``.
+3. Install this package using ``Pkg.add("Gurobi")``.
 
 4. Now, you can start using it.
 
 By default, `build`ing *Gurobi.jl* will fail if the Gurobi library is not found. This may not be desirable in certain cases, for example when part of a package's test suite uses Gurobi as an optional test dependency, but Gurobi cannot be installed on a CI server running the test suite. To support this use case, the `GUROBI_JL_SKIP_LIB_CHECK` environment variable may be set (to any value) to make *Gurobi.jl* installable (but not usable).
+
+## "LoadError: Unable to locate Gurobi installation"
+
+- Make sure that you have downloaded and installed Gurobi from [gurobi.com](https://gurobi.com). Also, make sure that you validate the license.
+
+- Check that you have a Gurobi version between 7.0 and 8.1.
+
+- Make sure that the `GUROBI_HOME` environment variable is set correctly. You can see the current value as follows
+```julia
+julia> ENV["GUROBI_HOME"]
+"C:\\gurobi801\\win64"
+```
+If it is not set correctly (e.g., you get an error `Key "GUROBI_HOME" not found`), you can set it as follows
+```julia
+julia> ENV["GUROBI_HOME"] = "/replace/this/with/the/path/to/gurobi"
+
+julia> import Pkg; Pkg.build("Gurobi")
+```
+The Gurobi library (`gurobiXXX.dll` on Windows, `gurobiXXX.so` on Unix, and `gurobiXXX.dylib` in OSX where `XXX` is a version) will be searched for in ``GUROBI_HOME/lib`` on unix platforms and ``GUROBI_HOME\bin`` on Windows.
 
 ## Use Other Packages
 
