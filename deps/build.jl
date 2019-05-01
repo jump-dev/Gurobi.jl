@@ -59,5 +59,5 @@ for l in paths_to_try
 end
 
 if !found && !haskey(ENV, "GUROBI_JL_SKIP_LIB_CHECK")
-    error("Unable to locate Gurobi installation. Note that this must be downloaded separately from gurobi.com")
+    error("Unable to locate Gurobi installation. Note that this must be downloaded separately from gurobi.com. Did you set the GUROBI_HOME environment variable?")
 end
