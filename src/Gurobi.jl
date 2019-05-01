@@ -5,7 +5,7 @@ module Gurobi
     if isfile(joinpath(dirname(@__FILE__),"..","deps","deps.jl"))
         include("../deps/deps.jl")
     else
-        error("Gurobi not properly installed. Please run Pkg.build(\"Gurobi\"). Did you set the GUROBI_HOME environment variable?")
+        error("Gurobi not properly installed. Please run Pkg.build(\"Gurobi\"). For more information go to https://github.com/JuliaOpt/Gurobi.jl")
     end
 
     using Compat
