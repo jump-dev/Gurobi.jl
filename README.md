@@ -60,7 +60,7 @@ This can be done using the ``GurobiSolver`` object. Here is how to create a *JuM
 ```julia
 using JuMP, Gurobi
 
-m = Model(solver=GurobiSolver(Presolve=0))
+model = Model(with_optimizer(Gurobi.Optimizer))
 ```
 
 *Most users should not need to use the low-level API detailed in the following sections.*
