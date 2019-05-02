@@ -327,17 +327,17 @@ natural algebraic approach.
 using JuMP, Gurobi
 
 # pass params as keyword arguments to GurobiSolver
-m = Model(with_optimizer(Gurobi.Optimizer, Presolve=0))
+model = Model(with_optimizer(Gurobi.Optimizer, Presolve=0))
 
-@variable(m, x >= 5)
-@variable(m, y >= 45)
+@variable(model, x >= 5)
+@variable(model, y >= 45)
 
-@objective(m, Min, x + y)
-@constraint(m, 50x + 24y <= 2400)
-@constraint(m, 30x + 33y <= 2100)
+@objective(model, Min, x + y)
+@constraint(model, 50x + 24y <= 2400)
+@constraint(model, 30x + 33y <= 2100)
 
-status = solve(m)
-println("Optimal objective: ",getobjectivevalue(m),
+status = solve(model)
+println("Optimal objective: ",getobjectivevalue(model),
 	". x = ", getvalue(x), " y = ", getvalue(y))
 ```
 
@@ -443,19 +443,19 @@ Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer 
 ```julia
 using JuMP, Gurobi
 
-m = Model(with_optimizer(Gurobi.Optimizer))
+model = Model(with_optimizer(Gurobi.Optimizer))
 
-@variables(m,begin
+@variables(model,begin
     0 <= x <= 5
     0 <= y <= 10, Int
     z, Bin
 end)
 
-@objective(m, Max, x + 2y + 5z)
-@constraint(m, x + y + z <= 10)
-@constraint(m, x + 2y + z <= 15)
+@objective(model, Max, x + 2y + 5z)
+@constraint(model, x + y + z <= 10)
+@constraint(model, x + 2y + z <= 15)
 
-solve(m)
+solve(model)
 ```
 
 ### Quadratic constraints
@@ -498,10 +498,10 @@ When using this package via other packages such as [MathProgBase.jl](https://git
 using JuMP, Gurobi
 env = Gurobi.Env()
 
-m1 = Model(with_optimizer(Gurobi.Optimizer, env))
+model1 = Model(with_optimizer(Gurobi.Optimizer, env))
 ...
 
 # The solvers can have different options too
-m2 = Model(with_optimizer(Gurobi.Optimizer, env, OutputFlag=0))
+model2 = Model(with_optimizer(Gurobi.Optimizer, env, OutputFlag=0))
 ...
 ```
