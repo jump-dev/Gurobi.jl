@@ -336,9 +336,9 @@ model = Model(with_optimizer(Gurobi.Optimizer, Presolve=0))
 @constraint(model, 50x + 24y <= 2400)
 @constraint(model, 30x + 33y <= 2100)
 
-status = solve(model)
-println("Optimal objective: ",getobjectivevalue(model),
-	". x = ", getvalue(x), " y = ", getvalue(y))
+optimize!(model)
+println("Optimal objective: ", objective_value(model),
+	". x = ", value(x), " y = ", value(y))
 ```
 
 ### Quadratic programming Examples
@@ -455,7 +455,7 @@ end)
 @constraint(model, x + y + z <= 10)
 @constraint(model, x + 2y + z <= 15)
 
-solve(model)
+optimize!(model)
 ```
 
 ### Quadratic constraints
