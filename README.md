@@ -327,7 +327,7 @@ natural algebraic approach.
 using JuMP, Gurobi
 
 # pass params as keyword arguments to GurobiSolver
-m = Model(solver=GurobiSolver(Presolve=0))
+m = Model(with_optimizer(Gurobi.Optimizer, Presolve=0))
 
 @variable(m, x >= 5)
 @variable(m, y >= 45)
@@ -443,7 +443,7 @@ Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer 
 ```julia
 using JuMP, Gurobi
 
-m = Model(solver=GurobiSolver())
+m = Model(with_optimizer(Gurobi.Optimizer))
 
 @variables(m,begin
     0 <= x <= 5
@@ -498,10 +498,10 @@ When using this package via other packages such as [MathProgBase.jl](https://git
 using JuMP, Gurobi
 env = Gurobi.Env()
 
-m1 = Model(solver=GurobiSolver(env))
+m1 = Model(with_optimizer(Gurobi.Optimizer, env))
 ...
 
 # The solvers can have different options too
-m2 = Model(solver=GurobiSolver(env, OutputFlag=0))
+m2 = Model(with_optimizer(Gurobi.Optimizer, env))
 ...
 ```
