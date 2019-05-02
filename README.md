@@ -502,6 +502,6 @@ m1 = Model(with_optimizer(Gurobi.Optimizer, env))
 ...
 
 # The solvers can have different options too
-m2 = Model(with_optimizer(Gurobi.Optimizer, env))
+m2 = Model(with_optimizer(Gurobi.Optimizer, env, OutputFlag=0))
 ...
 ```
