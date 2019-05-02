@@ -86,7 +86,7 @@ setparam!(env, name, v)   # set the value of a parameter
 setparams!(env, name1=value1, name2=value2, ...)  # set parameters using keyword arguments
 ```
 
-You may refer to Gurobi's [Parameter Reference](http://www.gurobi.com/documentation/5.0/reference-manual/node653) for the whole list of parameters.
+You may refer to Gurobi's [Parameter Reference](http://www.gurobi.com/documentation/8.1/refman/parameters.html) for the whole list of parameters.
 
 Here are some simple examples
 ```julia
