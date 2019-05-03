@@ -445,7 +445,7 @@ using JuMP, Gurobi
 
 model = Model(with_optimizer(Gurobi.Optimizer))
 
-@variables(model,begin
+@variables(model, begin
     0 <= x <= 5
     0 <= y <= 10, Int
     z, Bin
