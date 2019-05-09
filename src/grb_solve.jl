@@ -15,6 +15,7 @@ function computeIIS(model::Model)
     if ret != 0
         throw(GurobiError(model.env, ret))
     end
+    model.conflict = ret
     nothing
 end
 
@@ -123,7 +124,8 @@ const varmap = Dict(
 
 const conmap = Dict(
      0 => :Basic,
-    -1 => :Nonbasic)
+    -1 => :Nonbasic
+)
 
 const basicmap_rev = Dict(
     :Superbasic => Cint(-3),

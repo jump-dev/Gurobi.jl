@@ -11,9 +11,10 @@ mutable struct Model
     ptr_model::Ptr{Cvoid}
     callback::Any
     finalize_env::Bool
+    conflict::Integer
 
     function Model(env::Env, p::Ptr{Cvoid}; finalize_env::Bool=false)
-        model = new(env, p, nothing, finalize_env)
+        model = new(env, p, nothing, finalize_env, -1)
         if VERSION >= v"0.7-"
             finalizer(model) do m
                 free_model(m)

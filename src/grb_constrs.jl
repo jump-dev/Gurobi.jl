@@ -12,7 +12,7 @@ end
 function add_constr!(model::Model, inds::IVec, coeffs::FVec, rel::Cchar, rhs::Float64)
     length(inds) == length(coeffs) || error("Inconsistent argument dimensions.")
     ret = @grb_ccall(addconstr, Cint, (
-        Ptr{Cvoid},    # model
+        Ptr{Cvoid},   # model
         Cint,         # numnz
         Ptr{Cint},    # cind
         Ptr{Float64}, # cvals
