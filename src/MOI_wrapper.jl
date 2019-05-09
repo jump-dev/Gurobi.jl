@@ -733,15 +733,27 @@ conflict is not purged, and any calls to the above attributes will return values
 for the original conflict without a warning.
 """
 function compute_conflict(model::Optimizer)
-    computeIIS(model.inner)
+    try
+        computeIIS(model.inner)
+    catch exc
+        if isa(exc, GurobiError) && exc.code == 10015
+            model.inner.conflict = Gurobi.GRB_INFEASIBLE
+        else
+            rethrow(exc)
+        end
+    end
     return
 end
 
 function _ensure_conflict_computed(model::Optimizer)
-    if model.conflict == -1
+    if model.inner.conflict == -1
         error("Cannot access conflict status. Call `Gurobi.compute_conflict(model)` first. " *
               "In case the model is modified, the computed conflict will not be purged.")
     end
+end
+
+function _is_feasible(model::Optimizer)
+    return model.inner.conflict == Gurobi.GRB_INFEASIBLE
 end
 
 """
@@ -756,33 +768,35 @@ struct ConflictStatus <: MOI.AbstractModelAttribute  end
 MOI.is_set_by_optimize(::ConflictStatus) = true
 
 function MOI.get(model::Optimizer, ::ConflictStatus)
-    if model.conflict == -1
+    if model.inner.conflict == -1
         return MOI.OPTIMIZE_NOT_CALLED
-    elseif model.conflict == Gurobi.GRB_LOADED
-        return MOI.OTHER_ERROR
-    elseif model.conflict == Gurobi.GRB_OPTIMAL
+    elseif model.inner.conflict == 0
         return MOI.OPTIMAL
-    elseif model.conflict == Gurobi.GRB_INFEASIBLE
+    elseif model.inner.conflict == Gurobi.GRB_LOADED
+        return MOI.OTHER_ERROR
+    elseif model.inner.conflict == Gurobi.GRB_OPTIMAL
+        return MOI.OPTIMAL
+    elseif model.inner.conflict == Gurobi.GRB_INFEASIBLE
         return MOI.INFEASIBLE
-    elseif model.conflict == Gurobi.GRB_INF_OR_UNBD
+    elseif model.inner.conflict == Gurobi.GRB_INF_OR_UNBD
         return MOI.INFEASIBLE_OR_UNBOUNDED
-    elseif model.conflict == Gurobi.GRB_USER_OBJ_LIMIT
+    elseif model.inner.conflict == Gurobi.GRB_USER_OBJ_LIMIT
         return MOI.OBJECTIVE_LIMIT
-    elseif model.conflict == Gurobi.GRB_ITERATION_LIMIT
+    elseif model.inner.conflict == Gurobi.GRB_ITERATION_LIMIT
         return MOI.ITERATION_LIMIT
-    elseif model.conflict == Gurobi.GRB_NODE_LIMIT
+    elseif model.inner.conflict == Gurobi.GRB_NODE_LIMIT
         return MOI.NODE_LIMIT
-    elseif model.conflict == Gurobi.GRB_TIME_LIMIT
+    elseif model.inner.conflict == Gurobi.GRB_TIME_LIMIT
         return MOI.TIME_LIMIT
-    elseif model.conflict == Gurobi.GRB_SOLUTION_LIMIT
+    elseif model.inner.conflict == Gurobi.GRB_SOLUTION_LIMIT
         return MOI.SOLUTION_LIMIT
-    elseif model.conflict == Gurobi.GRB_INTERRUPTED
+    elseif model.inner.conflict == Gurobi.GRB_INTERRUPTED
         return MOI.INTERRUPTED
-    elseif model.conflict == Gurobi.GRB_NUMERIC
+    elseif model.inner.conflict == Gurobi.GRB_NUMERIC
         return MOI.NUMERICAL_ERROR
-    elseif model.conflict == Gurobi.GRB_SUBOPTIMAL
+    elseif model.inner.conflict == Gurobi.GRB_SUBOPTIMAL
         return MOI.OTHER_LIMIT
-    elseif model.conflict == Gurobi.GRB_INPROGRESS
+    elseif model.inner.conflict == Gurobi.GRB_INPROGRESS
         return MOI.OTHER_ERROR
     else
         return MOI.OTHER_ERROR
@@ -802,22 +816,28 @@ MOI.is_set_by_optimize(::ConstraintConflictStatus) = true
 
 function MOI.get(model::Optimizer, ::ConstraintConflictStatus, index::MOI.ConstraintIndex{<:MOI.SingleVariable, <:LQOI.LE})
     _ensure_conflict_computed(model)
-    return Bool(get_intattrelement(model, "IISUB", model[index] - 1))
+    return !_is_feasible(model) && Bool(get_intattrelement(model.inner, "IISUB", LQOI.get_column(model, model[index])))
 end
 
 function MOI.get(model::Optimizer, ::ConstraintConflictStatus, index::MOI.ConstraintIndex{<:MOI.SingleVariable, <:LQOI.GE})
     _ensure_conflict_computed(model)
-    return Bool(get_intattrelement(model, "IISLB", model[index] - 1))
+    return !_is_feasible(model) && Bool(get_intattrelement(model.inner, "IISLB", LQOI.get_column(model, model[index])))
 end
 
 function MOI.get(model::Optimizer, ::ConstraintConflictStatus, index::MOI.ConstraintIndex{<:MOI.SingleVariable, <:Union{LQOI.EQ, LQOI.IV}})
     _ensure_conflict_computed(model)
-    return Bool(get_intattrelement(model, "IISUB", model[index] - 1)) || Bool(get_intattrelement(model, "IISLB", model[index] - 1))
+    return !_is_feasible(model) && (
+        Bool(get_intattrelement(model.inner, "IISUB", LQOI.get_column(model, model[index]))) || Bool(get_intattrelement(model.inner, "IISLB", model[index])))
 end
 
 function MOI.get(model::Optimizer, ::ConstraintConflictStatus, index::MOI.ConstraintIndex{<:MOI.ScalarAffineFunction, <:Union{LQOI.LE, LQOI.GE, LQOI.EQ}})
     _ensure_conflict_computed(model)
-    return Bool(get_intattrelement(model, "IISConstr", model[index] - 1))
+    return !_is_feasible(model) && Bool(get_intattrelement(model.inner, "IISConstr", model[index]))
+end
+
+function MOI.get(model::Optimizer, ::ConstraintConflictStatus, index::MOI.ConstraintIndex{<:MOI.ScalarQuadraticFunction, <:Union{LQOI.LE, LQOI.GE}})
+    _ensure_conflict_computed(model)
+    return !_is_feasible(model) && Bool(get_intattrelement(model.inner, "IISQConstr", model[index]))
 end
 
 function MOI.supports(::Optimizer, ::ConstraintConflictStatus, ::Type{MOI.ConstraintIndex{<:MOI.SingleVariable, <:LQOI.LinSets}})
@@ -825,5 +845,9 @@ function MOI.supports(::Optimizer, ::ConstraintConflictStatus, ::Type{MOI.Constr
 end
 
 function MOI.supports(::Optimizer, ::ConstraintConflictStatus, ::Type{MOI.ConstraintIndex{<:MOI.ScalarAffineFunction, <:Union{LQOI.LE, LQOI.GE, LQOI.EQ}}})
+    return true
+end
+
+function MOI.supports(::Optimizer, ::ConstraintConflictStatus, ::Type{MOI.ConstraintIndex{<:MOI.ScalarQuadraticFunction, <:Union{LQOI.LE, LQOI.GE}}})
     return true
 end
