@@ -31,13 +31,17 @@ end
         solver = Gurobi.Optimizer(OutputFlag=0)
         MOIT.contlineartest(solver, MOIT.TestConfig(), [
             # This requires interval constraint.
-            "linear10",
+            "linear10", "linear10b",
             # This requires an infeasiblity certificate for a variable bound.
             "linear12"
         ])
     end
     @testset "linear10" begin
         MOIT.linear10test(
+            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(OutputFlag=0)),
+            MOIT.TestConfig()
+        )
+        MOIT.linear10btest(
             MOIB.SplitInterval{Float64}(Gurobi.Optimizer(OutputFlag=0)),
             MOIT.TestConfig()
         )
@@ -296,5 +300,58 @@ end
             @test model.inner.env !== env
             @test Gurobi.is_valid(model.inner.env)
         end
+    end
+end
+
+@testset "Cache objective_xxx" begin
+    @testset "LP" begin
+        model = Gurobi.Optimizer(OutputFlag = 0)
+        x = MOI.add_variable(model)
+        c = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(0.0))
+        MOI.set(model, MOI.ObjectiveFunction{MOI.SingleVariable}(), MOI.SingleVariable(x))
+        MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.ObjectiveValue()) == 0.0
+        @test MOI.get(model, MOI.ObjectiveBound()) == 0.0
+        MOI.set(model, MOI.ConstraintSet(), c, MOI.GreaterThan(1.0))
+        @test MOI.get(model, MOI.ConstraintSet(), c) == MOI.GreaterThan(1.0)
+        @test MOI.get(model, MOI.ObjectiveValue()) == 0.0
+        @test MOI.get(model, MOI.ObjectiveBound()) == 0.0
+    end
+    @testset "QP" begin
+        model = Gurobi.Optimizer(OutputFlag = 0)
+        MOI.Utilities.loadfromstring!(model, """
+        variables: x
+        minobjective: 1.0 * x * x
+        c: x >= 0.0
+        """)
+        x = MOI.get(model, MOI.VariableIndex, "x")
+        c = MOI.get(model, MOI.ConstraintIndex, "c")
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.ObjectiveValue()) == 0.0
+        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ObjectiveBound())
+        MOI.set(model, MOI.ConstraintSet(), c, MOI.GreaterThan(1.0))
+        @test MOI.get(model, MOI.ConstraintSet(), c) == MOI.GreaterThan(1.0)
+        @test MOI.get(model, MOI.ObjectiveValue()) == 0.0
+        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ObjectiveBound())
+    end
+    @testset "QCP" begin
+        model = Gurobi.Optimizer(OutputFlag = 0)
+        MOI.Utilities.loadfromstring!(model, """
+        variables: x
+        minobjective: x
+        c1: 1.0 * x * x >= 0.0
+        c2: x >= -1.0
+        """)
+        MOI.optimize!(model)
+        x = MOI.get(model, MOI.VariableIndex, "x")
+        c = MOI.get(model, MOI.ConstraintIndex, "c2")
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.ObjectiveValue()) == -1.0
+        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ObjectiveBound())
+        MOI.set(model, MOI.ConstraintSet(), c, MOI.GreaterThan(1.0))
+        @test MOI.get(model, MOI.ConstraintSet(), c) == MOI.GreaterThan(1.0)
+        @test MOI.get(model, MOI.ObjectiveValue()) == -1.0
+        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ObjectiveBound())
     end
 end

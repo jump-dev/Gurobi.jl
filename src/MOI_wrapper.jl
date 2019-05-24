@@ -53,6 +53,11 @@ mutable struct Optimizer <: LQOI.LinQuadOptimizer
     num_variables::Int
     num_linear_constraints::Int
     num_quadratic_constraints::Int
+    # These fields cache the objective value and objective bound after the solve
+    # so that their values can still be queried, even if the model has been
+    # modified.
+    objective_value::Float64
+    objective_bound::Float64
 
     """
         Optimizer(env = nothing; kwargs...)
@@ -128,6 +133,9 @@ function MOI.empty!(model::Optimizer)
     model.num_variables = 0
     model.num_linear_constraints = 0
     model.num_quadratic_constraints = 0
+
+    model.objective_value = NaN
+    model.objective_bound = NaN
     return
 end
 
@@ -468,7 +476,16 @@ LQOI.solve_quadratic_problem!(model::Optimizer) = LQOI.solve_linear_problem!(mod
 
 function LQOI.solve_linear_problem!(model::Optimizer)
     # Note: Gurobi will call update regardless, so we don't have to.
+    model.objective_value = NaN
+    model.objective_bound = NaN
     optimize(model.inner)
+    if LQOI.get_primal_status(model) == MOI.FEASIBLE_POINT
+        model.objective_value = get_objval(model.inner)
+        if get_intattr(model.inner, "isQCP") == 0 && get_intattr(model.inner, "isQP") == 0
+            # Objective bound can't be called for quadratic problems.
+            model.objective_bound = get_objbound(model.inner)
+        end
+    end
     return
 end
 
@@ -575,9 +592,17 @@ function LQOI.get_quadratic_dual_solution!(model::Optimizer, dest)
     return
 end
 
-LQOI.get_objective_value(model::Optimizer) = get_objval(model.inner)
+function LQOI.get_objective_value(model::Optimizer)
+    if !isnan(model.objective_value)
+        return model.objective_value
+    end
+    return get_objval(model.inner)
+end
 
 function LQOI.get_objective_bound(model::Optimizer)
+    if !isnan(model.objective_bound)
+        return model.objective_bound
+    end
     return get_objbound(model.inner)
 end
 
