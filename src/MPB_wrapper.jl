@@ -115,11 +115,9 @@ function MPB.loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
     m.ub = MPB.getconstrUB(m)
 end
 
-if VERSION >= v"0.7-"
-    function MPB.loadproblem!(m::GurobiMathProgModel, A::LinearAlgebra.Adjoint{T, Array{T, 2}},
-                          collb, colub, obj, rowlb, rowub, sense) where T
-        MPB.loadproblem!(m, collect(A), collb, colub, obj, rowlb, rowub, sense)
-    end
+function MPB.loadproblem!(m::GurobiMathProgModel, A::LinearAlgebra.Adjoint{T, Array{T, 2}},
+                        collb, colub, obj, rowlb, rowub, sense) where T
+    MPB.loadproblem!(m, collect(A), collb, colub, obj, rowlb, rowub, sense)
 end
 
 function MPB.loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
