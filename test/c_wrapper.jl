@@ -23,10 +23,7 @@ end
 end
 
 @testset "changing coefficients" begin
-    A = spzeros(2, 2)
-    A[1, 1] = 1.0
-    A[1, 2] = 2.0
-    A[2, 1] = 3.0
+    A = [1.0 2.0; 3.0 0.0]
     b = [0.1, 0.2]
     f = [0.0, 0.0]
     model = gurobi_model(Gurobi.Env(); f=f, A=A, b=b)

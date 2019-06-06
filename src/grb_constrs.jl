@@ -1,9 +1,5 @@
 # work around for julia issue #28948, Gurobi.jl issue #152
-if VERSION ≤ v"0.7-"
-    sparse_transpose(A) = sparse(transpose(A))
-else
-    sparse_transpose(A) = SparseMatrixCSC(transpose(A))
-end
+sparse_transpose(A) = SparseArrays.SparseMatrixCSC(transpose(A))
 
 ## Add Linear constraints
 
@@ -70,7 +66,7 @@ function add_constrs!(model::Model, cbeg::Vector, inds::Vector, coeffs::Vector, 
     add_constrs!(model, ivec(cbeg), ivec(inds), fvec(coeffs), cvecx(rel, length(cbeg)), fvec(rhs))
 end
 
-function add_constrs_t!(model::Model, At::SparseMatrixCSC{Float64}, rel::GCharOrVec, b::Vector)
+function add_constrs_t!(model::Model, At::SparseArrays.SparseMatrixCSC{Float64}, rel::GCharOrVec, b::Vector)
     n, m = size(At)
     (m == length(b) && n == num_vars(model)) || error("Incompatible argument dimensions.")
     add_constrs!(model, At.colptr[1:At.n], At.rowval, At.nzval, rel, b)
@@ -79,7 +75,7 @@ end
 function add_constrs_t!(model::Model, At::Matrix{Float64}, rel::GCharOrVec, b::Vector)
     n, m = size(At)
     (m == length(b) && n == num_vars(model)) || error("Incompatible argument dimensions.")
-    add_constrs_t!(model, sparse(At), rel, b)
+    add_constrs_t!(model, SparseArrays.sparse(At), rel, b)
 end
 
 function add_constrs!(model::Model, A::CoeffMat, rel::GCharOrVec, b::Vector{Float64})
@@ -151,12 +147,12 @@ function add_rangeconstrs!(model::Model, cbeg::Vector, inds::Vector, coeffs::Vec
     add_rangeconstrs!(model, ivec(cbeg), ivec(inds), fvec(coeffs), fvec(lb), fvec(ub))
 end
 
-function add_rangeconstrs_t!(model::Model, At::SparseMatrixCSC{Float64}, lb::Vector, ub::Vector)
+function add_rangeconstrs_t!(model::Model, At::SparseArrays.SparseMatrixCSC{Float64}, lb::Vector, ub::Vector)
     add_rangeconstrs!(model, At.colptr[1:At.n], At.rowval, At.nzval, lb, ub)
 end
 
 function add_rangeconstrs_t!(model::Model, At::Matrix{Float64}, lb::Vector, ub::Vector)
-    add_rangeconstrs_t!(model, sparse(At), lb, ub)
+    add_rangeconstrs_t!(model, SparseArrays.sparse(At), lb, ub)
 end
 
 function add_rangeconstrs!(model::Model, A::CoeffMat, lb::Vector, ub::Vector)
@@ -217,7 +213,7 @@ function get_constrs(model::Model, start::Integer, len::Integer)
             V[j] = cval[j]
         end
     end
-    return sparse(I, J, V, m, n)
+    return SparseArrays.sparse(I, J, V, m, n)
 end
 
 const GRB_SOS_TYPE1 = convert(Cint, 1)
@@ -304,7 +300,7 @@ function get_sos(model::Model, start::Integer, len::Integer)
             V[j] = cval[j]
         end
     end
-    return sparse(I, J, V, m, n), sostype#map(x-> x==Cint(1) ? :SOS1 : :SOS2 ,sostype)
+    return SparseArrays.sparse(I, J, V, m, n), sostype#map(x-> x==Cint(1) ? :SOS1 : :SOS2 ,sostype)
 end
 
 del_constrs!(model::Model, idx::T) where {T<:Real} = del_constrs!(model, Cint[idx])

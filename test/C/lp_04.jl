@@ -15,7 +15,7 @@
 #
 #   solution: x = 1.3333333, y = 1.3333333, objv = 2.66666666
 
-using Gurobi, Compat.Test, Compat.GC
+using Gurobi, Test
 
 @testset "LP 04" begin
     env = Gurobi.Env()

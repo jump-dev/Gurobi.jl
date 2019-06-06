@@ -233,7 +233,7 @@ end
 
 function LQOI.get_linear_constraint(model::Optimizer, row::Int)
     _update_if_necessary(model)
-    A = sparse(get_constrs(model.inner, row, 1)')
+    A = SparseArrays.sparse(get_constrs(model.inner, row, 1)')
     # note: we return 1-index columns
     return A.rowval, A.nzval
 end
@@ -348,7 +348,7 @@ function LQOI.get_quadratic_constraint(model::Optimizer, row::Int)
     affine_cols .+= 1
     I .+= 1
     J .+= 1
-    return affine_cols, affine_coefficients, sparse(I, J, V)
+    return affine_cols, affine_coefficients, SparseArrays.sparse(I, J, V)
 end
 
 function LQOI.get_quadratic_rhs(model::Optimizer, row::Int)

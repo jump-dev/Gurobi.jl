@@ -10,7 +10,7 @@
 #         z is binary
 #
 
-using Gurobi, Compat.Test
+using Gurobi, Test
 
 @testset "MIP 01" begin
     env = Gurobi.Env()

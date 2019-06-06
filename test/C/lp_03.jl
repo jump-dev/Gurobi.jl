@@ -1,6 +1,6 @@
 # Test get/set objective coefficients in LP
 
-using Gurobi, Compat.Test, Compat.GC
+using Gurobi, Test
 
 @testset "LP 03" begin
 	env = Gurobi.Env()

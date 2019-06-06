@@ -1,16 +1,9 @@
 using Gurobi
 import MathProgBase
-
-if VERSION >= v"0.7-"
-    using Compat.Pkg
-end
+using Pkg
 
 function mathprogbase_file(file::String)
-    if VERSION >= v"0.7-"
-        return joinpath(dirname(dirname(pathof(MathProgBase))), "test", file)
-    else
-        return joinpath(Pkg.dir("MathProgBase"), "test", file)
-    end
+    return joinpath(dirname(dirname(pathof(MathProgBase))), "test", file)
 end
 
 include(mathprogbase_file("linprog.jl"))

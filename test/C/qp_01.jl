@@ -8,7 +8,7 @@
 #    solution: (0.25, 0.75), objv = 1.875
 #
 
-using Gurobi, Compat.Test
+using Gurobi, Test
 
 @testset "QP1" begin
 
