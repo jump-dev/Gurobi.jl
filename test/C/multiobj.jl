@@ -1,7 +1,7 @@
 # hierarchical multi-objetive LP
 #
 
-using Gurobi, Compat.Test
+using Gurobi, Test
 
 env = Gurobi.Env()
 setparam!(env, "OutputFlag", 0)

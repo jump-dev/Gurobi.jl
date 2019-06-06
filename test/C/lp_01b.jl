@@ -8,7 +8,7 @@
 #
 #   solution: x = 45, y = 6.25, objv = 51.25
 
-using Gurobi, Compat.Test, Compat.GC
+using Gurobi, Test
 
 @testset "LP 01b" begin
 

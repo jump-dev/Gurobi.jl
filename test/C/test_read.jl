@@ -10,7 +10,7 @@
 #         p1 is integer: 0 <= p3
 #         z is binary
 
-using Gurobi, Compat.Test
+using Gurobi, Test
 
 @testset "test_read" begin
 # The function read() is used to produce a MIP start vector

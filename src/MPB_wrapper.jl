@@ -33,10 +33,10 @@ end
 
 function Base.copy(m::GurobiMathProgModel)
 
-    m.lazycb == nothing || @Compat.warn("Callbacks can't be copied, lazy callback ignored")
-    m.cutcb == nothing || @Compat.warn("Callbacks can't be copied, cut callback ignored")
-    m.heuristiccb == nothing || @Compat.warn("Callbacks can't be copied, heuristic callback ignored")
-    m.infocb == nothing || @Compat.warn("Callbacks can't be copied, info callback ignored")
+    m.lazycb == nothing || @warn("Callbacks can't be copied, lazy callback ignored")
+    m.cutcb == nothing || @warn("Callbacks can't be copied, cut callback ignored")
+    m.heuristiccb == nothing || @warn("Callbacks can't be copied, heuristic callback ignored")
+    m.infocb == nothing || @warn("Callbacks can't be copied, info callback ignored")
 
     return GurobiMathProgModel(copy(m.inner),
                                m.last_op_type,
@@ -115,11 +115,9 @@ function MPB.loadproblem!(m::GurobiMathProgModel, filename::AbstractString)
     m.ub = MPB.getconstrUB(m)
 end
 
-if VERSION >= v"0.7-"
-    function MPB.loadproblem!(m::GurobiMathProgModel, A::Compat.LinearAlgebra.Adjoint{T, Array{T, 2}},
-                          collb, colub, obj, rowlb, rowub, sense) where T
-        MPB.loadproblem!(m, collect(A), collb, colub, obj, rowlb, rowub, sense)
-    end
+function MPB.loadproblem!(m::GurobiMathProgModel, A::LinearAlgebra.Adjoint{T, Array{T, 2}},
+                        collb, colub, obj, rowlb, rowub, sense) where T
+    MPB.loadproblem!(m, collect(A), collb, colub, obj, rowlb, rowub, sense)
 end
 
 function MPB.loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, rowub, sense)
@@ -143,8 +141,8 @@ function MPB.loadproblem!(m::GurobiMathProgModel, A, collb, colub, obj, rowlb, r
   # slack variables automatically added by gurobi.
   rangeconstrs = sum((rowlb .!= rowub) .& (rowlb .> neginf) .& (rowub .< posinf))
   if rangeconstrs > 0
-      Compat.@warn("Julia Gurobi interface doesn't properly support range " *
-                   "(two-sided) constraints. See Gurobi.jl issue #14")
+      @warn("Julia Gurobi interface doesn't properly support range " *
+            "(two-sided) constraints. See Gurobi.jl issue #14")
       add_rangeconstrs!(m.inner, float(A), float(rowlb), float(rowub))
       # A work around for the additional slack variables introduced and the
       # reformulation bug warning
@@ -349,7 +347,7 @@ MPB.changecoeffs!(m::GurobiMathProgModel, cidx, vidx, val) = chg_coeffs!(m.inner
 function updatemodel!(m::GurobiMathProgModel)
     update_model!(m.inner)
     if Gurobi.version < v"7.0" && m.obj != MPB.getobj(m)
-        Compat.@warn("""
+        @warn("""
             You have encountered a known bug in Gurobi. Any information you query from the model may be incorrect.
             This bug has existed since the first version of Gurobi but is fixed in Gurobi v7.0.
 
@@ -417,7 +415,7 @@ function MPB.optimize!(m::GurobiMathProgModel)
     if m.lazycb != nothing || m.cutcb != nothing || m.heuristiccb != nothing || m.infocb != nothing
         updatemodel!(m)
         if !is_mip(m.inner)
-            @Compat.warn("Gurobi ignores branch-and-bound callbacks when no discrete elements are present in the model.")
+            @warn("Gurobi ignores branch-and-bound callbacks when no discrete elements are present in the model.")
         end
         setmathprogcallback!(m)
     end
@@ -437,7 +435,7 @@ function MPB.status(m::GurobiMathProgModel)
   elseif s == :unbounded
     return :Unbounded
   elseif s == :inf_or_unbd
-    @Compat.warn("Gurobi reported infeasible or unbounded. Set InfUnbdInfo=1 for more specific status.")
+    @warn("Gurobi reported infeasible or unbounded. Set InfUnbdInfo=1 for more specific status.")
     return :InfeasibleOrUnbounded
   elseif s == :iteration_limit || s == :node_limit || s == :time_limit || s == :solution_limit
     return :UserLimit
@@ -717,7 +715,7 @@ end
 # return :Exit to indicate an error
 
 function setmathprogcallback!(model::GurobiMathProgModel)
-    if Compat.Sys.iswindows() && Sys.WORD_SIZE != 64
+    if Sys.iswindows() && Sys.WORD_SIZE != 64
         error("Callbacks not currently supported on Win32. Use 64-bit Julia with 64-bit Gurobi.")
     end
     grbcallback = @cfunction(mastercallback, Cint, (Ptr{Cvoid}, Ptr{Cvoid}, Cint, Ptr{Cvoid}))

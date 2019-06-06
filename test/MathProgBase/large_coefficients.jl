@@ -1,6 +1,4 @@
-using Gurobi, MathProgBase, Compat.Test
-
-using Compat: undef
+using Gurobi, MathProgBase, Test
 
 @testset "Large Coefficients" begin
 

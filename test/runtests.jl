@@ -1,7 +1,4 @@
-using Gurobi
-
-using Compat
-using Compat.Test, Compat.SparseArrays, Compat.Random
+using Gurobi, Test, Random
 
 @testset "C API" begin
     include("c_wrapper.jl")

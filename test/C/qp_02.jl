@@ -6,7 +6,7 @@
 #           x +   y       >= 1
 #
 
-using Gurobi, Compat.Test
+using Gurobi, Test
 
 @testset "QP2" begin
 

@@ -6,7 +6,7 @@
 #
 #    solution: (0.71, 0.71) objv = 1.414
 
-using Gurobi, Compat.Test
+using Gurobi, Test
 
 @testset "QCQP1" begin
 

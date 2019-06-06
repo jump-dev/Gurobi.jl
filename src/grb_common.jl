@@ -10,7 +10,7 @@ const CVec            = Vector{Cchar}
 const GCharOrVec      = Union{Cchar, Char, Vector{Cchar}, Vector{Char}}
 
 const Bounds{T<:Real} = Union{T, Vector{T}}
-const CoeffMat        = Union{Matrix{Float64}, SparseMatrixCSC{Float64}}
+const CoeffMat        = Union{Matrix{Float64}, SparseArrays.SparseMatrixCSC{Float64}}
 
 cchar(c::Cchar) = c
 cchar(c::Char) = convert(Cchar, c)
@@ -48,11 +48,11 @@ const emptyfmat = Array{Float64}(undef, 0, 0)
 macro grb_ccall(func, args...)
     f = "GRB$(func)"
     args = map(esc,args)
-    if Compat.Sys.isunix()
+    if Sys.isunix()
         return quote
             ccall(($f,libgurobi), $(args...))
         end
-    elseif Compat.Sys.iswindows()
+    elseif Sys.iswindows()
         return quote
             ccall(($f,libgurobi), $(esc(:stdcall)), $(args...))
         end
@@ -81,11 +81,11 @@ function checkvalue(x::Real, bound)
 end
 checkvalue(x::Vector, bound) = any(checkvalue(c, bound) for c in x)
 
-_objwarning(c) = Compat.@warn("Gurobi will silently silently truncate " *
+_objwarning(c) = @warn("Gurobi will silently silently truncate " *
     "objective coefficients >$(GRB_INFINITY) or <-$(GRB_INFINITY). Current " *
     "objective coefficient extrema: $(extrema(c))")
 
-_boundwarning(lb, ub) = Compat.@warn("Gurobi has implicit variable bounds of " *
+_boundwarning(lb, ub) = @warn("Gurobi has implicit variable bounds of " *
     "[-1e30, 1e30]. Settings variable bounds outside this can cause " *
     "infeasibility or unboundedness. Current lower bound extrema: " *
     "$(extrema(lb)). Current upper bound extrema: $(extrema(ub))")
