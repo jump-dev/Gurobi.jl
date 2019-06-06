@@ -13,7 +13,7 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 [compat]
 LinQuadOptInterface = "~0.6.0"
 MathProgBase = "~0.5.0, ~0.6, ~0.7"
-julia = "~1"
+julia = "1"
 
 [extras]
 Compat = "34da2185-b29b-5c13-b0c7-acf172513d20"
