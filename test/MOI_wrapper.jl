@@ -13,7 +13,7 @@ const CONFIG = MOIT.TestConfig()
 
 @testset "Unit Tests" begin
     MOIT.basic_constraint_tests(OPTIMIZER, CONFIG)
-    MOIT.unittest(OPTIMIZER, CONFIG)
+    MOIT.unittest(OPTIMIZER, MOIT.TestConfig(atol=1e-6))
     MOIT.modificationtest(OPTIMIZER, CONFIG)
 end
 

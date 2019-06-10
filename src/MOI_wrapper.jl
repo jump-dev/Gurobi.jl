@@ -48,9 +48,6 @@ const SCALAR_SETS = Union{
 @enum(BoundType, NONE, LESS_THAN, GREATER_THAN, LESS_AND_GREATER_THAN, INTERVAL, EQUAL_TO)
 @enum(ObjectiveType, SINGLE_VARIABLE, SCALAR_AFFINE, SCALAR_QUADRATIC)
 
-# Annoyingly, Gurobi ignores the name `""`, so we need a new default name.
-const DEFAULT_NAME = " "
-
 mutable struct VariableInfo
     column::Int
     bound::BoundType
@@ -120,7 +117,7 @@ mutable struct Optimizer <: MOI.ModelLike
 
     Note that we set the parameter `InfUnbdInfo` to `1` rather than the default
     of `0` so that we can query infeasibility certificates. Users are, however,
-    free to overide this as follows `Gurobi.Optimizer(InfUndbInfo=0)`.
+    free to overide this as follows `Optimizer(InfUndbInfo=0)`.
     """
     function Optimizer(env::Union{Nothing, Env} = nothing; kwargs...)
         model = new()
@@ -223,8 +220,6 @@ end
 
 MOI.supports(::Optimizer, ::MOI.VariableName, ::Type{MOI.VariableIndex}) = true
 MOI.supports(::Optimizer, ::MOI.ConstraintName, ::Type{<:MOI.ConstraintIndex}) = true
-# TODO: this next one looks like it might be a bug in MOI.Test.
-MOI.supports(::Optimizer, ::MOI.ConstraintName, ::MOI.ConstraintIndex) = true
 MOI.supports(::Optimizer, ::MOI.ObjectiveFunctionType) = true
 
 MOI.supports(::Optimizer, ::MOI.Name) = true
@@ -260,31 +255,6 @@ end
 
 function MOI.get(model::Optimizer, ::MOI.ListOfConstraintAttributesSet)
     return MOI.AbstractConstraintAttribute[MOI.ConstraintName()]
-end
-
-# These strings are taken directly from the following page of the online Gurobi
-# documentation: https://www.gurobi.com/documentation/8.1/refman/optimization_status_codes.html#sec:StatusCodes
-const RAW_STATUS_STRINGS = [
-    "Model is loaded, but no solution information is available.",
-    "Model was solved to optimality (subject to tolerances), and an optimal solution is available.",
-    "Model was proven to be infeasible.",
-    "Model was proven to be either infeasible or unbounded. To obtain a more definitive conclusion, set the DualReductions parameter to 0 and reoptimize.",
-    "Model was proven to be unbounded. Important note: an unbounded status indicates the presence of an unbounded ray that allows the objective to improve without limit. It says nothing about whether the model has a feasible solution. If you require information on feasibility, you should set the objective to zero and reoptimize.",
-    "Optimal objective for model was proven to be worse than the value specified in the Cutoff parameter. No solution information is available.",
-    "Optimization terminated because the total number of simplex iterations performed exceeded the value specified in the IterationLimit parameter, or because the total number of barrier iterations exceeded the value specified in the BarIterLimit parameter.",
-    "Optimization terminated because the total number of branch-and-cut nodes explored exceeded the value specified in the NodeLimit parameter.",
-    "Optimization terminated because the time expended exceeded the value specified in the TimeLimit parameter.",
-    "Optimization terminated because the number of solutions found reached the value specified in the SolutionLimit parameter.",
-    "Optimization was terminated by the user.",
-    "Optimization was terminated due to unrecoverable numerical difficulties.",
-    "Unable to satisfy optimality tolerances; a sub-optimal solution is available.",
-    "An asynchronous optimization call was made, but the associated optimization run is not yet complete.",
-    "User specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached."
-]
-
-function MOI.get(model::Optimizer, ::MOI.RawStatusString)
-    status_code = get_status_code(model.inner)
-    return RAW_STATUS_STRINGS[status_code]
 end
 
 function indices_and_coefficients(model::Optimizer, f::MOI.ScalarAffineFunction{Float64})
@@ -346,7 +316,7 @@ function MOI.add_variable(model::Optimizer)
 end
 
 function MOI.add_variables(model::Optimizer, N::Int)
-    Gurobi.add_cvars!(model.inner, zeros(N))
+    add_cvars!(model.inner, zeros(N))
     _require_update(model)
     indices = Vector{MOI.VariableIndex}(undef, N)
     num_variables = length(model.variable_info)
@@ -408,6 +378,8 @@ function MOI.set(model::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex, nam
     info = model[v]
     info.name = name
     _update_if_necessary(model)
+    # We set the default name to `" "` because Gurobi will ignore the blank name
+    # `""` and retain it's default naming convention of `C0`.
     set_strattrelement!(model.inner, "VarName", info.column, name == "" ? " " : name)
     _require_update(model)
     if model.name_to_variable !== nothing && !haskey(model.name_to_variable, name)
@@ -752,7 +724,7 @@ function MOI.delete(
     throw_if_invalid(model, c)
     _update_if_necessary(model)
     info = model[c]
-    Gurobi.set_dblattrelement!(model.inner, "UB", info.column, Inf)
+    set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
     if info.bound == LESS_AND_GREATER_THAN
         info.bound = GREATER_THAN
@@ -784,8 +756,8 @@ function MOI.delete(
     throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
-    Gurobi.set_dblattrelement!(model.inner, "LB", info.column, -Inf)
-    Gurobi.set_dblattrelement!(model.inner, "UB", info.column, Inf)
+    set_dblattrelement!(model.inner, "LB", info.column, -Inf)
+    set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
     info.bound = NONE
     return
@@ -797,8 +769,8 @@ function MOI.delete(
     throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
-    Gurobi.set_dblattrelement!(model.inner, "LB", info.column, -Inf)
-    Gurobi.set_dblattrelement!(model.inner, "UB", info.column, Inf)
+    set_dblattrelement!(model.inner, "LB", info.column, -Inf)
+    set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
     info.bound = NONE
     return
@@ -810,7 +782,7 @@ function MOI.get(
 )
     throw_if_invalid(model, c)
     _update_if_necessary(model)
-    lower = Gurobi.get_dblattrelement(model.inner, "LB", model[c].column)
+    lower = get_dblattrelement(model.inner, "LB", model[c].column)
     return MOI.GreaterThan(lower)
 end
 
@@ -820,7 +792,7 @@ function MOI.get(
 )
     throw_if_invalid(model, c)
     _update_if_necessary(model)
-    upper = Gurobi.get_dblattrelement(model.inner, "UB", model[c].column)
+    upper = get_dblattrelement(model.inner, "UB", model[c].column)
     return MOI.LessThan(upper)
 end
 
@@ -830,7 +802,7 @@ function MOI.get(
 )
     throw_if_invalid(model, c)
     _update_if_necessary(model)
-    lower = Gurobi.get_dblattrelement(model.inner, "LB", model[c].column)
+    lower = get_dblattrelement(model.inner, "LB", model[c].column)
     return MOI.EqualTo(lower)
 end
 
@@ -840,8 +812,8 @@ function MOI.get(
 )
     throw_if_invalid(model, c)
     _update_if_necessary(model)
-    lower = Gurobi.get_dblattrelement(model.inner, "LB", model[c].column)
-    upper = Gurobi.get_dblattrelement(model.inner, "UB", model[c].column)
+    lower = get_dblattrelement(model.inner, "LB", model[c].column)
+    upper = get_dblattrelement(model.inner, "UB", model[c].column)
     return MOI.Interval(lower, upper)
 end
 
@@ -854,10 +826,10 @@ function MOI.set(
     info = model[c]
     _update_if_necessary(model)
     if lower !== nothing
-        Gurobi.set_dblattrelement!(model.inner, "LB", info.column, lower)
+        set_dblattrelement!(model.inner, "LB", info.column, lower)
     end
     if upper !== nothing
-        Gurobi.set_dblattrelement!(model.inner, "UB", info.column, upper)
+        set_dblattrelement!(model.inner, "UB", info.column, upper)
     end
     _require_update(model)
     return
@@ -866,7 +838,7 @@ end
 function MOI.add_constraint(model::Optimizer, f::MOI.SingleVariable, ::MOI.ZeroOne)
     info = model[f.variable]
     _update_if_necessary(model)
-    Gurobi.set_charattrelement!(model.inner, "VType", info.column, Char('B'))
+    set_charattrelement!(model.inner, "VType", info.column, Char('B'))
     _require_update(model)
     info.type = BINARY
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne}(f.variable.value)
@@ -876,7 +848,7 @@ function MOI.delete(model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable,
     throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
-    Gurobi.set_charattrelement!(model.inner, "VType", info.column, Char('C'))
+    set_charattrelement!(model.inner, "VType", info.column, Char('C'))
     _require_update(model)
     info.type = CONTINUOUS
     return
@@ -895,7 +867,7 @@ function MOI.add_constraint(
 )
     info = model[f.variable]
     _update_if_necessary(model)
-    Gurobi.set_charattrelement!(model.inner, "VType", info.column, Char('I'))
+    set_charattrelement!(model.inner, "VType", info.column, Char('I'))
     _require_update(model)
     info.type = INTEGER
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.Integer}(f.variable.value)
@@ -907,7 +879,7 @@ function MOI.delete(
     throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
-    Gurobi.set_charattrelement!(model.inner, "VType", info.column, Char('C'))
+    set_charattrelement!(model.inner, "VType", info.column, Char('C'))
     _require_update(model)
     info.type = CONTINUOUS
     return
@@ -928,9 +900,9 @@ function MOI.add_constraint(
     throw_if_existing_lower(info.bound, info.type, typeof(s), f.variable)
     throw_if_existing_upper(info.bound, info.type, typeof(s), f.variable)
     _update_if_necessary(model)
-    Gurobi.set_charattrelement!(model.inner, "VType", info.column, Char('S'))
-    Gurobi.set_dblattrelement!(model.inner, "LB", info.column, s.lower)
-    Gurobi.set_dblattrelement!(model.inner, "UB", info.column, s.upper)
+    set_charattrelement!(model.inner, "VType", info.column, Char('S'))
+    set_dblattrelement!(model.inner, "LB", info.column, s.lower)
+    set_dblattrelement!(model.inner, "UB", info.column, s.upper)
     _require_update(model)
     info.type = SEMICONTINUOUS
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semicontinuous{Float64}}(f.variable.value)
@@ -943,9 +915,9 @@ function MOI.delete(
     throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
-    Gurobi.set_charattrelement!(model.inner, "VType", info.column, Char('C'))
-    Gurobi.set_dblattrelement!(model.inner, "LB", info.column, -Inf)
-    Gurobi.set_dblattrelement!(model.inner, "UB", info.column, Inf)
+    set_charattrelement!(model.inner, "VType", info.column, Char('C'))
+    set_dblattrelement!(model.inner, "LB", info.column, -Inf)
+    set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
     info.type = CONTINUOUS
     return
@@ -958,8 +930,8 @@ function MOI.get(
     throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
-    lower = Gurobi.get_dblattrelement(model.inner, "LB", info.column)
-    upper = Gurobi.get_dblattrelement(model.inner, "UB", info.column)
+    lower = get_dblattrelement(model.inner, "LB", info.column)
+    upper = get_dblattrelement(model.inner, "UB", info.column)
     return MOI.Semicontinuous(lower, upper)
 end
 
@@ -970,9 +942,9 @@ function MOI.add_constraint(
     throw_if_existing_lower(info.bound, info.type, typeof(s), f.variable)
     throw_if_existing_upper(info.bound, info.type, typeof(s), f.variable)
     _update_if_necessary(model)
-    Gurobi.set_charattrelement!(model.inner, "VType", info.column, Char('N'))
-    Gurobi.set_dblattrelement!(model.inner, "LB", info.column, s.lower)
-    Gurobi.set_dblattrelement!(model.inner, "UB", info.column, s.upper)
+    set_charattrelement!(model.inner, "VType", info.column, Char('N'))
+    set_dblattrelement!(model.inner, "LB", info.column, s.lower)
+    set_dblattrelement!(model.inner, "UB", info.column, s.upper)
     _require_update(model)
     info.type = SEMIINTEGER
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semiinteger{Float64}}(f.variable.value)
@@ -985,9 +957,9 @@ function MOI.delete(
     throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
-    Gurobi.set_charattrelement!(model.inner, "VType", info.column, Char('C'))
-    Gurobi.set_dblattrelement!(model.inner, "LB", info.column, -Inf)
-    Gurobi.set_dblattrelement!(model.inner, "UB", info.column, Inf)
+    set_charattrelement!(model.inner, "VType", info.column, Char('C'))
+    set_dblattrelement!(model.inner, "LB", info.column, -Inf)
+    set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
     info.type = CONTINUOUS
     return
@@ -1000,8 +972,8 @@ function MOI.get(
     throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
-    lower = Gurobi.get_dblattrelement(model.inner, "LB", info.column)
-    upper = Gurobi.get_dblattrelement(model.inner, "UB", info.column)
+    lower = get_dblattrelement(model.inner, "LB", info.column)
+    upper = get_dblattrelement(model.inner, "UB", info.column)
     return MOI.Semiinteger(lower, upper)
 end
 
@@ -1156,6 +1128,8 @@ function MOI.set(
 )
     model[c].name = name
     _update_if_necessary(model)
+    # We set the default name to `" "` because Gurobi will ignore the blank name
+    # `""` and retain it's default naming convention of `R0`.
     set_strattrelement!(model.inner, "ConstrName", model[c].row, name == "" ? " " : name)
     _require_update(model)
     if model.name_to_constraint_index !== nothing && !haskey(model.name_to_constraint_index, name)
@@ -1473,7 +1447,9 @@ end
 ###
 
 function MOI.optimize!(model::Optimizer)
-    # Note: Gurobi will call update regardless, so we don't have to.
+    # Note: although Gurobi will call update regardless, we do it now so that
+    # the appropriate `needs_update` flag is set.
+    _update_if_necessary(model)
     optimize(model.inner)
     model.has_infeasibility_cert =
     MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
@@ -1482,38 +1458,38 @@ function MOI.optimize!(model::Optimizer)
     return
 end
 
+# These strings are taken directly from the following page of the online Gurobi
+# documentation: https://www.com/documentation/8.1/refman/optimization_status_codes.html#sec:StatusCodes
+const RAW_STATUS_STRINGS = [
+    (MOI.OPTIMIZE_NOT_CALLED, "Model is loaded, but no solution information is available."),
+    (MOI.OPTIMAL, "Model was solved to optimality (subject to tolerances), and an optimal solution is available."),
+    (MOI.INFEASIBLE, "Model was proven to be infeasible."),
+    (MOI.INFEASIBLE_OR_UNBOUNDED, "Model was proven to be either infeasible or unbounded. To obtain a more definitive conclusion, set the DualReductions parameter to 0 and reoptimize."),
+    (MOI.DUAL_INFEASIBLE, "Model was proven to be unbounded. Important note: an unbounded status indicates the presence of an unbounded ray that allows the objective to improve without limit. It says nothing about whether the model has a feasible solution. If you require information on feasibility, you should set the objective to zero and reoptimize."),
+    (MOI.OBJECTIVE_LIMIT, "Optimal objective for model was proven to be worse than the value specified in the Cutoff parameter. No solution information is available."),
+    (MOI.ITERATION_LIMIT, "Optimization terminated because the total number of simplex iterations performed exceeded the value specified in the IterationLimit parameter, or because the total number of barrier iterations exceeded the value specified in the BarIterLimit parameter."),
+    (MOI.NODE_LIMIT, "Optimization terminated because the total number of branch-and-cut nodes explored exceeded the value specified in the NodeLimit parameter."),
+    (MOI.TIME_LIMIT, "Optimization terminated because the time expended exceeded the value specified in the TimeLimit parameter."),
+    (MOI.SOLUTION_LIMIT, "Optimization terminated because the number of solutions found reached the value specified in the SolutionLimit parameter."),
+    (MOI.INTERRUPTED, "Optimization was terminated by the user."),
+    (MOI.NUMERICAL_ERROR, "Optimization was terminated due to unrecoverable numerical difficulties."),
+    (MOI.OTHER_LIMIT, "Unable to satisfy optimality tolerances; a sub-optimal solution is available."),
+    (MOI.OTHER_ERROR, "An asynchronous optimization call was made, but the associated optimization run is not yet complete."),
+    (MOI.OBJECTIVE_LIMIT, "User specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached.")
+]
+
+function MOI.get(model::Optimizer, ::MOI.RawStatusString)
+    status_code = get_status_code(model.inner)
+    if 1 <= status_code <= length(RAW_STATUS_STRINGS)
+        return RAW_STATUS_STRINGS[status_code][2]
+    end
+    return MOI.OTHER_ERROR
+end
+
 function MOI.get(model::Optimizer, ::MOI.TerminationStatus)
-    stat = get_status(model.inner)
-    if stat == :loaded
-        return MOI.OPTIMIZE_NOT_CALLED
-    elseif stat == :optimal
-        return MOI.OPTIMAL
-    elseif stat == :infeasible
-        return MOI.INFEASIBLE
-    elseif stat == :inf_or_unbd
-        return MOI.INFEASIBLE_OR_UNBOUNDED
-    elseif stat == :unbounded
-        return MOI.DUAL_INFEASIBLE
-    elseif stat == :cutoff
-        return MOI.OBJECTIVE_LIMIT
-    elseif stat == :iteration_limit
-        return MOI.ITERATION_LIMIT
-    elseif stat == :node_limit
-        return MOI.NODE_LIMIT
-    elseif stat == :time_limit
-        return MOI.TIME_LIMIT
-    elseif stat == :solution_limit
-        return MOI.SOLUTION_LIMIT
-    elseif stat == :interrupted
-        return MOI.INTERRUPTED
-    elseif stat == :numeric
-        return MOI.NUMERICAL_ERROR
-    elseif stat == :suboptimal
-        return MOI.OTHER_LIMIT
-    elseif stat == :inprogress
-        return MOI.OTHER_ERROR
-    elseif stat == :user_obj_limit
-        return MOI.OBJECTIVE_LIMIT
+    status_code = get_status_code(model.inner)
+    if 1 <= status_code <= length(RAW_STATUS_STRINGS)
+        return RAW_STATUS_STRINGS[status_code][1]
     end
     return MOI.OTHER_ERROR
 end
@@ -1538,10 +1514,10 @@ function has_dual_ray(model::Optimizer)
     try
         # Note: for performance reasons, we try to get 1 element because for
         # some versions of Gurobi, we cannot query 0 elements without error.
-        Gurobi.get_dblattrarray(model.inner, "FarkasDual", 1, 1)
+        get_dblattrarray(model.inner, "FarkasDual", 1, 1)
         return true
     catch ex
-        if isa(ex, Gurobi.GurobiError)
+        if isa(ex, GurobiError)
             return false
         else
             rethrow(ex)
@@ -1569,10 +1545,10 @@ function has_primal_ray(model::Optimizer)
     try
         # Note: for performance reasons, we try to get 1 element because for
         # some versions of Gurobi, we cannot query 0 elements without error.
-        Gurobi.get_dblattrarray(model.inner, "UnbdRay", 1, 1)
+        get_dblattrarray(model.inner, "UnbdRay", 1, 1)
         return true
     catch ex
-        if isa(ex, Gurobi.GurobiError)
+        if isa(ex, GurobiError)
             return false
         else
             rethrow(ex)
@@ -1600,6 +1576,7 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}
 )
     row = model[c].row
+    _update_if_necessary(model)
     rhs = get_dblattrelement(model.inner, "RHS", row)
     slack = get_dblattrelement(model.inner, "Slack", row)
     return rhs - slack
@@ -1610,6 +1587,7 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, <:Any}
 )
     row = model[c].row
+    _update_if_necessary(model)
     rhs = get_dblattrelement(model.inner, "QCRHS", row)
     slack = get_dblattrelement(model.inner, "QCSlack", row)
     return rhs - slack
@@ -1623,6 +1601,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
+    _update_if_necessary(model)
     x = get_dblattrelement(model.inner, "X", model[c].column)
     ub = get_dblattrelement(model.inner, "UB", model[c].column)
     if x ≈ ub
@@ -1636,6 +1615,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
+    _update_if_necessary(model)
     x = get_dblattrelement(model.inner, "X", model[c].column)
     lb = get_dblattrelement(model.inner, "LB", model[c].column)
     if x ≈ lb
@@ -1666,7 +1646,7 @@ function MOI.get(
     # attr = model.has_infeasibility_cert ? "FarkasDual" : "Pi"
     # return dual_multiplier(model) * get_dblattrelement(model.inner, attr, model[c].row)
     if model.has_infeasibility_cert
-        return dual_multiplier(model) * get_dblattrelement(model.inner, "FarkasDual", model[c].row)
+        return -dual_multiplier(model) * get_dblattrelement(model.inner, "FarkasDual", model[c].row)
     end
     return dual_multiplier(model) * get_dblattrelement(model.inner, "Pi", model[c].row)
 end
@@ -1728,7 +1708,8 @@ MOI.get(model::Optimizer, ::MOI.RawSolver) = model.inner
 function MOI.set(
     model::Optimizer, ::MOI.VariablePrimalStart, x::MOI.VariableIndex, value::Float64
 )
-    Gurobi.set_dblattrelement!(model.inner, "Start", model[x].column, value)
+    set_dblattrelement!(model.inner, "Start", model[x].column, value)
+    _require_update(model)
     return
 end
 
