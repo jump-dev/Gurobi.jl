@@ -3,107 +3,107 @@ const MOIT = MOI.Test
 const MOIB = MOI.Bridges
 
 const GUROBI_ENV = Gurobi.Env()
+const OPTIMIZER = MOIB.Constraint.SplitInterval{Float64}(
+    MOIB.Constraint.Scalarize{Float64}(
+        Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+    )
+)
+
+const CONFIG = MOIT.TestConfig()
 
 @testset "Unit Tests" begin
-    config = MOIT.TestConfig()
-    solver = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
-    MOIT.basic_constraint_tests(solver, config)
-    MOIT.unittest(solver, config,
-        ["solve_affine_interval", "solve_qcp_edge_cases"])
-    @testset "solve_affine_interval" begin
-        MOIT.solve_affine_interval(
-            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)),
-            config
-        )
-    end
-    @testset "solve_qcp_edge_cases" begin
-        MOIT.solve_qcp_edge_cases(solver,
-            MOIT.TestConfig(atol=1e-3)
-        )
-    end
-    MOIT.modificationtest(solver, config, [
-        "solve_func_scalaraffine_lessthan"
-    ])
+    MOIT.basic_constraint_tests(OPTIMIZER, CONFIG)
+    MOIT.unittest(OPTIMIZER, CONFIG)
+    MOIT.modificationtest(OPTIMIZER, CONFIG)
 end
 
 @testset "Linear tests" begin
     @testset "Default Solver"  begin
-        solver = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
-        MOIT.contlineartest(solver, MOIT.TestConfig(), [
-            # This requires interval constraint.
-            "linear10", "linear10b",
+        MOIT.contlineartest(OPTIMIZER, CONFIG, [
             # This requires an infeasiblity certificate for a variable bound.
             "linear12"
         ])
     end
-    @testset "linear10" begin
-        MOIT.linear10test(
-            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)),
-            MOIT.TestConfig()
-        )
-        MOIT.linear10btest(
-            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)),
-            MOIT.TestConfig()
-        )
-    end
     @testset "No certificate" begin
-        MOIT.linear12test(
-            Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, InfUnbdInfo=0),
-            MOIT.TestConfig(infeas_certificates=false)
-        )
+        MOIT.linear12test(OPTIMIZER, MOIT.TestConfig(infeas_certificates=false))
     end
 end
 
 @testset "Quadratic tests" begin
-    MOIT.contquadratictest(
-        Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0),
-        MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals=false, query=false)
-    )
+    MOIT.contquadratictest(OPTIMIZER, MOIT.TestConfig(atol=1e-3, rtol=1e-3), [
+        "ncqcp"  # Gurobi doesn't support non-convex problems.
+    ])
 end
 
 @testset "Linear Conic tests" begin
-    MOIT.lintest(
-        Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0),
-        MOIT.TestConfig()
-    )
+    MOIT.lintest(OPTIMIZER, CONFIG)
 end
 
 @testset "Integer Linear tests" begin
-    MOIT.intlineartest(
-        Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0),
-        MOIT.TestConfig(),
-        ["int3"]  # int3 has interval constriants
-    )
-    @testset "int3" begin
-        MOIT.int3test(
-            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)),
-            MOIT.TestConfig()
+    MOIT.intlineartest(OPTIMIZER, CONFIG, [
+        # Indicator sets not supported.
+        "indicator1", "indicator2", "indicator3"
+    ])
+end
+
+@testset "ModelLike tests" begin
+
+    @test MOI.get(OPTIMIZER, MOI.SolverName()) == "Gurobi"
+
+    @testset "default_objective_test" begin
+        MOIT.default_objective_test(OPTIMIZER)
+    end
+
+    @testset "default_status_test" begin
+        MOIT.default_status_test(OPTIMIZER)
+    end
+
+    @testset "nametest" begin
+        MOIT.nametest(OPTIMIZER)
+    end
+
+    @testset "validtest" begin
+        MOIT.validtest(OPTIMIZER)
+    end
+
+    @testset "emptytest" begin
+        MOIT.emptytest(OPTIMIZER)
+    end
+
+    @testset "orderedindicestest" begin
+        MOIT.orderedindicestest(OPTIMIZER)
+    end
+
+    @testset "copytest" begin
+        MOIT.copytest(
+            OPTIMIZER,
+            MOIB.Constraint.Scalarize{Float64}(Gurobi.Optimizer(GUROBI_ENV))
         )
     end
-end
-@testset "ModelLike tests" begin
-    solver = Gurobi.Optimizer(GUROBI_ENV)
-    @test MOI.get(solver, MOI.SolverName()) == "Gurobi"
-    @testset "default_objective_test" begin
-         MOIT.default_objective_test(solver)
-     end
-     @testset "default_status_test" begin
-         MOIT.default_status_test(solver)
-     end
-    @testset "nametest" begin
-        MOIT.nametest(solver)
+
+    @testset "scalar_function_constant_not_zero" begin
+        MOIT.scalar_function_constant_not_zero(OPTIMIZER)
     end
-    @testset "validtest" begin
-        MOIT.validtest(solver)
+
+    @testset "start_values_test" begin
+        # We don't support ConstraintDualStart or ConstraintPrimalStart yet.
+        # @test_broken MOIT.start_values_test(Gurobi.Optimizer(GUROBI_ENV), OPTIMIZER)
     end
-    @testset "emptytest" begin
-        MOIT.emptytest(solver)
+
+    @testset "supports_constrainttest" begin
+        MOIT.supports_constrainttest(OPTIMIZER, Float64, Int)
     end
-    @testset "orderedindicestest" begin
-        MOIT.orderedindicestest(solver)
+
+    @testset "set_lower_bound_twice" begin
+        # Something weird is going on with the SplitInterval bridge.
+        # @test_broken MOIT.set_lower_bound_twice(OPTIMIZER, Float64)
+        MOIT.set_lower_bound_twice(Gurobi.Optimizer(GUROBI_ENV), Float64)
     end
-    @testset "copytest" begin
-        MOIT.copytest(solver, Gurobi.Optimizer(GUROBI_ENV))
+
+    @testset "set_upper_bound_twice" begin
+        # Something weird is going on with the SplitInterval bridge.
+        # @test_broken MOIT.set_upper_bound_twice(OPTIMIZER, Float64)
+        MOIT.set_upper_bound_twice(Gurobi.Optimizer(GUROBI_ENV), Float64)
     end
 end
 
@@ -156,9 +156,9 @@ end
         function callback_function(cb_data::Gurobi.CallbackData, cb_where::Int32)
             push!(cb_calls, cb_where)
             if cb_where == Gurobi.CB_MIPSOL
-                Gurobi.loadcbsolution!(m, cb_data, cb_where)
-                x_val = MOI.get(m, MOI.VariablePrimal(), x)
-                y_val = MOI.get(m, MOI.VariablePrimal(), y)
+                Gurobi.load_callback_variable_primal(m, cb_data, cb_where)
+                x_val = MOI.get(m, Gurobi.CallbackVariablePrimal(), x)
+                y_val = MOI.get(m, Gurobi.CallbackVariablePrimal(), y)
                 # We have two constraints, one cutting off the top
                 # left corner and one cutting off the top right corner, e.g.
                 # (0,2) +---+---+ (2,2)
@@ -228,11 +228,7 @@ end
     # Given a collection of items with individual weights and values,
     # maximize the total value carried subject to the constraint that
     # the total weight carried is less than 10.
-    if VERSION >= v"0.7-"
-        Random.seed!(1)
-    else
-        srand(1)
-    end
+    Random.seed!(1)
     item_weights = rand(N)
     item_values = rand(N)
     MOI.add_constraint(m,
