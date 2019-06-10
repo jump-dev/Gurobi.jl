@@ -7,43 +7,6 @@ import MathOptInterface
 
 const MOI  = MathOptInterface
 
-const SUPPORTED_OBJECTIVES = (
-    MOI.SingleVariable,
-    MOI.ScalarAffineFunction{Float64},
-    MOI.ScalarQuadraticFunction{Float64}
-)
-
-const SUPPORTED_CONSTRAINTS = (
-    (MOI.SingleVariable,                    MOI.EqualTo{Float64}),
-    (MOI.SingleVariable,                    MOI.LessThan{Float64}),
-    (MOI.SingleVariable,                    MOI.GreaterThan{Float64}),
-    (MOI.SingleVariable,                    MOI.Interval{Float64}),
-
-    (MOI.SingleVariable,                    MOI.ZeroOne),
-    (MOI.SingleVariable,                    MOI.Integer),
-    (MOI.SingleVariable,                    MOI.Semicontinuous{Float64}),
-    (MOI.SingleVariable,                    MOI.Semiinteger{Float64}),
-
-    (MOI.VectorOfVariables,                 MOI.SOS1{Float64}),
-    (MOI.VectorOfVariables,                 MOI.SOS2{Float64}),
-
-    (MOI.ScalarAffineFunction{Float64},     MOI.EqualTo{Float64}),
-    (MOI.ScalarAffineFunction{Float64},     MOI.LessThan{Float64}),
-    (MOI.ScalarAffineFunction{Float64},     MOI.GreaterThan{Float64}),
-    # We choose _not_ to support ScalarAffineFunction-in-Interval because Gurobi
-    # introduces some slack variables that makes it hard to keep track.
-    # (MOI.ScalarAffineFunction{Float64},   MOI.Interval{Float64}),
-
-    (MOI.ScalarQuadraticFunction{Float64},  MOI.EqualTo{Float64}),
-    (MOI.ScalarQuadraticFunction{Float64},  MOI.LessThan{Float64}),
-    (MOI.ScalarQuadraticFunction{Float64},  MOI.GreaterThan{Float64})
-)
-
-const SCALAR_SETS = Union{
-    MOI.GreaterThan{Float64}, MOI.LessThan{Float64},
-    MOI.EqualTo{Float64}, MOI.Interval{Float64}
-}
-
 @enum(VariableType, CONTINUOUS, BINARY, INTEGER, SEMIINTEGER, SEMICONTINUOUS)
 @enum(BoundType, NONE, LESS_THAN, GREATER_THAN, LESS_AND_GREATER_THAN, INTERVAL, EQUAL_TO)
 @enum(ObjectiveType, SINGLE_VARIABLE, SCALAR_AFFINE, SCALAR_QUADRATIC)
@@ -76,9 +39,12 @@ mutable struct ConstraintInfo
 end
 
 mutable struct Optimizer <: MOI.ModelLike
+    # The low-level Gurobi model.
     inner::Model
+    # The Gurobi environment. If `nothing`, a new environment will be created
+    # on `MOI.empty!`.
     env::Union{Nothing, Env}
-    silent::Bool
+    # The current user-provided parameters for the model.
     params::Dict{String, Any}
 
     # The next field is used to cleverly manage calls to `update_model!`.
@@ -86,24 +52,57 @@ mutable struct Optimizer <: MOI.ModelLike
     # accessing a model attribute (such as the value of a RHS term).
     needs_update::Bool
 
+    # A flag to keep track of MOI.Silent, which over-rides the OutputFlag
+    # parameter.
+    silent::Bool
+
+    # An enum to remember what objective is currently stored in the model.
     objective_type::ObjectiveType
+
+    # A flag to keep track of MOI.FEASIBILITY_SENSE, since Gurobi only stores
+    # MIN_SENSE or MAX_SENSE. This allows us to differentiate between MIN_SENSE
+    # and FEASIBILITY_SENSE.
     is_feasibility::Bool
 
+    # An index that is incremented for each new variable. We can check if a
+    # VariableIndex is valid by checking if it is in variable_info. We should
+    # _not_ reset this to zero, since then new variables cannot be distinguished
+    # from previously created ones.
     last_variable_index::Int
+    # A mapping from the MOI.VariableIndex to the Gurobi column. VaribleInfo
+    # also stores some additional fields like what bounds have been added, the
+    # variable type, and the names of SingleVariable-in-Set constraints.
     variable_info::Dict{MOI.VariableIndex, VariableInfo}
+    # We also need a mapping from the Gurobi column back to the
+    # MOI.VariableIndex.
     columns::Vector{MOI.VariableIndex}
 
+    # An index that is incremented for each new constraint (regardless of type).
+    # We can check if a constraint is valid by checking if it is in the correct
+    # xxx_constraint_info. We should _not_ reset this to zero, since then new
+    # constraints cannot be distinguished from previously created ones.
     last_constraint_index::Int
+    # ScalarAffineFunction{Float64}-in-Set storage.
     affine_constraint_info::Dict{Int, ConstraintInfo}
+    # ScalarQuadraticFunction{Float64}-in-Set storage.
     quadratic_constraint_info::Dict{Int, ConstraintInfo}
+    # VectorOfVariables-in-Set storage.
     sos_constraint_info::Dict{Int, ConstraintInfo}
+    # Note: we do not have a singlevariable_constraint_info dictionary. Instead,
+    # data associated with these constraints are stored in the VariableInfo
+    # objects.
 
+    # Mappings from variable and constraint names to their indices. These are
+    # lazily built on-demand, so most of the time, they are `nothing`.
     name_to_variable::Union{Nothing, Dict{String, MOI.VariableIndex}}
     name_to_constraint_index::Union{Nothing, Dict{String, MOI.ConstraintIndex}}
 
+    # These two flags allow us to distinguish between FEASIBLE_POINT and
+    # INFEASIBILITY_CERTIFICATE when querying VariablePrimal and ConstraintDual.
     has_unbounded_ray::Bool
     has_infeasibility_cert::Bool
 
+    # A helper cache for calling CallbackVariablePrimal.
     callback_variable_primal::Vector{Float64}
 
     """
@@ -210,13 +209,57 @@ end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Gurobi"
 
-function MOI.supports_constraint(::Optimizer, F::Type{<:MOI.AbstractFunction}, S::Type{<:MOI.AbstractSet})
-    return (F, S) in SUPPORTED_CONSTRAINTS
+function MOI.supports(
+    ::Optimizer,
+    ::MOI.ObjectiveFunction{F}
+) where {F <: Union{
+    MOI.SingleVariable,
+    MOI.ScalarAffineFunction{Float64},
+    MOI.ScalarQuadraticFunction{Float64}
+}}
+    return true
 end
 
-function MOI.supports(::Optimizer, ::MOI.ObjectiveFunction{F}) where {F}
-    return F in SUPPORTED_OBJECTIVES
+function MOI.supports_constraint(
+    ::Optimizer, ::Type{MOI.SingleVariable}, ::Type{F}
+) where {F <: Union{
+    MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64},
+    MOI.Interval{Float64}, MOI.ZeroOne, MOI.Integer,
+    MOI.Semicontinuous{Float64}, MOI.Semiinteger{Float64}
+}}
+    return true
 end
+
+function MOI.supports_constraint(
+    ::Optimizer, ::Type{MOI.VectorOfVariables}, ::Type{F}
+) where {F <: Union{MOI.SOS1{Float64}, MOI.SOS2{Float64}}}
+    return true
+end
+
+# We choose _not_ to support ScalarAffineFunction-in-Interval and
+# ScalarQuadraticFunction-in-Interval because Gurobi introduces some slack
+# variables that makes it hard to keep track of the column indices.
+
+function MOI.supports_constraint(
+    ::Optimizer, ::Type{MOI.ScalarAffineFunction{Float64}}, ::Type{F}
+) where {F <: Union{
+    MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}
+}}
+    return true
+end
+
+function MOI.supports_constraint(
+    ::Optimizer, ::Type{MOI.ScalarQuadraticFunction{Float64}}, ::Type{F}
+) where {F <: Union{
+    MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}
+}}
+    return true
+end
+
+const SCALAR_SETS = Union{
+    MOI.GreaterThan{Float64}, MOI.LessThan{Float64},
+    MOI.EqualTo{Float64}, MOI.Interval{Float64}
+}
 
 MOI.supports(::Optimizer, ::MOI.VariableName, ::Type{MOI.VariableIndex}) = true
 MOI.supports(::Optimizer, ::MOI.ConstraintName, ::Type{<:MOI.ConstraintIndex}) = true
@@ -257,7 +300,9 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraintAttributesSet)
     return MOI.AbstractConstraintAttribute[MOI.ConstraintName()]
 end
 
-function indices_and_coefficients(model::Optimizer, f::MOI.ScalarAffineFunction{Float64})
+function indices_and_coefficients(
+    model::Optimizer, f::MOI.ScalarAffineFunction{Float64}
+)
     f_canon = MOI.Utilities.canonical(f)
     indices = Int[]
     coefficients = Float64[]
@@ -268,10 +313,6 @@ function indices_and_coefficients(model::Optimizer, f::MOI.ScalarAffineFunction{
     return indices, coefficients
 end
 
-sense_and_rhs(s::MOI.LessThan{Float64}) = (Cchar('<'), s.upper)
-sense_and_rhs(s::MOI.GreaterThan{Float64}) = (Cchar('>'), s.lower)
-sense_and_rhs(s::MOI.EqualTo{Float64}) = (Cchar('='), s.value)
-
 function indices_and_coefficients(
     model::Optimizer, f::MOI.ScalarQuadraticFunction
 )
@@ -281,6 +322,16 @@ function indices_and_coefficients(
         push!(I, model[term.variable_index_1].column)
         push!(J, model[term.variable_index_2].column)
         push!(V, term.coefficient)
+        # Gurobi returns a list of terms. MOI requires 0.5 x' Q x. So, to get
+        # from
+        #   Gurobi -> MOI => multiply diagonals by 2.0
+        #   MOI -> Gurobi => multiply diagonals by 0.5
+        # Example: 2x^2 + x*y + y^2
+        #   |x y| * |a b| * |x| = |ax+by bx+cy| * |x| = 0.5ax^2 + bxy + 0.5cy^2
+        #           |b c|   |y|                   |y|
+        #   Gurobi needs: (I, J, V) = ([0, 0, 1], [0, 1, 1], [2, 1, 1])
+        #   MOI needs:
+        #     [SQT(4.0, x, x), SQT(1.0, x, y), SQT(2.0, y, y)]
         if I[end] == J[end]
             V[end] *= 0.5
         end
@@ -292,6 +343,10 @@ function indices_and_coefficients(
     end
     return indices, coefficients, I, J, V
 end
+
+sense_and_rhs(s::MOI.LessThan{Float64}) = (Cchar('<'), s.upper)
+sense_and_rhs(s::MOI.GreaterThan{Float64}) = (Cchar('>'), s.lower)
+sense_and_rhs(s::MOI.EqualTo{Float64}) = (Cchar('='), s.value)
 
 ###
 ### Variables
@@ -330,7 +385,9 @@ function MOI.add_variables(model::Optimizer, N::Int)
     return indices
 end
 
-MOI.is_valid(model::Optimizer, v::MOI.VariableIndex) = haskey(model.variable_info, v)
+function MOI.is_valid(model::Optimizer, v::MOI.VariableIndex)
+    return haskey(model.variable_info, v)
+end
 
 function MOI.delete(model::Optimizer, v::MOI.VariableIndex)
     _update_if_necessary(model)
@@ -374,7 +431,9 @@ function MOI.get(model::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex)
     return model[v].name
 end
 
-function MOI.set(model::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex, name::String)
+function MOI.set(
+    model::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex, name::String
+)
     info = model[v]
     info.name = name
     _update_if_necessary(model)
@@ -515,18 +574,10 @@ function MOI.get(
     end
     constant = get_dblattr(model.inner, "ObjCon")
     q_terms = MOI.ScalarQuadraticTerm{Float64}[]
-    # getq returns a list of terms. MOI requires 0.5 x' Q x. So, to get from
-    #   Gurobi -> MOI => multiply diagonals by 2.0
-    #   MOI -> Gurobi => multiply diagonals by 0.5
-    # Example: 2x^2 + x*y + y^2
-    #   Gurobi returns: (I, J, V) = ([0, 0, 1], [0, 1, 1], [2, 1, 1])
-    #   MOI needs:
-    #     [SQT(4.0, x, x), SQT(1.0, x, y), SQT(2.0, y, y)]
-    #   |x y| * |a b| * |x| = |ax+by bx+cy| * |x| = 0.5ax^2 + bxy + 0.5cy^2
-    #           |b c|   |y|                   |y|
     I, J, V = getq(model.inner)
     for (i, j, v) in zip(I, J, V)
         iszero(v) && continue
+        # See note in `indices_and_coefficients`.
         new_v = i == j ? 2v : v
         push!(
             q_terms,
@@ -552,7 +603,9 @@ end
 ##  SingleVariable-in-Set constraints.
 ##
 
-function Base.getindex(model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any})
+function Base.getindex(
+    model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any}
+)
     var_index = MOI.VariableIndex(c.value)
     if haskey(model.variable_info, var_index)
         return model[var_index]
@@ -560,7 +613,9 @@ function Base.getindex(model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariab
     return throw(MOI.InvalidIndex(c))
 end
 
-function throw_if_invalid(model, c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any})
+function throw_if_invalid(
+    model, c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any}
+)
     if !MOI.is_valid(model, c)
         throw(MOI.InvalidIndex(c))
     end
@@ -719,7 +774,8 @@ function MOI.add_constraint(
 end
 
 function MOI.delete(
-    model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
+    model::Optimizer,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
     throw_if_invalid(model, c)
     _update_if_necessary(model)
@@ -735,7 +791,8 @@ function MOI.delete(
 end
 
 function MOI.delete(
-    model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
+    model::Optimizer,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
     throw_if_invalid(model, c)
     info = model[c]
@@ -751,7 +808,8 @@ function MOI.delete(
 end
 
 function MOI.delete(
-    model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
+    model::Optimizer,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
 )
     throw_if_invalid(model, c)
     info = model[c]
@@ -764,7 +822,8 @@ function MOI.delete(
 end
 
 function MOI.delete(
-    model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
+    model::Optimizer,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
 )
     throw_if_invalid(model, c)
     info = model[c]
@@ -835,7 +894,9 @@ function MOI.set(
     return
 end
 
-function MOI.add_constraint(model::Optimizer, f::MOI.SingleVariable, ::MOI.ZeroOne)
+function MOI.add_constraint(
+    model::Optimizer, f::MOI.SingleVariable, ::MOI.ZeroOne
+)
     info = model[f.variable]
     _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('B'))
@@ -844,7 +905,9 @@ function MOI.add_constraint(model::Optimizer, f::MOI.SingleVariable, ::MOI.ZeroO
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne}(f.variable.value)
 end
 
-function MOI.delete(model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne})
+function MOI.delete(
+    model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne}
+)
     throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
@@ -1124,7 +1187,8 @@ end
 
 function MOI.set(
     model::Optimizer, ::MOI.ConstraintName,
-    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}, name::String
+    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any},
+    name::String
 )
     model[c].name = name
     _update_if_necessary(model)
@@ -1168,7 +1232,8 @@ function MOI.get(model::Optimizer, ::Type{MOI.ConstraintIndex}, name::String)
 end
 
 function MOI.get(
-    model::Optimizer, C::Type{MOI.ConstraintIndex{MOI.SingleVariable, S}}, name::String
+    model::Optimizer, C::Type{MOI.ConstraintIndex{MOI.SingleVariable, S}},
+    name::String
 ) where {S}
     index = nothing
     for (key, info) in model.variable_info
@@ -1643,8 +1708,6 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}
 )
-    # attr = model.has_infeasibility_cert ? "FarkasDual" : "Pi"
-    # return dual_multiplier(model) * get_dblattrelement(model.inner, attr, model[c].row)
     if model.has_infeasibility_cert
         return -dual_multiplier(model) * get_dblattrelement(model.inner, "FarkasDual", model[c].row)
     end
@@ -1706,14 +1769,17 @@ end
 MOI.get(model::Optimizer, ::MOI.RawSolver) = model.inner
 
 function MOI.set(
-    model::Optimizer, ::MOI.VariablePrimalStart, x::MOI.VariableIndex, value::Float64
+    model::Optimizer, ::MOI.VariablePrimalStart, x::MOI.VariableIndex,
+    value::Float64
 )
     set_dblattrelement!(model.inner, "Start", model[x].column, value)
     _require_update(model)
     return
 end
 
-function MOI.get(model::Optimizer, ::MOI.VariablePrimalStart, x::MOI.VariableIndex)
+function MOI.get(
+    model::Optimizer, ::MOI.VariablePrimalStart, x::MOI.VariableIndex
+)
     return get_dblattrelement(model.inner, "Start", model[x].column)
 end
 
