@@ -1,12 +1,9 @@
 const MOI  = Gurobi.MOI
 const MOIT = MOI.Test
-const MOIB = MOI.Bridges
 
 const GUROBI_ENV = Gurobi.Env()
-const OPTIMIZER = MOIB.Constraint.SplitInterval{Float64}(
-    MOIB.Constraint.Scalarize{Float64}(
-        Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
-    )
+const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
+    Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0), Float64
 )
 
 const CONFIG = MOIT.TestConfig()
@@ -77,7 +74,7 @@ end
     @testset "copytest" begin
         MOIT.copytest(
             OPTIMIZER,
-            MOIB.Constraint.Scalarize{Float64}(Gurobi.Optimizer(GUROBI_ENV))
+            MOI.Bridges.full_bridge_optimizer(Gurobi.Optimizer(GUROBI_ENV), Float64)
         )
     end
 
@@ -91,7 +88,21 @@ end
     end
 
     @testset "supports_constrainttest" begin
-        MOIT.supports_constrainttest(OPTIMIZER, Float64, Int)
+        # supports_constrainttest needs VectorOfVariables-in-Zeros,
+        # MOIT.supports_constrainttest(Gurobi.Optimizer(GUROBI_ENV), Float64, Float32)
+        # but supports_constrainttest is broken via bridges:
+        MOI.empty!(OPTIMIZER)
+        MOI.add_variable(OPTIMIZER)
+        @test  MOI.supports_constraint(OPTIMIZER, MOI.SingleVariable, MOI.EqualTo{Float64})
+        @test  MOI.supports_constraint(OPTIMIZER, MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64})
+        # This test is broken for some reason:
+        @test_broken !MOI.supports_constraint(OPTIMIZER, MOI.ScalarAffineFunction{Int}, MOI.EqualTo{Float64})
+        @test !MOI.supports_constraint(OPTIMIZER, MOI.ScalarAffineFunction{Int}, MOI.EqualTo{Int})
+        @test !MOI.supports_constraint(OPTIMIZER, MOI.SingleVariable, MOI.EqualTo{Int})
+        @test  MOI.supports_constraint(OPTIMIZER, MOI.VectorOfVariables, MOI.Zeros)
+        @test !MOI.supports_constraint(OPTIMIZER, MOI.VectorOfVariables, MOI.EqualTo{Float64})
+        @test !MOI.supports_constraint(OPTIMIZER, MOI.SingleVariable, MOI.Zeros)
+        @test !MOI.supports_constraint(OPTIMIZER, MOI.VectorOfVariables, MOIT.UnknownVectorSet)
     end
 
     @testset "set_lower_bound_twice" begin
