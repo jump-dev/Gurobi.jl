@@ -95,15 +95,11 @@ end
     end
 
     @testset "set_lower_bound_twice" begin
-        # Something weird is going on with the SplitInterval bridge.
-        # @test_broken MOIT.set_lower_bound_twice(OPTIMIZER, Float64)
-        MOIT.set_lower_bound_twice(Gurobi.Optimizer(GUROBI_ENV), Float64)
+        MOIT.set_lower_bound_twice(OPTIMIZER, Float64)
     end
 
     @testset "set_upper_bound_twice" begin
-        # Something weird is going on with the SplitInterval bridge.
-        # @test_broken MOIT.set_upper_bound_twice(OPTIMIZER, Float64)
-        MOIT.set_upper_bound_twice(Gurobi.Optimizer(GUROBI_ENV), Float64)
+        MOIT.set_upper_bound_twice(OPTIMIZER, Float64)
     end
 end
 
