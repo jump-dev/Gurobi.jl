@@ -1,5 +1,4 @@
 # Attributes still to implement:
-#  - RawParameter
 #  - BasisStatusCode
 #  - ConstraintBasisStatus
 
@@ -137,8 +136,7 @@ mutable struct Optimizer <: MOI.ModelLike
             setparam!(model.inner, string(name), value)
         end
         if !haskey(model.params, "InfUnbdInfo")
-            model.params["InfUnbdInfo"] = 1
-            setparam!(model.inner, "InfUnbdInfo", 1)
+            MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
         end
         return model
     end
@@ -154,6 +152,9 @@ function MOI.empty!(model::Optimizer)
         setparam!(model.inner, name, value)
     end
     if model.silent
+        # Set the parameter on the internal model, but don't modify the entry in
+        # model.params so that if Silent() is set to `true`, the user-provided
+        # value will be restored.
         setparam!(model.inner, "OutputFlag", 0)
     end
     model.needs_update = false
@@ -274,6 +275,17 @@ MOI.supports(::Optimizer, ::MOI.ConstraintDual, c) = true
 MOI.supports(::Optimizer, ::MOI.ObjectiveSense) = true
 MOI.supports(::Optimizer, ::MOI.ListOfConstraintIndices) = true
 MOI.supports(::Optimizer, ::MOI.RawStatusString) = true
+MOI.supports(::Optimizer, ::MOI.RawParameter) = true
+
+function MOI.set(model::Optimizer, param::MOI.RawParameter, value)
+    model.params[param.name] = value
+    setparam!(model.inner, param.name, value)
+    return
+end
+
+function MOI.get(model::Optimizer, param::MOI.RawParameter)
+    return getparam(model.inner, param.name)
+end
 
 MOI.Utilities.supports_default_copy_to(::Optimizer, ::Bool) = true
 

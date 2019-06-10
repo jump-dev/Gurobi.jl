@@ -304,29 +304,29 @@ end
         c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(2.0))
         c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(1.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         println(model.inner.conflict)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == true
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == true
     end
-    
+
     @testset "Variable bounds (ScalarAffine)" begin
         model = Gurobi.Optimizer()
         x = MOI.add_variable(model)
         c1 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.GreaterThan(2.0))
         c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.LessThan(1.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == true
@@ -339,11 +339,11 @@ end
         c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.EqualTo(1.0))
         c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(2.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == true
@@ -356,11 +356,11 @@ end
         c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.Interval(1.0, 3.0))
         c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(0.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == true
@@ -378,11 +378,11 @@ end
         cf2 = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0, -1.0], [x, y]), 0.0)
         c2 = MOI.add_constraint(model, cf2, MOI.GreaterThan(1.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), b1) == true
@@ -402,11 +402,11 @@ end
         cf2 = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0, -1.0], [x, y]), 0.0)
         c2 = MOI.add_constraint(model, cf2, MOI.GreaterThan(1.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), b1) == true
@@ -428,11 +428,11 @@ end
         cf2 = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0, -1.0, 1.0], [x, y, z]), 0.0)
         c2 = MOI.add_constraint(model, cf2, MOI.GreaterThan(1.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), b1) == true
@@ -448,14 +448,21 @@ end
         c1 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.GreaterThan(1.0))
         c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.LessThan(2.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.INFEASIBLE
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == false
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == false
     end
+end
+
+@testset "RawParameter" begin
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    @test MOI.get(model, MOI.RawParameter("OutputFlag")) == 1
+    MOI.set(model, MOI.RawParameter("OutputFlag"), 0)
+    @test MOI.get(model, MOI.RawParameter("OutputFlag")) == 0
 end
