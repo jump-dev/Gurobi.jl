@@ -4,7 +4,7 @@
 
 import MathOptInterface
 
-const MOI  = MathOptInterface
+const MOI = MathOptInterface
 
 @enum(VariableType, CONTINUOUS, BINARY, INTEGER, SEMIINTEGER, SEMICONTINUOUS)
 @enum(BoundType, NONE, LESS_THAN, GREATER_THAN, LESS_AND_GREATER_THAN, INTERVAL, EQUAL_TO)
@@ -17,15 +17,13 @@ mutable struct VariableInfo
     name::String
     # Storage for constraint names associated with variables because Gurobi
     # can only store names for variables and proper constraints.
+    # We can perform an optimization and only store three strings for the
+    # constraint names because, at most, there can be three SingleVariable
+    # constraints, e.g., LessThan, GreaterThan, and Integer.
     lessthan_name::String
-    greaterthan_name::String
-    equalto_name::String
-    interval_name::String
-    zeroone_name::String
-    integer_name::String
-    semiinteger_name::String
-    semicontinuous_name::String
-    VariableInfo(column::Int) = new(column, NONE, CONTINUOUS, "", "", "", "", "", "", "", "", "")
+    greaterthan_interval_or_equalto_name::String
+    type_constraint_name::String
+    VariableInfo(column::Int) = new(column, NONE, CONTINUOUS, "", "", "", "")
 end
 
 mutable struct ConstraintInfo
@@ -312,7 +310,7 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraintAttributesSet)
     return MOI.AbstractConstraintAttribute[MOI.ConstraintName()]
 end
 
-function indices_and_coefficients(
+function _indices_and_coefficients(
     model::Optimizer, f::MOI.ScalarAffineFunction{Float64}
 )
     f_canon = MOI.Utilities.canonical(f)
@@ -325,7 +323,7 @@ function indices_and_coefficients(
     return indices, coefficients
 end
 
-function indices_and_coefficients(
+function _indices_and_coefficients(
     model::Optimizer, f::MOI.ScalarQuadraticFunction
 )
     f_canon = MOI.Utilities.canonical(f)
@@ -356,9 +354,9 @@ function indices_and_coefficients(
     return indices, coefficients, I, J, V
 end
 
-sense_and_rhs(s::MOI.LessThan{Float64}) = (Cchar('<'), s.upper)
-sense_and_rhs(s::MOI.GreaterThan{Float64}) = (Cchar('>'), s.lower)
-sense_and_rhs(s::MOI.EqualTo{Float64}) = (Cchar('='), s.value)
+_sense_and_rhs(s::MOI.LessThan{Float64}) = (Cchar('<'), s.upper)
+_sense_and_rhs(s::MOI.GreaterThan{Float64}) = (Cchar('>'), s.lower)
+_sense_and_rhs(s::MOI.EqualTo{Float64}) = (Cchar('='), s.value)
 
 ###
 ### Variables
@@ -419,12 +417,12 @@ end
 
 function MOI.get(model::Optimizer, ::Type{MOI.VariableIndex}, name::String)
     if model.name_to_variable === nothing
-        rebuild_name_to_variable(model)
+        _rebuild_name_to_variable(model)
     end
     return get(model.name_to_variable, name, nothing)
 end
 
-function rebuild_name_to_variable(model::Optimizer)
+function _rebuild_name_to_variable(model::Optimizer)
     model.name_to_variable = Dict{String, MOI.VariableIndex}()
     for (index, info) in model.variable_info
         if info.name == ""
@@ -554,7 +552,7 @@ end
 function MOI.set(
     model::Optimizer, ::MOI.ObjectiveFunction{F}, f::F
 ) where {F <: MOI.ScalarQuadraticFunction{Float64}}
-    affine_indices, affine_coefficients, I, J, V = indices_and_coefficients(model, f)
+    affine_indices, affine_coefficients, I, J, V = _indices_and_coefficients(model, f)
     _update_if_necessary(model)
     # We need to zero out any existing linear objective.
     obj = zeros(length(model.variable_info))
@@ -589,7 +587,7 @@ function MOI.get(
     I, J, V = getq(model.inner)
     for (i, j, v) in zip(I, J, V)
         iszero(v) && continue
-        # See note in `indices_and_coefficients`.
+        # See note in `_indices_and_coefficients`.
         new_v = i == j ? 2v : v
         push!(
             q_terms,
@@ -625,7 +623,7 @@ function Base.getindex(
     return throw(MOI.InvalidIndex(c))
 end
 
-function throw_if_invalid(
+function _throw_if_invalid(
     model, c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any}
 )
     if !MOI.is_valid(model, c)
@@ -707,7 +705,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintFunction,
     c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     return MOI.SingleVariable(MOI.VariableIndex(c.value))
 end
 
@@ -718,12 +716,15 @@ function MOI.set(
     return throw(MOI.SettingSingleVariableFunctionNotAllowed())
 end
 
-bounds(s::MOI.GreaterThan{Float64}) = (s.lower, nothing)
-bounds(s::MOI.LessThan{Float64}) = (nothing, s.upper)
-bounds(s::MOI.EqualTo{Float64}) = (s.value, s.value)
-bounds(s::MOI.Interval{Float64}) = (s.lower, s.upper)
+_bounds(s::MOI.GreaterThan{Float64}) = (s.lower, nothing)
+_bounds(s::MOI.LessThan{Float64}) = (nothing, s.upper)
+_bounds(s::MOI.EqualTo{Float64}) = (s.value, s.value)
+_bounds(s::MOI.Interval{Float64}) = (s.lower, s.upper)
 
-function throw_if_existing_lower(bound, var_type, new_set, variable)
+function _throw_if_existing_lower(
+    bound::BoundType, var_type::VariableType, new_set::Type{<:MOI.AbstractSet},
+    variable::MOI.VariableIndex
+)
     existing_set = if bound == LESS_AND_GREATER_THAN || bound == GREATER_THAN
         MOI.GreaterThan{Float64}
     elseif bound == INTERVAL
@@ -742,7 +743,10 @@ function throw_if_existing_lower(bound, var_type, new_set, variable)
     end
 end
 
-function throw_if_existing_upper(bound, var_type, new_set, variable)
+function _throw_if_existing_upper(
+    bound::BoundType, var_type::VariableType, new_set::Type{<:MOI.AbstractSet},
+    variable::MOI.VariableIndex
+)
     existing_set = if bound == LESS_AND_GREATER_THAN || bound == LESS_THAN
         MOI.LessThan{Float64}
     elseif bound == INTERVAL
@@ -766,18 +770,18 @@ function MOI.add_constraint(
 ) where {S <: SCALAR_SETS}
     info = model[f.variable]
     if typeof(s) == MOI.LessThan{Float64}
-        throw_if_existing_upper(info.bound, info.type, S, f.variable)
+        _throw_if_existing_upper(info.bound, info.type, S, f.variable)
         info.bound = info.bound == GREATER_THAN ? LESS_AND_GREATER_THAN : LESS_THAN
     elseif typeof(s) == MOI.GreaterThan{Float64}
-        throw_if_existing_lower(info.bound, info.type, S, f.variable)
+        _throw_if_existing_lower(info.bound, info.type, S, f.variable)
         info.bound = info.bound == LESS_THAN ? LESS_AND_GREATER_THAN : GREATER_THAN
     elseif typeof(s) == MOI.EqualTo{Float64}
-        throw_if_existing_lower(info.bound, info.type, S, f.variable)
-        throw_if_existing_upper(info.bound, info.type, S, f.variable)
+        _throw_if_existing_lower(info.bound, info.type, S, f.variable)
+        _throw_if_existing_upper(info.bound, info.type, S, f.variable)
         info.bound = EQUAL_TO
     elseif typeof(s) == MOI.Interval{Float64}
-        throw_if_existing_lower(info.bound, info.type, S, f.variable)
-        throw_if_existing_upper(info.bound, info.type, S, f.variable)
+        _throw_if_existing_lower(info.bound, info.type, S, f.variable)
+        _throw_if_existing_upper(info.bound, info.type, S, f.variable)
         info.bound = INTERVAL
     end
     index = MOI.ConstraintIndex{MOI.SingleVariable, typeof(s)}(f.variable.value)
@@ -789,7 +793,7 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     _update_if_necessary(model)
     info = model[c]
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
@@ -799,6 +803,7 @@ function MOI.delete(
     else
         info.bound = NONE
     end
+    info.lessthan_name = ""
     return
 end
 
@@ -806,7 +811,7 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
@@ -816,6 +821,7 @@ function MOI.delete(
     else
         info.bound = NONE
     end
+    info.greaterthan_interval_or_equalto_name = ""
     return
 end
 
@@ -823,13 +829,14 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
     info.bound = NONE
+    info.greaterthan_interval_or_equalto_name = ""
     return
 end
 
@@ -837,13 +844,14 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
     info.bound = NONE
+    info.greaterthan_interval_or_equalto_name = ""
     return
 end
 
@@ -851,7 +859,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     _update_if_necessary(model)
     lower = get_dblattrelement(model.inner, "LB", model[c].column)
     return MOI.GreaterThan(lower)
@@ -861,7 +869,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     _update_if_necessary(model)
     upper = get_dblattrelement(model.inner, "UB", model[c].column)
     return MOI.LessThan(upper)
@@ -871,7 +879,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     _update_if_necessary(model)
     lower = get_dblattrelement(model.inner, "LB", model[c].column)
     return MOI.EqualTo(lower)
@@ -881,7 +889,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     _update_if_necessary(model)
     lower = get_dblattrelement(model.inner, "LB", model[c].column)
     upper = get_dblattrelement(model.inner, "UB", model[c].column)
@@ -892,8 +900,8 @@ function MOI.set(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}, s::S
 ) where {S<:SCALAR_SETS}
-    throw_if_invalid(model, c)
-    lower, upper = bounds(s)
+    _throw_if_invalid(model, c)
+    lower, upper = _bounds(s)
     info = model[c]
     _update_if_necessary(model)
     if lower !== nothing
@@ -920,12 +928,13 @@ end
 function MOI.delete(
     model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('C'))
     _require_update(model)
     info.type = CONTINUOUS
+    info.type_constraint_name = ""
     return
 end
 
@@ -933,7 +942,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     return MOI.ZeroOne()
 end
 
@@ -951,12 +960,13 @@ end
 function MOI.delete(
     model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Integer}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('C'))
     _require_update(model)
     info.type = CONTINUOUS
+    info.type_constraint_name = ""
     return
 end
 
@@ -964,7 +974,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Integer}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     return MOI.Integer()
 end
 
@@ -972,8 +982,8 @@ function MOI.add_constraint(
     model::Optimizer, f::MOI.SingleVariable, s::MOI.Semicontinuous{Float64}
 )
     info = model[f.variable]
-    throw_if_existing_lower(info.bound, info.type, typeof(s), f.variable)
-    throw_if_existing_upper(info.bound, info.type, typeof(s), f.variable)
+    _throw_if_existing_lower(info.bound, info.type, typeof(s), f.variable)
+    _throw_if_existing_upper(info.bound, info.type, typeof(s), f.variable)
     _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('S'))
     set_dblattrelement!(model.inner, "LB", info.column, s.lower)
@@ -987,7 +997,7 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semicontinuous{Float64}}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('C'))
@@ -995,6 +1005,7 @@ function MOI.delete(
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
     info.type = CONTINUOUS
+    info.type_constraint_name = ""
     return
 end
 
@@ -1002,7 +1013,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semicontinuous{Float64}}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
     lower = get_dblattrelement(model.inner, "LB", info.column)
@@ -1014,8 +1025,8 @@ function MOI.add_constraint(
     model::Optimizer, f::MOI.SingleVariable, s::MOI.Semiinteger{Float64}
 )
     info = model[f.variable]
-    throw_if_existing_lower(info.bound, info.type, typeof(s), f.variable)
-    throw_if_existing_upper(info.bound, info.type, typeof(s), f.variable)
+    _throw_if_existing_lower(info.bound, info.type, typeof(s), f.variable)
+    _throw_if_existing_upper(info.bound, info.type, typeof(s), f.variable)
     _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('N'))
     set_dblattrelement!(model.inner, "LB", info.column, s.lower)
@@ -1029,7 +1040,7 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semiinteger{Float64}}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('C'))
@@ -1037,6 +1048,7 @@ function MOI.delete(
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
     info.type = CONTINUOUS
+    info.type_constraint_name = ""
     return
 end
 
@@ -1044,7 +1056,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semiinteger{Float64}}
 )
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     info = model[c]
     _update_if_necessary(model)
     lower = get_dblattrelement(model.inner, "LB", info.column)
@@ -1052,48 +1064,34 @@ function MOI.get(
     return MOI.Semiinteger(lower, upper)
 end
 
-constraint_name(info::VariableInfo, ::Type{<:MOI.LessThan}) = info.lessthan_name
-constraint_name(info::VariableInfo, ::Type{<:MOI.GreaterThan}) = info.greaterthan_name
-constraint_name(info::VariableInfo, ::Type{<:MOI.EqualTo}) = info.equalto_name
-constraint_name(info::VariableInfo, ::Type{<:MOI.Interval}) = info.interval_name
-constraint_name(info::VariableInfo, ::Type{<:MOI.ZeroOne}) = info.zeroone_name
-constraint_name(info::VariableInfo, ::Type{<:MOI.Integer}) = info.integer_name
-constraint_name(info::VariableInfo, ::Type{<:MOI.Semiinteger}) = info.semiinteger_name
-constraint_name(info::VariableInfo, ::Type{<:MOI.Semicontinuous}) = info.semicontinuous_name
-
 function MOI.get(
     model::Optimizer, ::MOI.ConstraintName,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}
 ) where {S}
-    throw_if_invalid(model, c)
-    return constraint_name(model[c], S)
+    _throw_if_invalid(model, c)
+    if S <: MOI.LessThan
+        return model[c].lessthan_name
+    elseif S <: MOI.GreaterThan || S <: MOI.Interval || S <: MOI.EqualTo
+        return model[c].greaterthan_interval_or_equalto_name
+    elseif S <: MOI.ZeroOne || S <: MOI.Integer || S <: MOI.Semiinteger || S <: MOI.Semicontinuous
+        return model[c].type_constraint_name
+    end
 end
 
 function MOI.set(
     model::Optimizer, ::MOI.ConstraintName,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}, name::String
 ) where {S}
-    throw_if_invalid(model, c)
+    _throw_if_invalid(model, c)
     if S <: MOI.LessThan
         model[c].lessthan_name = name
-    elseif S <: MOI.GreaterThan
-        model[c].greaterthan_name = name
-    elseif S <: MOI.Interval
-        model[c].interval_name = name
-    elseif S <: MOI.EqualTo
-        model[c].equalto_name = name
-    elseif S <: MOI.ZeroOne
-        model[c].zeroone_name = name
-    elseif S <: MOI.Integer
-        model[c].integer_name = name
-    elseif S <: MOI.Semicontinuous
-        model[c].semicontinuous_name = name
-    elseif S <: MOI.Semiinteger
-        model[c].semiinteger_name = name
+    elseif S <: MOI.GreaterThan || S <: MOI.Interval || S <: MOI.EqualTo
+        model[c].greaterthan_interval_or_equalto_name = name
+    elseif S <: MOI.ZeroOne || S <: MOI.Integer || S <: MOI.Semiinteger || S <: MOI.Semicontinuous
+        model[c].type_constraint_name = name
     end
     return
 end
-
 
 ###
 ### ScalarAffineFunction-in-Set
@@ -1132,8 +1130,8 @@ function MOI.add_constraint(
     model.affine_constraint_info[model.last_constraint_index] =
         ConstraintInfo(length(model.affine_constraint_info) + 1, s)
 
-    indices, coefficients = indices_and_coefficients(model, f)
-    sense, rhs = sense_and_rhs(s)
+    indices, coefficients = _indices_and_coefficients(model, f)
+    sense, rhs = _sense_and_rhs(s)
     add_constr!(model.inner, indices, coefficients, sense, rhs)
     _require_update(model)
     return MOI.ConstraintIndex{typeof(f), typeof(s)}(model.last_constraint_index)
@@ -1218,7 +1216,7 @@ end
 
 function MOI.get(model::Optimizer, ::Type{MOI.ConstraintIndex}, name::String)
     if model.name_to_constraint_index === nothing
-        rebuild_name_to_constraint_index(model)
+        _rebuild_name_to_constraint_index(model)
     end
     index = get(model.name_to_constraint_index, name, nothing)
     if index === nothing
@@ -1249,7 +1247,19 @@ function MOI.get(
 ) where {S}
     index = nothing
     for (key, info) in model.variable_info
-        if constraint_name(info, S) == name
+        constraint_name = ""
+        if info.bound in _bound_enums(S)
+            if S <: MOI.LessThan
+                constraint_name = info.lessthan_name
+            else
+                constraint_name = info.greaterthan_interval_or_equalto_name
+            end
+        elseif info.type in _type_enums(S)
+            constraint_name = info.type_constraint_name
+        end
+        if constraint_name == ""
+            continue
+        elseif constraint_name == name
             if index === nothing
                 index = key
             else
@@ -1273,7 +1283,7 @@ function MOI.get(
     return nothing
 end
 
-function rebuild_name_to_constraint_index(model::Optimizer)
+function _rebuild_name_to_constraint_index(model::Optimizer)
     model.name_to_constraint_index = Dict{String, Int}()
     _update_if_necessary(model)
     _rebuild_name_to_constraint_index_util(
@@ -1322,8 +1332,8 @@ function MOI.add_constraint(
     if !iszero(f.constant)
         throw(MOI.ScalarFunctionConstantNotZero{Float64, typeof(f), typeof(s)}(f.constant))
     end
-    indices, coefficients, I, J, V = indices_and_coefficients(model, f)
-    sense, rhs = sense_and_rhs(s)
+    indices, coefficients, I, J, V = _indices_and_coefficients(model, f)
+    sense, rhs = _sense_and_rhs(s)
     _update_if_necessary(model)
     add_qconstr!(model.inner, indices, coefficients, I, J, V, sense, rhs)
     _update_if_necessary(model)
@@ -1436,8 +1446,8 @@ function Base.getindex(
     throw(MOI.InvalidIndex(key))
 end
 
-sos_type(::MOI.SOS1) = :SOS1
-sos_type(::MOI.SOS2) = :SOS2
+_sos_type(::MOI.SOS1) = :SOS1
+_sos_type(::MOI.SOS2) = :SOS2
 
 function MOI.is_valid(
     model::Optimizer,
@@ -1455,7 +1465,7 @@ function MOI.add_constraint(
     model::Optimizer, f::MOI.VectorOfVariables, s::SOS
 )
     columns = Int[model[v].column for v in f.variables]
-    add_sos!(model.inner, sos_type(s), columns, s.weights)
+    add_sos!(model.inner, _sos_type(s), columns, s.weights)
     model.last_constraint_index += 1
     index = MOI.ConstraintIndex{MOI.VectorOfVariables, typeof(s)}(model.last_constraint_index)
     model.sos_constraint_info[index.value] = ConstraintInfo(
@@ -1577,7 +1587,7 @@ function MOI.get(model::Optimizer, ::MOI.PrimalStatus)
         return MOI.FEASIBLE_POINT
     elseif stat == :solution_limit
         return MOI.FEASIBLE_POINT
-    elseif (stat == :inf_or_unbd || stat == :unbounded) && has_primal_ray(model)
+    elseif (stat == :inf_or_unbd || stat == :unbounded) && _has_primal_ray(model)
         return MOI.INFEASIBILITY_CERTIFICATE
     elseif stat == :suboptimal
         return MOI.FEASIBLE_POINT
@@ -1587,7 +1597,7 @@ function MOI.get(model::Optimizer, ::MOI.PrimalStatus)
     return MOI.NO_SOLUTION
 end
 
-function has_dual_ray(model::Optimizer)
+function _has_dual_ray(model::Optimizer)
     try
         # Note: for performance reasons, we try to get 1 element because for
         # some versions of Gurobi, we cannot query 0 elements without error.
@@ -1610,7 +1620,7 @@ function MOI.get(model::Optimizer, ::MOI.DualStatus)
         return MOI.FEASIBLE_POINT
     elseif stat == :solution_limit
         return MOI.FEASIBLE_POINT
-    elseif (stat == :inf_or_unbd || stat == :infeasible) && has_dual_ray(model)
+    elseif (stat == :inf_or_unbd || stat == :infeasible) && _has_dual_ray(model)
         return MOI.INFEASIBILITY_CERTIFICATE
     elseif stat == :suboptimal
         return MOI.FEASIBLE_POINT
@@ -1618,7 +1628,7 @@ function MOI.get(model::Optimizer, ::MOI.DualStatus)
     return MOI.NO_SOLUTION
 end
 
-function has_primal_ray(model::Optimizer)
+function _has_primal_ray(model::Optimizer)
     try
         # Note: for performance reasons, we try to get 1 element because for
         # some versions of Gurobi, we cannot query 0 elements without error.
@@ -1670,7 +1680,7 @@ function MOI.get(
     return rhs - slack
 end
 
-function dual_multiplier(model::Optimizer)
+function _dual_multiplier(model::Optimizer)
     return MOI.get(model, MOI.ObjectiveSense()) == MOI.MIN_SENSE ? 1.0 : -1.0
 end
 
@@ -1682,7 +1692,7 @@ function MOI.get(
     x = get_dblattrelement(model.inner, "X", model[c].column)
     ub = get_dblattrelement(model.inner, "UB", model[c].column)
     if x ≈ ub
-        return dual_multiplier(model) * get_dblattrelement(model.inner, "RC", model[c].column)
+        return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", model[c].column)
     else
         return 0.0
     end
@@ -1696,7 +1706,7 @@ function MOI.get(
     x = get_dblattrelement(model.inner, "X", model[c].column)
     lb = get_dblattrelement(model.inner, "LB", model[c].column)
     if x ≈ lb
-        return dual_multiplier(model) * get_dblattrelement(model.inner, "RC", model[c].column)
+        return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", model[c].column)
     else
         return 0.0
     end
@@ -1706,14 +1716,14 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
 )
-    return dual_multiplier(model) * get_dblattrelement(model.inner, "RC", model[c].column)
+    return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", model[c].column)
 end
 
 function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
 )
-    return dual_multiplier(model) * get_dblattrelement(model.inner, "RC", model[c].column)
+    return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", model[c].column)
 end
 
 function MOI.get(
@@ -1721,16 +1731,16 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}
 )
     if model.has_infeasibility_cert
-        return -dual_multiplier(model) * get_dblattrelement(model.inner, "FarkasDual", model[c].row)
+        return -_dual_multiplier(model) * get_dblattrelement(model.inner, "FarkasDual", model[c].row)
     end
-    return dual_multiplier(model) * get_dblattrelement(model.inner, "Pi", model[c].row)
+    return _dual_multiplier(model) * get_dblattrelement(model.inner, "Pi", model[c].row)
 end
 
 function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, <:Any}
 )
-    return dual_multiplier(model) * get_dblattrelement(model.inner, "QCPi", model[c].row)
+    return _dual_multiplier(model) * get_dblattrelement(model.inner, "QCPi", model[c].row)
 end
 
 MOI.get(model::Optimizer, ::MOI.ObjectiveValue) = get_dblattr(model.inner, "ObjVal")
@@ -1803,24 +1813,24 @@ function MOI.get(model::Optimizer, ::MOI.NumberOfConstraints{F, S}) where {F, S}
     return length(MOI.get(model, MOI.ListOfConstraintIndices{F, S}()))
 end
 
-bound_enums(::Type{<:MOI.LessThan}) = (LESS_THAN, LESS_AND_GREATER_THAN)
-bound_enums(::Type{<:MOI.GreaterThan}) = (GREATER_THAN, LESS_AND_GREATER_THAN)
-bound_enums(::Type{<:MOI.Interval}) = (INTERVAL,)
-bound_enums(::Type{<:MOI.EqualTo}) = (EQUAL_TO,)
-bound_enums(::Any) = (nothing,)
+_bound_enums(::Type{<:MOI.LessThan}) = (LESS_THAN, LESS_AND_GREATER_THAN)
+_bound_enums(::Type{<:MOI.GreaterThan}) = (GREATER_THAN, LESS_AND_GREATER_THAN)
+_bound_enums(::Type{<:MOI.Interval}) = (INTERVAL,)
+_bound_enums(::Type{<:MOI.EqualTo}) = (EQUAL_TO,)
+_bound_enums(::Any) = (nothing,)
 
-type_enums(::Type{MOI.ZeroOne}) = (BINARY,)
-type_enums(::Type{MOI.Integer}) = (INTEGER,)
-type_enums(::Type{<:MOI.Semicontinuous}) = (SEMICONTINUOUS,)
-type_enums(::Type{<:MOI.Semiinteger}) = (SEMIINTEGER,)
-type_enums(::Any) = (nothing,)
+_type_enums(::Type{MOI.ZeroOne}) = (BINARY,)
+_type_enums(::Type{MOI.Integer}) = (INTEGER,)
+_type_enums(::Type{<:MOI.Semicontinuous}) = (SEMICONTINUOUS,)
+_type_enums(::Type{<:MOI.Semiinteger}) = (SEMIINTEGER,)
+_type_enums(::Any) = (nothing,)
 
 function MOI.get(
     model::Optimizer, ::MOI.ListOfConstraintIndices{MOI.SingleVariable, S}
 ) where {S}
     indices = MOI.ConstraintIndex{MOI.SingleVariable, S}[]
     for (key, info) in model.variable_info
-        if info.bound in bound_enums(S) || info.type in type_enums(S)
+        if info.bound in _bound_enums(S) || info.type in _type_enums(S)
             push!(indices, MOI.ConstraintIndex{MOI.SingleVariable, S}(key.value))
         end
     end
@@ -2096,8 +2106,8 @@ function cblazy!(
     f::MOI.ScalarAffineFunction{Float64},
     s::Union{MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, MOI.EqualTo{Float64}}
 )
-    indices, coefficients = indices_and_coefficients(model, f)
-    sense, rhs = sense_and_rhs(s)
+    indices, coefficients = _indices_and_coefficients(model, f)
+    sense, rhs = _sense_and_rhs(s)
     return cblazy(cb_data, Cint.(indices), coefficients, Char(sense), rhs)
 end
 
