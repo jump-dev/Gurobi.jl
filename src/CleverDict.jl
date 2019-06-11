@@ -102,28 +102,28 @@ function Base.length(c::CleverDict)
     end
 end
 
-function Base.iterate(c::CleverDict)
+function Base.iterate(c::CleverDict{K, V}) where {K, V}
     if c.vector !== nothing
         next = iterate(c.vector)
         if next === nothing
             return nothing
         else
             (val, new_state) = next
-            return (MOI.VariableIndex(1 + c.offset), val), new_state
+            return index_to_key(K, 1 + c.offset) => val, new_state
         end
     else
         return iterate(c.dict)
     end
 end
 
-function Base.iterate(c::CleverDict, state)
+function Base.iterate(c::CleverDict{K, V}, state) where {K, V}
     if c.vector !== nothing
         next = iterate(c.vector, state)
         if next === nothing
             return nothing
         else
             (val, new_state) = next
-            return MOI.VariableIndex(state + c.offset) => val, new_state
+            return index_to_key(K, state + c.offset) => val, new_state
         end
     else
         return iterate(c.dict, state)
@@ -143,9 +143,9 @@ function Base.values(c::CleverDict)
     return c.vector !== nothing ? c.vector : values(c.dict)
 end
 
-function Base.keys(c::CleverDict{MOI.VariableIndex, V}) where {V}
+function Base.keys(c::CleverDict{K, V}) where {K, V}
     if c.vector !== nothing
-        return MOI.VariableIndex.((1:length(c.vector)) .+ c.offset)
+        return index_to_key.(K, (1:length(c.vector)) .+ c.offset)
     end
     return keys(c.dict)
 end
