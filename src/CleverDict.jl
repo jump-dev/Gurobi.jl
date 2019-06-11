@@ -42,16 +42,21 @@ function key_to_index(key::K) where {K}
     error("You need to define `key_to_index`.")
 end
 
+"""
+    new_key(c::CleverDict{K, V}) where {K, V}
+
+Return the next available key in the ordered sequence.
+"""
+function new_key(c::CleverDict{K, V}) where {K, V}
+    c.last_index += 1
+    return index_to_key(K, c.last_index)
+end
+
 function Base.empty!(c::CleverDict{K, V}) where {K, V}
     c.vector = V[]
     c.offset = c.last_index
     c.dict = nothing
     return
-end
-
-function new_key(c::CleverDict{K, V}) where {K, V}
-    c.last_index += 1
-    return new_key(K, c.last_index)
 end
 
 function Base.getindex(c::CleverDict{K, V}, key::K) where {K, V}
