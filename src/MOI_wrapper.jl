@@ -377,8 +377,6 @@ end
 
 function MOI.add_variable(model::Optimizer)
     index = new_key(model.variable_info)
-    # model.last_variable_index += 1
-    # index = MOI.VariableIndex(model.last_variable_index)
     model.variable_info[index] = VariableInfo(length(model.variable_info) + 1)
     add_cvar!(model.inner, 0.0)
     _require_update(model)
@@ -393,8 +391,6 @@ function MOI.add_variables(model::Optimizer, N::Int)
     num_variables = length(model.variable_info)
     for i in 1:N
         index = new_key(model.variable_info)
-        # model.last_variable_index += 1
-        # index = MOI.VariableIndex(model.last_variable_index)
         model.variable_info[index] = VariableInfo(num_variables + i)
         indices[i] = index
         push!(model.columns, index)
