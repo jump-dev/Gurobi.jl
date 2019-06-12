@@ -8,7 +8,7 @@ const MOI = MathOptInterface
 
 include("CleverDict.jl")
 
-index_to_key(::Type{MOI.VariableIndex}, index::Int) =  MOI.VariableIndex(index)
+index_to_key(::Type{MOI.VariableIndex}, index::Int) = MOI.VariableIndex(index)
 key_to_index(key::MOI.VariableIndex) = key.value
 
 @enum(VariableType, CONTINUOUS, BINARY, INTEGER, SEMIINTEGER, SEMICONTINUOUS)
@@ -173,7 +173,7 @@ end
 function MOI.is_empty(model::Optimizer)
     model.needs_update && return false
     model.objective_type != SCALAR_AFFINE && return false
-    model.is_feasibility && return false
+    model.is_feasibility == false && return false
     length(model.variable_info) != 0 && return false
     length(model.affine_constraint_info) != 0 && return false
     length(model.quadratic_constraint_info) != 0 && return false
@@ -444,7 +444,6 @@ function MOI.set(
 )
     info = _info(model, v)
     info.name = name
-    _update_if_necessary(model)
     # We set the default name to `" "` because Gurobi will ignore the blank name
     # `""` and retain it's default naming convention of `C0`.
     set_strattrelement!(model.inner, "VarName", info.column, name == "" ? " " : name)
@@ -794,7 +793,6 @@ function MOI.delete(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
     _throw_if_invalid(model, c)
-    _update_if_necessary(model)
     info = _info(model, c)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
@@ -813,7 +811,6 @@ function MOI.delete(
 )
     _throw_if_invalid(model, c)
     info = _info(model, c)
-    _update_if_necessary(model)
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
     _require_update(model)
     if info.bound == LESS_AND_GREATER_THAN
@@ -831,7 +828,6 @@ function MOI.delete(
 )
     _throw_if_invalid(model, c)
     info = _info(model, c)
-    _update_if_necessary(model)
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
@@ -846,7 +842,6 @@ function MOI.delete(
 )
     _throw_if_invalid(model, c)
     info = _info(model, c)
-    _update_if_necessary(model)
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
@@ -904,7 +899,6 @@ function MOI.set(
     _throw_if_invalid(model, c)
     lower, upper = _bounds(s)
     info = _info(model, c)
-    _update_if_necessary(model)
     if lower !== nothing
         set_dblattrelement!(model.inner, "LB", info.column, lower)
     end
@@ -919,7 +913,6 @@ function MOI.add_constraint(
     model::Optimizer, f::MOI.SingleVariable, ::MOI.ZeroOne
 )
     info = _info(model, f.variable)
-    _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('B'))
     _require_update(model)
     info.type = BINARY
@@ -931,7 +924,6 @@ function MOI.delete(
 )
     _throw_if_invalid(model, c)
     info = _info(model, c)
-    _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('C'))
     _require_update(model)
     info.type = CONTINUOUS
@@ -951,7 +943,6 @@ function MOI.add_constraint(
     model::Optimizer, f::MOI.SingleVariable, ::MOI.Integer
 )
     info = _info(model, f.variable)
-    _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('I'))
     _require_update(model)
     info.type = INTEGER
@@ -963,7 +954,6 @@ function MOI.delete(
 )
     _throw_if_invalid(model, c)
     info = _info(model, c)
-    _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('C'))
     _require_update(model)
     info.type = CONTINUOUS
@@ -985,7 +975,6 @@ function MOI.add_constraint(
     info = _info(model, f.variable)
     _throw_if_existing_lower(info.bound, info.type, typeof(s), f.variable)
     _throw_if_existing_upper(info.bound, info.type, typeof(s), f.variable)
-    _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('S'))
     set_dblattrelement!(model.inner, "LB", info.column, s.lower)
     set_dblattrelement!(model.inner, "UB", info.column, s.upper)
@@ -1000,7 +989,6 @@ function MOI.delete(
 )
     _throw_if_invalid(model, c)
     info = _info(model, c)
-    _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('C'))
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
@@ -1028,7 +1016,6 @@ function MOI.add_constraint(
     info = _info(model, f.variable)
     _throw_if_existing_lower(info.bound, info.type, typeof(s), f.variable)
     _throw_if_existing_upper(info.bound, info.type, typeof(s), f.variable)
-    _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('N'))
     set_dblattrelement!(model.inner, "LB", info.column, s.lower)
     set_dblattrelement!(model.inner, "UB", info.column, s.upper)
@@ -1043,7 +1030,6 @@ function MOI.delete(
 )
     _throw_if_invalid(model, c)
     info = _info(model, c)
-    _update_if_necessary(model)
     set_charattrelement!(model.inner, "VType", info.column, Char('C'))
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
@@ -1173,7 +1159,6 @@ function MOI.set(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}, s::S
 ) where {S}
-    _update_if_necessary(model)
     set_dblattrelement!(model.inner, "RHS", _info(model, c).row, MOI.constant(s))
     _require_update(model)
     return
@@ -1213,7 +1198,6 @@ function MOI.set(
 )
     info = _info(model, c)
     info.name = name
-    _update_if_necessary(model)
     # We set the default name to `" "` because Gurobi will ignore the blank name
     # `""` and retain it's default naming convention of `R0`.
     set_strattrelement!(model.inner, "ConstrName", info.row, name == "" ? " " : name)
@@ -1297,7 +1281,6 @@ end
 
 function _rebuild_name_to_constraint_index(model::Optimizer)
     model.name_to_constraint_index = Dict{String, Int}()
-    _update_if_necessary(model)
     _rebuild_name_to_constraint_index_util(
         model, model.affine_constraint_info, MOI.ScalarAffineFunction{Float64}
     )
@@ -1346,7 +1329,6 @@ function MOI.add_constraint(
     end
     indices, coefficients, I, J, V = _indices_and_coefficients(model, f)
     sense, rhs = _sense_and_rhs(s)
-    _update_if_necessary(model)
     add_qconstr!(model.inner, indices, coefficients, I, J, V, sense, rhs)
     _update_if_necessary(model)
     _require_update(model)
@@ -1437,7 +1419,6 @@ function MOI.set(
     c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, S},
     name::String
 ) where {S}
-    _update_if_necessary(model)
     info = _info(model, c)
     set_strattrelement!(model.inner, "QCName", info.row, name)
     _require_update(model)
