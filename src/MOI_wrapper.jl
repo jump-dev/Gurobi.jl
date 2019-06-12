@@ -69,11 +69,6 @@ mutable struct Optimizer <: MOI.ModelLike
     # and FEASIBILITY_SENSE.
     is_feasibility::Bool
 
-    # An index that is incremented for each new variable. We can check if a
-    # VariableIndex is valid by checking if it is in variable_info. We should
-    # _not_ reset this to zero, since then new variables cannot be distinguished
-    # from previously created ones.
-    last_variable_index::Int
     # A mapping from the MOI.VariableIndex to the Gurobi column. VariableInfo
     # also stores some additional fields like what bounds have been added, the
     # variable type, and the names of SingleVariable-in-Set constraints.
@@ -129,7 +124,6 @@ mutable struct Optimizer <: MOI.ModelLike
         model.affine_constraint_info = Dict{Int, ConstraintInfo}()
         model.quadratic_constraint_info = Dict{Int, Int}()
         model.sos_constraint_info = Dict{Int, ConstraintInfo}()
-        model.last_variable_index = 0
         model.last_constraint_index = 0
         model.callback_variable_primal = Float64[]
         MOI.empty!(model)  # MOI.empty!(model) re-sets the `.inner` field.
@@ -143,6 +137,8 @@ mutable struct Optimizer <: MOI.ModelLike
         return model
     end
 end
+
+Base.show(io::IO, model::Optimizer) = show(io, model.inner)
 
 function MOI.empty!(model::Optimizer)
     if model.env === nothing
@@ -163,11 +159,11 @@ function MOI.empty!(model::Optimizer)
     model.objective_type = SCALAR_AFFINE
     model.is_feasibility = true
     empty!(model.variable_info)
-    model.name_to_variable = nothing
     empty!(model.affine_constraint_info)
-    model.name_to_constraint_index = nothing
     empty!(model.quadratic_constraint_info)
     empty!(model.sos_constraint_info)
+    model.name_to_variable = nothing
+    model.name_to_constraint_index = nothing
     model.has_unbounded_ray = false
     model.has_infeasibility_cert = false
     empty!(model.callback_variable_primal)
@@ -177,12 +173,16 @@ end
 function MOI.is_empty(model::Optimizer)
     model.needs_update && return false
     model.objective_type != SCALAR_AFFINE && return false
+    model.is_feasibility && return false
     length(model.variable_info) != 0 && return false
     length(model.affine_constraint_info) != 0 && return false
     length(model.quadratic_constraint_info) != 0 && return false
     length(model.sos_constraint_info) != 0 && return false
     model.name_to_variable !== nothing && return false
     model.name_to_constraint_index !== nothing && return false
+    model.has_unbounded_ray && return false
+    model.has_infeasibility_cert && return false
+    length(model.callback_variable_primal) != 0 && return false
     return true
 end
 
