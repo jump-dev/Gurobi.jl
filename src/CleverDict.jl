@@ -63,10 +63,10 @@ end
 
 function Base.getindex(c::CleverDict{K, V}, key::K) where {K, V}
     if c.dict === nothing
-        # Case I) no call to `MOI.delete!`, so return the offsetted element:
+        # Case I) no call to `Base.delete!`, so return the offsetted element:
         return c.vector[key_to_index(key) - c.offset]
     end
-    # Case II) `MOI.delete!` must have been called, so return the element
+    # Case II) `Base.delete!` must have been called, so return the element
     #          from the dictionary.
     return c.dict[key]
 end
@@ -93,7 +93,7 @@ function Base.delete!(c::CleverDict{K, V}, key::K) where {K, V}
             end
             c.dict[index_to_key(K, i + c.offset)] = info
         end
-        splice!(c.vector, key.value - c.offset)
+        splice!(c.vector, key_to_index(key) - c.offset)
     else
         for (i, v) in enumerate(c.vector)
             if v == key
