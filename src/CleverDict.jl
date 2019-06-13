@@ -56,7 +56,7 @@ function new_key(c::CleverDict{K, V}) where {K, V}
 end
 
 function Base.empty!(c::CleverDict{K, V}) where {K, V}
-    empty!(c.vector)
+    c.vector = V[]
     c.last_index = 0
     c.dict = nothing
     return
@@ -101,7 +101,7 @@ function Base.getindex(c::CleverDict{K, V}, index::LinearIndex) where {K, V}
     # querying a LinearIndex (e.g., getting the MOI objective function).
     if c.vector === nothing
         c.vector = Vector{V}(undef, length(c))
-        for (i, val) in values(c.dict)
+        for (i, val) in enumerate(values(c.dict))
             c.vector[i] = val
         end
     end
