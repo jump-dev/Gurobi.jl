@@ -8,21 +8,65 @@ end
 
 suite = BenchmarkGroup()
 
-function add_variable_constraint()
+function add_variable()
     model = new_model()
     for i in 1:10_000
         x = MOI.add_variable(model)
-        c = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(1.0 * i))
+    end
+    return model
+end
+suite["add_variable"] = @benchmarkable add_variable()
+
+function add_variables()
+    model = new_model()
+    MOI.add_variables(model, 10_000)
+    return model
+end
+suite["add_variables"] = @benchmarkable add_variables()
+
+function add_variable_constraint()
+    model = new_model()
+    x = MOI.add_variables(model, 10_000)
+    for (i, xi) in enumerate(x)
+        MOI.add_constraint(model, MOI.SingleVariable(xi), MOI.LessThan(1.0 * i))
     end
     return model
 end
 suite["add_variable_constraint"] = @benchmarkable add_variable_constraint()
 
-function add_constraints()
+function add_variable_constraints()
+    model = new_model()
+    x = MOI.add_variables(model, 10_000)
+    MOI.add_constraints(
+        model,
+        MOI.SingleVariable.(x),
+        MOI.LessThan.(1.0:10_000.0)
+    )
+    return model
+end
+suite["add_variable_constraints"] = @benchmarkable add_variable_constraints()
+
+function add_constraint()
     model = new_model()
     index = MOI.add_variables(model, 10_000)
+    for (i, x) in enumerate(index)
+        MOI.add_constraint(
+            model,
+            MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, x)], 0.0),
+            MOI.LessThan(1.0 * i)
+        )
+    end
+    return model
+end
+suite["add_constraint"] = @benchmarkable add_constraint()
+
+function add_constraints()
+    model = new_model()
+    x = MOI.add_variables(model, 10_000)
     MOI.add_constraints(
-        model, MOI.SingleVariable.(index), MOI.LessThan.(1:1.0:10_000)
+        model,
+        [MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, xi)], 0.0) for xi in x],
+        MOI.LessThan.(1:1.0:10_000)
     )
     return model
 end
