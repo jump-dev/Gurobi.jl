@@ -7,10 +7,12 @@ A smart storage type for managing sequential objects with non-decreasing integer
 indices.
 
 Provided no keys are deleted, the backing storage is a `Vector{V}`. Once a key
-has been deleted, the backing storage switches to a standard Julia `Dict{K,
-V}`.
+has been deleted, the backing storage switches to an `OrderedDict{K, V}`.
 
 The i'th ordered element can be obtained with `c[LinearIndex(i)]`.
+
+Note that querying a `LinearIndex` immediately after deleting a key via
+`delete!` is very slow. (It requires a rebuild of an ordered list of variables.)
 
 Use `new_key(c::CleverDict)` to obtain the next key in the sequential order.
 
@@ -64,10 +66,11 @@ function Base.getindex(c::CleverDict{K, V}, key::K) where {K, V}
     if c.dict === nothing
         # Case I) no call to `Base.delete!`, so return the element:
         return c.vector[key_to_index(key)]
+    else
+        # Case II) `Base.delete!` must have been called, so return the element
+        #          from the dictionary.
+        return c.dict[key]
     end
-    # Case II) `Base.delete!` must have been called, so return the element
-    #          from the dictionary.
-    return c.dict[key]
 end
 
 function Base.setindex!(c::CleverDict{K, V}, val::V, key::K) where {K, V}
@@ -83,9 +86,10 @@ end
 struct LinearIndex
     i::Int
 end
+
 function Base.getindex(c::CleverDict{K, V}, index::LinearIndex) where {K, V}
     # Get the `index` linear element. If `c.vector` is currently `nothing`
-    # (i.e., there has been a deletion, rebuild `c.vector`). This is a
+    # (i.e., there has been a deletion), rebuild `c.vector`. This is a
     # trade-off: We could ensure `c.vector` is always updated, but this requires
     # a `splice!` in `delete!`, making deletions costly. However, it makes this
     # `getindex` operation trival because we would never have to rebuild the
@@ -93,7 +97,7 @@ function Base.getindex(c::CleverDict{K, V}, index::LinearIndex) where {K, V}
     # The current implemented approach offers quick deletions, but an expensive
     # rebuild the first time you query a `LinearIndex` after a deletion. Once
     # the rebuild is done, there are quick queries until the next deletion.
-    # Thus, the worst-case is a user repeatedly deleting a variable and then
+    # Thus, the worst-case is a user repeatedly deleting a key and then
     # querying a LinearIndex (e.g., getting the MOI objective function).
     if c.vector === nothing
         c.vector = Vector{V}(undef, length(c))
