@@ -1128,6 +1128,42 @@ function MOI.add_constraint(
     return MOI.ConstraintIndex{typeof(f), typeof(s)}(model.last_constraint_index)
 end
 
+function MOI.add_constraints(
+    model::Optimizer, f::Vector{MOI.ScalarAffineFunction{Float64}},
+    s::Vector{<:Union{MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.EqualTo{Float64}}}
+)
+    if length(f) != length(s)
+        error("Number of functions does not equal number of sets.")
+    end
+    indices = MOI.ConstraintIndex{eltype(f), eltype(s)}[]
+    row_starts, columns, coefficients = Int[], Int[], Float64[], Cchar[]
+    senses, rhss = Cchar[], Float64[]
+    old_nnz, new_nnz = 0, 0
+    for (fi, si) in zip(f, s)
+        if !iszero(fi.constant)
+            throw(MOI.ScalarFunctionConstantNotZero{Float64, eltype(f), eltype(s)}(fi.constant))
+        end
+        model.last_constraint_index += 1
+        push!(indices, MOI.ConstraintIndex{eltype(f), eltype(s)}(model.last_constraint_index))
+        model.affine_constraint_info[model.last_constraint_index] =
+            ConstraintInfo(length(model.affine_constraint_info) + 1, si)
+        i_indices, i_coefficients = _indices_and_coefficients(model, fi)
+        i_sense, i_rhs = _sense_and_rhs(si)
+        push!(row_starts, old_nnz + 1)
+        new_nnz = old_nnz + length(i_indices)
+        resize!(columns, new_nnz)
+        resize!(coefficients, new_nnz)
+        columns[(old_nnz + 1):new_nnz] .= i_indices
+        coefficients[(old_nnz + 1):new_nnz] .= i_coefficients
+        push!(senses, i_sense)
+        push!(rhss, i_rhs)
+        old_nnz = new_nnz
+    end
+    add_constrs!(model.inner, row_starts, columns, coefficients, senses, rhss)
+    _require_update(model)
+    return indices
+end
+
 function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}
