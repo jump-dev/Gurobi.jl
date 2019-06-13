@@ -813,6 +813,35 @@ function MOI.add_constraint(
     return index
 end
 
+function MOI.add_constraints(
+    model::Optimizer, f::Vector{MOI.SingleVariable}, s::Vector{S}
+) where {S <: SCALAR_SETS}
+    for fi in f
+        info = _info(model, fi.variable)
+        if typeof(s) == MOI.LessThan{Float64}
+            _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
+            info.bound = info.bound == GREATER_THAN ? LESS_AND_GREATER_THAN : LESS_THAN
+        elseif typeof(s) == MOI.GreaterThan{Float64}
+            _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
+            info.bound = info.bound == LESS_THAN ? LESS_AND_GREATER_THAN : GREATER_THAN
+        elseif typeof(s) == MOI.EqualTo{Float64}
+            _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
+            _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
+            info.bound = EQUAL_TO
+        elseif typeof(s) == MOI.Interval{Float64}
+            _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
+            _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
+            info.bound = INTERVAL
+        end
+    end
+    indices = [
+        MOI.ConstraintIndex{MOI.SingleVariable, eltype(s)}(fi.variable.value)
+        for fi in f
+    ]
+    _set_bounds(model, indices, s)
+    return indices
+end
+
 function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
@@ -915,6 +944,34 @@ function MOI.get(
     lower = get_dblattrelement(model.inner, "LB", info.column)
     upper = get_dblattrelement(model.inner, "UB", info.column)
     return MOI.Interval(lower, upper)
+end
+
+function _set_bounds(
+    model::Optimizer,
+    indices::Vector{MOI.ConstraintIndex{MOI.SingleVariable, S}},
+    sets::Vector{S}
+) where {S}
+    lower_columns, lower_values = Int[], Float64[]
+    upper_columns, upper_values = Int[], Float64[]
+    for (c, s) in zip(indices, sets)
+        lower, upper = _bounds(s)
+        info = _info(model, c)
+        if lower !== nothing
+            push!(lower_columns, info.column)
+            push!(lower_values, lower)
+        end
+        if upper !== nothing
+            push!(upper_columns, info.column)
+            push!(upper_values, upper)
+        end
+    end
+    if length(lower_columns) > 0
+        set_dblattrlist!(model.inner, "LB", lower_columns, lower_values)
+    end
+    if length(upper_columns) > 0
+        set_dblattrlist!(model.inner, "UB", upper_columns, upper_values)
+    end
+    _require_update(model)
 end
 
 function MOI.set(
