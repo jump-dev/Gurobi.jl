@@ -314,27 +314,38 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraintAttributesSet)
 end
 
 function _indices_and_coefficients(
+    indices::AbstractVector{Int}, coefficients::AbstractVector{Float64},
     model::Optimizer, f::MOI.ScalarAffineFunction{Float64}
 )
-    f_canon = MOI.Utilities.canonical(f)
-    indices = Int[]
-    coefficients = Float64[]
-    for term in f_canon.terms
-        push!(indices, _info(model, term.variable_index).column)
-        push!(coefficients, term.coefficient)
+    i = 1
+    for term in f.terms
+        indices[i] = _info(model, term.variable_index).column
+        coefficients[i] = term.coefficient
+        i += 1
     end
     return indices, coefficients
 end
 
 function _indices_and_coefficients(
-    model::Optimizer, f::MOI.ScalarQuadraticFunction
+    model::Optimizer, f::MOI.ScalarAffineFunction{Float64}
 )
     f_canon = MOI.Utilities.canonical(f)
-    I, J, V = Int[], Int[], Float64[]
-    for term in f_canon.quadratic_terms
-        push!(I, _info(model, term.variable_index_1).column)
-        push!(J, _info(model, term.variable_index_2).column)
-        push!(V, term.coefficient)
+    nnz = length(f_canon.terms)
+    indices = Vector{Int}(undef, nnz)
+    coefficients = Vector{Float64}(undef, nnz)
+    _indices_and_coefficients(indices, coefficients, model, f_canon)
+    return indices, coefficients
+end
+
+function _indices_and_coefficients(
+    I::AbstractVector{Int}, J::AbstractVector{Int}, V::AbstractVector{Float64},
+    indices::AbstractVector{Int}, coefficients::AbstractVector{Float64},
+    model::Optimizer, f::MOI.ScalarQuadraticFunction
+)
+    for (i, term) in enumerate(f.quadratic_terms)
+        I[i] = _info(model, term.variable_index_1).column
+        J[i] = _info(model, term.variable_index_2).column
+        V[i] =  term.coefficient
         # Gurobi returns a list of terms. MOI requires 0.5 x' Q x. So, to get
         # from
         #   Gurobi -> MOI => multiply diagonals by 2.0
@@ -345,15 +356,29 @@ function _indices_and_coefficients(
         #   Gurobi needs: (I, J, V) = ([0, 0, 1], [0, 1, 1], [2, 1, 1])
         #   MOI needs:
         #     [SQT(4.0, x, x), SQT(1.0, x, y), SQT(2.0, y, y)]
-        if I[end] == J[end]
-            V[end] *= 0.5
+        if I[i] == J[i]
+            V[i] *= 0.5
         end
     end
-    indices, coefficients = Int[], Float64[]
-    for term in f_canon.affine_terms
-        push!(indices, _info(model, term.variable_index).column)
-        push!(coefficients, term.coefficient)
+    for (i, term) in enumerate(f.affine_terms)
+        indices[i] = _info(model, term.variable_index).column
+        coefficients[i] = term.coefficient
     end
+    return
+end
+
+function _indices_and_coefficients(
+    model::Optimizer, f::MOI.ScalarQuadraticFunction
+)
+    f_canon = MOI.Utilities.canonical(f)
+    nnz_quadratic = length(f_canon.quadratic_terms)
+    nnz_affine = length(f_canon.affine_terms)
+    I = Vector{Int}(undef, nnz_quadratic)
+    J = Vector{Int}(undef, nnz_quadratic)
+    V = Vector{Float64}(undef, nnz_quadratic)
+    indices = Vector{Int}(undef, nnz_affine)
+    coefficients = Vector{Float64}(undef, nnz_affine)
+    _indices_and_coefficients(I, J, V, indices, coefficients, model, f_canon)
     return indices, coefficients, I, J, V
 end
 
@@ -1135,30 +1160,39 @@ function MOI.add_constraints(
     if length(f) != length(s)
         error("Number of functions does not equal number of sets.")
     end
-    indices = MOI.ConstraintIndex{eltype(f), eltype(s)}[]
-    row_starts, columns, coefficients = Int[], Int[], Float64[], Cchar[]
-    senses, rhss = Cchar[], Float64[]
-    old_nnz, new_nnz = 0, 0
-    for (fi, si) in zip(f, s)
+    canonicalized_functions = MOI.Utilities.canonical.(f)
+
+    # First pass: compute number of non-zeros to allocate space.
+    nnz = 0
+    for fi in canonicalized_functions
         if !iszero(fi.constant)
             throw(MOI.ScalarFunctionConstantNotZero{Float64, eltype(f), eltype(s)}(fi.constant))
         end
+        nnz += length(fi.terms)
+    end
+    # Initialize storage
+    indices = Vector{MOI.ConstraintIndex{eltype(f), eltype(s)}}(undef, length(f))
+    row_starts = Vector{Int}(undef, length(f) + 1)
+    row_starts[1] = 1
+    columns = Vector{Int}(undef, nnz)
+    coefficients = Vector{Float64}(undef, nnz)
+    senses = Vector{Cchar}(undef, length(f))
+    rhss = Vector{Float64}(undef, length(f))
+    # Second pass: loop through, passing views to _indices_and_coefficients.
+    for (i, (fi, si)) in enumerate(zip(f, s))
+        senses[i], rhss[i] = _sense_and_rhs(si)
+        row_starts[i + 1] = row_starts[i] + length(fi.terms)
+        _indices_and_coefficients(
+            view(columns, row_starts[i]:row_starts[i + 1] - 1),
+            view(coefficients, row_starts[i]:row_starts[i + 1] - 1),
+            model, fi
+        )
         model.last_constraint_index += 1
-        push!(indices, MOI.ConstraintIndex{eltype(f), eltype(s)}(model.last_constraint_index))
+        indices[i] = MOI.ConstraintIndex{eltype(f), eltype(s)}(model.last_constraint_index)
         model.affine_constraint_info[model.last_constraint_index] =
             ConstraintInfo(length(model.affine_constraint_info) + 1, si)
-        i_indices, i_coefficients = _indices_and_coefficients(model, fi)
-        i_sense, i_rhs = _sense_and_rhs(si)
-        push!(row_starts, old_nnz + 1)
-        new_nnz = old_nnz + length(i_indices)
-        resize!(columns, new_nnz)
-        resize!(coefficients, new_nnz)
-        columns[(old_nnz + 1):new_nnz] .= i_indices
-        coefficients[(old_nnz + 1):new_nnz] .= i_coefficients
-        push!(senses, i_sense)
-        push!(rhss, i_rhs)
-        old_nnz = new_nnz
     end
+    pop!(row_starts)  # Gurobi doesn't need the final row start.
     add_constrs!(model.inner, row_starts, columns, coefficients, senses, rhss)
     _require_update(model)
     return indices
