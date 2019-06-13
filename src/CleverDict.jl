@@ -12,18 +12,14 @@ The i'th ordered element can be obtained with `c[LinearIndex(i)]`.
 
 Use `new_key(c::CleverDict)` to obtain the next key in the sequential order.
 
-When `empty!` is called, the largest index is stored in `offset` so that new
-keys are generated from `offset + 1`.
-
 Overload the functions `index_to_key` and `key_to_index` to enable mappings
-between the integer index of the vector (plus the offset) and the dictionary key.
+between the integer index of the vector and the dictionary key.
 """
 mutable struct CleverDict{K, V}
     last_index::Int
     vector::Vector{V}
-    offset::Int
     dict::Union{Nothing, Dict{K, V}}
-    CleverDict{K, V}() where {K, V} = new{K, V}(0, V[], 0, nothing)
+    CleverDict{K, V}() where {K, V} = new{K, V}(0, V[], nothing)
 end
 
 """
@@ -56,15 +52,15 @@ end
 
 function Base.empty!(c::CleverDict{K, V}) where {K, V}
     empty!(c.vector)
-    c.offset = c.last_index
+    c.last_index = 0
     c.dict = nothing
     return
 end
 
 function Base.getindex(c::CleverDict{K, V}, key::K) where {K, V}
     if c.dict === nothing
-        # Case I) no call to `Base.delete!`, so return the offsetted element:
-        return c.vector[key_to_index(key) - c.offset]
+        # Case I) no call to `Base.delete!`, so return the element:
+        return c.vector[key_to_index(key)]
     end
     # Case II) `Base.delete!` must have been called, so return the element
     #          from the dictionary.
@@ -88,12 +84,12 @@ function Base.delete!(c::CleverDict{K, V}, key::K) where {K, V}
     if c.dict === nothing
         c.dict = Dict{K, V}()
         for (i, info) in enumerate(c.vector)
-            if key.value == i + c.offset
+            if key_to_index(key) == i
                 continue
             end
-            c.dict[index_to_key(K, i + c.offset)] = info
+            c.dict[index_to_key(K, i)] = info
         end
-        splice!(c.vector, key_to_index(key) - c.offset)
+        splice!(c.vector, key_to_index(key))
     else
         for (i, v) in enumerate(c.vector)
             if v == key
@@ -115,7 +111,7 @@ function Base.iterate(c::CleverDict{K, V}) where {K, V}
             return nothing
         else
             (val, new_state) = next
-            return index_to_key(K, 1 + c.offset) => val, new_state
+            return index_to_key(K, 1) => val, new_state
         end
     else
         return iterate(c.dict)
@@ -129,7 +125,7 @@ function Base.iterate(c::CleverDict{K, V}, state) where {K, V}
             return nothing
         else
             (val, new_state) = next
-            return index_to_key(K, state + c.offset) => val, new_state
+            return index_to_key(K, state) => val, new_state
         end
     else
         return iterate(c.dict, state)
@@ -139,7 +135,7 @@ end
 Base.haskey(::CleverDict, key) = false
 function Base.haskey(c::CleverDict{K, V}, key::K) where {K, V}
     if c.dict === nothing
-        return 1 <= key_to_index(key) - c.offset <= length(c.vector)
+        return 1 <= key_to_index(key) <= length(c.vector)
     else
         return haskey(c.dict, key)
     end
@@ -151,7 +147,7 @@ end
 
 function Base.keys(c::CleverDict{K, V}) where {K, V}
     if c.dict === nothing
-        return index_to_key.(K, (1:length(c.vector)) .+ c.offset)
+        return index_to_key.(K, 1:length(c.vector))
     end
     return keys(c.dict)
 end
