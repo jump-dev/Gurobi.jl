@@ -1,3 +1,5 @@
+import OrderedCollections
+
 """
     CleverDict{K, V}
 
@@ -17,8 +19,8 @@ between the integer index of the vector and the dictionary key.
 """
 mutable struct CleverDict{K, V}
     last_index::Int
-    vector::Vector{V}
-    dict::Union{Nothing, Dict{K, V}}
+    vector::Union{Nothing, Vector{V}}
+    dict::Union{Nothing, OrderedCollections.OrderedDict{K, V}}
     CleverDict{K, V}() where {K, V} = new{K, V}(0, V[], nothing)
 end
 
@@ -34,7 +36,8 @@ end
 """
     key_to_index(key::K)
 
-Map `key` to an integer valued index.
+Map `key` to an integer valued index, assuming that there have been no
+deletions.
 """
 function key_to_index(key::K) where {K}
     error("You need to define `key_to_index`.")
@@ -68,7 +71,9 @@ function Base.getindex(c::CleverDict{K, V}, key::K) where {K, V}
 end
 
 function Base.setindex!(c::CleverDict{K, V}, val::V, key::K) where {K, V}
-    push!(c.vector, val)
+    if c.vector !== nothing
+        push!(c.vector, val)
+    end
     if c.dict !== nothing
         c.dict[key] = val
     end
@@ -78,31 +83,46 @@ end
 struct LinearIndex
     i::Int
 end
-Base.getindex(c::CleverDict, index::LinearIndex) = c.vector[index.i]
+function Base.getindex(c::CleverDict{K, V}, index::LinearIndex) where {K, V}
+    # Get the `index` linear element. If `c.vector` is currently `nothing`
+    # (i.e., there has been a deletion, rebuild `c.vector`). This is a
+    # trade-off: We could ensure `c.vector` is always updated, but this requires
+    # a `splice!` in `delete!`, making deletions costly. However, it makes this
+    # `getindex` operation trival because we would never have to rebuild the
+    # vector.
+    # The current implemented approach offers quick deletions, but an expensive
+    # rebuild the first time you query a `LinearIndex` after a deletion. Once
+    # the rebuild is done, there are quick queries until the next deletion.
+    # Thus, the worst-case is a user repeatedly deleting a variable and then
+    # querying a LinearIndex (e.g., getting the MOI objective function).
+    if c.vector === nothing
+        c.vector = Vector{V}(undef, length(c))
+        for (i, val) in values(c.dict)
+            c.vector[i] = val
+        end
+    end
+    return c.vector[index.i]
+end
 
 function Base.delete!(c::CleverDict{K, V}, key::K) where {K, V}
     if c.dict === nothing
-        c.dict = Dict{K, V}()
+        c.dict = OrderedCollections.OrderedDict{K, V}()
         for (i, info) in enumerate(c.vector)
-            if key_to_index(key) == i
-                continue
-            end
             c.dict[index_to_key(K, i)] = info
         end
-        splice!(c.vector, key_to_index(key))
-    else
-        for (i, v) in enumerate(c.vector)
-            if v == key
-                splice!(c.vector, i)
-                break
-            end
-        end
-        delete!(c.dict, key)
     end
+    delete!(c.dict, key)
+    c.vector = nothing
     return
 end
 
-Base.length(c::CleverDict) = length(c.vector)
+function Base.length(c::CleverDict)
+    if c.vector !== nothing
+        return length(c.vector)
+    else
+        return length(c.dict)
+    end
+end
 
 function Base.iterate(c::CleverDict{K, V}) where {K, V}
     if c.dict === nothing

@@ -11,7 +11,7 @@ suite = BenchmarkGroup()
 function add_variable()
     model = new_model()
     for i in 1:10_000
-        x = MOI.add_variable(model)
+        MOI.add_variable(model)
     end
     return model
 end
@@ -46,6 +46,36 @@ function add_variable_constraints()
 end
 suite["add_variable_constraints"] = @benchmarkable add_variable_constraints()
 
+function delete_variable()
+    model = new_model()
+    x = MOI.add_variables(model, 1_000)
+    MOI.add_constraint.(model, MOI.SingleVariable.(x), Ref(MOI.LessThan(1.0)))
+    MOI.delete.(model, x)
+    return model
+end
+suite["delete_variable"] = @benchmarkable delete_variable()
+
+function delete_variable_constraint()
+    model = new_model()
+    x = MOI.add_variables(model, 1_000)
+    cons = MOI.add_constraint.(model, MOI.SingleVariable.(x), Ref(MOI.LessThan(1.0)))
+    for con in cons
+        MOI.delete(model, con)
+    end
+    cons = MOI.add_constraint.(model, MOI.SingleVariable.(x), Ref(MOI.LessThan(1.0)))
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    MOI.set(model,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, x), 0.0)
+    )
+    MOI.optimize!(model)
+    for con in cons
+        MOI.delete(model, con)
+    end
+    return model
+end
+suite["delete_variable_constraint"] = @benchmarkable delete_variable_constraint()
+
 function add_constraint()
     model = new_model()
     index = MOI.add_variables(model, 10_000)
@@ -74,18 +104,17 @@ suite["add_constraints"] = @benchmarkable add_constraints()
 
 function delete_constraint()
     model = new_model()
-    x = MOI.add_variables(model, 1_000)
-    cons = MOI.add_constraint.(model, MOI.SingleVariable.(x), Ref(MOI.LessThan(1.0)))
-    for con in cons
-        MOI.delete(model, con)
+    index = MOI.add_variables(model, 1_000)
+    cons = Vector{
+        MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64}}
+    }(undef, 1_000)
+    for (i, x) in enumerate(index)
+        cons[i] = MOI.add_constraint(
+            model,
+            MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, x)], 0.0),
+            MOI.LessThan(1.0 * i)
+        )
     end
-    cons = MOI.add_constraint.(model, MOI.SingleVariable.(x), Ref(MOI.LessThan(1.0)))
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
-    MOI.set(model,
-        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(1.0, x), 0.0)
-    )
-    MOI.optimize!(model)
     for con in cons
         MOI.delete(model, con)
     end
@@ -125,22 +154,42 @@ function compare_test(suite, params_filename, results_filename)
     end
 end
 
-const PARAMS_FILENAME = joinpath(@__DIR__, "params.json")
-const RESULTS_FILENAME = joinpath(@__DIR__, "results.json")
+function print_help()
+    println("""
+    Usage
+        perf.jl [arg] [name]
 
-if length(ARGS) > 0
+    [arg]
+        --new       Begin a new benchmark comparison
+        --compare   Run another benchmark and compare to existing
+
+    [name]          A name for the benchmark test. Will create a folder in /perf.
+
+    Examples
+        git checkout master
+        julia perf.jl --new master
+        git checkout approach_1
+        julia perf.jl --new approach_1
+        git checkout approach_2
+        julia perf.jl --compare master
+        julia perf.jl --compare approach_1
+    """)
+end
+
+if length(ARGS) != 2
+    print_help()
+else
+    test_path = joinpath(@__DIR__, ARGS[2])
+    if !isdir(test_path)
+        mkdir(test_path)
+    end
+    params_filename = joinpath(test_path, "params.json")
+    results_filename = joinpath(test_path, "results.json")
     if ARGS[1] == "--new"
-        new_test(suite, PARAMS_FILENAME, RESULTS_FILENAME)
+        new_test(suite, params_filename, results_filename)
     elseif ARGS[1] == "--compare"
-        compare_test(suite, PARAMS_FILENAME, RESULTS_FILENAME)
+        compare_test(suite, params_filename, results_filename)
     else
-        println("""
-        Usage
-            perf.jl [arg]
-
-        Arguments
-            --new       Begin a new benchmark comparison
-            --compare   Run another benchmark and compare to existing
-        """)
+        print_help()
     end
 end

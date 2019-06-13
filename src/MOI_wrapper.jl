@@ -426,7 +426,7 @@ end
 function MOI.delete(model::Optimizer, v::MOI.VariableIndex)
     _update_if_necessary(model)
     info = _info(model, v)
-    del_vars!(model.inner, info.column)
+    del_vars!(model.inner, Cint[info.column])
     _require_update(model)
     delete!(model.variable_info, v)
     for other_info in values(model.variable_info)
@@ -469,10 +469,10 @@ function MOI.set(
 )
     info = _info(model, v)
     info.name = name
-    # We set the default name to `" "` because Gurobi will ignore the blank name
-    # `""` and retain it's default naming convention of `C0`.
-    set_strattrelement!(model.inner, "VarName", info.column, name == "" ? " " : name)
-    _require_update(model)
+    if name != ""
+        set_strattrelement!(model.inner, "VarName", info.column, name)
+        _require_update(model)
+    end
     if model.name_to_variable !== nothing && !haskey(model.name_to_variable, name)
         model.name_to_variable[name] = v
     end
@@ -1268,10 +1268,10 @@ function MOI.set(
 )
     info = _info(model, c)
     info.name = name
-    # We set the default name to `" "` because Gurobi will ignore the blank name
-    # `""` and retain it's default naming convention of `R0`.
-    set_strattrelement!(model.inner, "ConstrName", info.row, name == "" ? " " : name)
-    _require_update(model)
+    if name != ""
+        set_strattrelement!(model.inner, "ConstrName", info.row, name)
+        _require_update(model)
+    end
     if model.name_to_constraint_index !== nothing && !haskey(model.name_to_constraint_index, name)
         model.name_to_constraint_index[c] = name
     else
