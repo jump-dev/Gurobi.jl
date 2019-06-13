@@ -16,7 +16,7 @@ end
 
 @testset "Linear tests" begin
     @testset "Default Solver"  begin
-        MOIT.contlineartest(OPTIMIZER, CONFIG, [
+        MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis = true), [
             # This requires an infeasiblity certificate for a variable bound.
             "linear12"
         ])

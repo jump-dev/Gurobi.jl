@@ -1,7 +1,3 @@
-# Attributes still to implement:
-#  - BasisStatusCode
-#  - ConstraintBasisStatus
-
 import MathOptInterface
 
 const MOI = MathOptInterface
@@ -793,17 +789,18 @@ function MOI.add_constraint(
     model::Optimizer, f::MOI.SingleVariable, s::S
 ) where {S <: SCALAR_SETS}
     info = _info(model, f.variable)
-    if typeof(s) == MOI.LessThan{Float64}
+    if S <: MOI.LessThan{Float64}
         _throw_if_existing_upper(info.bound, info.type, S, f.variable)
         info.bound = info.bound == GREATER_THAN ? LESS_AND_GREATER_THAN : LESS_THAN
-    elseif typeof(s) == MOI.GreaterThan{Float64}
+    elseif S <: MOI.GreaterThan{Float64}
         _throw_if_existing_lower(info.bound, info.type, S, f.variable)
         info.bound = info.bound == LESS_THAN ? LESS_AND_GREATER_THAN : GREATER_THAN
-    elseif typeof(s) == MOI.EqualTo{Float64}
+    elseif S <: MOI.EqualTo{Float64}
         _throw_if_existing_lower(info.bound, info.type, S, f.variable)
         _throw_if_existing_upper(info.bound, info.type, S, f.variable)
         info.bound = EQUAL_TO
-    elseif typeof(s) == MOI.Interval{Float64}
+    else
+        @assert S <: MOI.Interval{Float64}
         _throw_if_existing_lower(info.bound, info.type, S, f.variable)
         _throw_if_existing_upper(info.bound, info.type, S, f.variable)
         info.bound = INTERVAL
@@ -818,17 +815,18 @@ function MOI.add_constraints(
 ) where {S <: SCALAR_SETS}
     for fi in f
         info = _info(model, fi.variable)
-        if typeof(s) == MOI.LessThan{Float64}
+        if S <: MOI.LessThan{Float64}
             _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
             info.bound = info.bound == GREATER_THAN ? LESS_AND_GREATER_THAN : LESS_THAN
-        elseif typeof(s) == MOI.GreaterThan{Float64}
+        elseif S <: MOI.GreaterThan{Float64}
             _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
             info.bound = info.bound == LESS_THAN ? LESS_AND_GREATER_THAN : GREATER_THAN
-        elseif typeof(s) == MOI.EqualTo{Float64}
+        elseif S <: MOI.EqualTo{Float64}
             _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
             _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
             info.bound = EQUAL_TO
-        elseif typeof(s) == MOI.Interval{Float64}
+        else
+            @assert S <: MOI.Interval{Float64}
             _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
             _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
             info.bound = INTERVAL
@@ -2192,6 +2190,55 @@ function MOI.set(
     set_dblattrelement!(model.inner, "RHS", row, new_rhs)
     _require_update(model)
     return
+end
+
+function MOI.get(
+    model::Optimizer, ::MOI.ConstraintBasisStatus,
+    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}
+) where {S <: SCALAR_SETS}
+    row = _info(model, c).row
+    _update_if_necessary(model)
+    cbasis = get_intattrelement(model.inner, "CBasis", row)
+    if cbasis == 0
+        return MOI.BASIC
+    elseif cbasis == -1
+        return MOI.NONBASIC
+    else
+        error("CBasis value of $(cbasis) isn't defined.")
+    end
+end
+
+function MOI.get(
+    model::Optimizer, ::MOI.ConstraintBasisStatus,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
+) where {S <: SCALAR_SETS}
+    column = _info(model, c).column
+    _update_if_necessary(model)
+    vbasis = get_intattrelement(model.inner, "VBasis", column)
+    if vbasis == 0
+        return MOI.BASIC
+    elseif vbasis == -1
+        if S <: MOI.LessThan
+            return MOI.BASIC
+        elseif !(S <: MOI.Interval)
+            return MOI.NONBASIC
+        else
+            return MOI.NONBASIC_AT_LOWER
+        end
+    elseif vbasis == -2
+        MOI.NONBASIC_AT_UPPER
+        if S <: MOI.GreaterThan
+            return MOI.BASIC
+        elseif !(S <: MOI.Interval)
+            return MOI.NONBASIC
+        else
+            return MOI.NONBASIC_AT_UPPER
+        end
+    elseif vbasis == -3
+        return MOI.SUPER_BASIC
+    else
+        error("VBasis value of $(vbasis) isn't defined.")
+    end
 end
 
 # ==============================================================================
