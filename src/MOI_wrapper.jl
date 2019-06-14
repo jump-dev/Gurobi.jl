@@ -25,8 +25,8 @@ mutable struct VariableInfo
     lessthan_name::String
     greaterthan_interval_or_equalto_name::String
     type_constraint_name::String
-    function VariableInfo(index::MOI.VariableIndex, column::Int)
-        return new(index, column, NONE, CONTINUOUS, "", "", "", "")
+    function VariableInfo()
+        return new(MOI.VariableIndex(-1), 0, NONE, CONTINUOUS, "", "", "", "")
     end
 end
 
@@ -395,8 +395,10 @@ function _info(model::Optimizer, key::MOI.VariableIndex)
 end
 
 function MOI.add_variable(model::Optimizer)
-    index = new_key(model.variable_info)
-    model.variable_info[index] = VariableInfo(index, length(model.variable_info) + 1)
+    index = new_item(model.variable_info, VariableInfo())
+    info = _info(model, index)
+    info.index = index
+    info.column = length(model.variable_info)
     add_cvar!(model.inner, 0.0)
     _require_update(model)
     return index
@@ -408,8 +410,10 @@ function MOI.add_variables(model::Optimizer, N::Int)
     indices = Vector{MOI.VariableIndex}(undef, N)
     num_variables = length(model.variable_info)
     for i in 1:N
-        index = new_key(model.variable_info)
-        model.variable_info[index] = VariableInfo(index, num_variables + i)
+        index = new_item(model.variable_info, VariableInfo())
+        info = _info(model, index)
+        info.index = index
+        info.column = num_variables + i
         indices[i] = index
     end
     return indices

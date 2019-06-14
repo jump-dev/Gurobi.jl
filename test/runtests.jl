@@ -14,5 +14,6 @@ end
 end
 
 @testset "MathOptInterface Tests" begin
+    include("CleverDict.jl")
     include("MOI_wrapper.jl")
 end
