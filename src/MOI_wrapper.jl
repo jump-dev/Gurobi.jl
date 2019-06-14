@@ -647,14 +647,6 @@ function _info(
     return throw(MOI.InvalidIndex(c))
 end
 
-function _throw_if_invalid(
-    model, c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any}
-)
-    if !MOI.is_valid(model, c)
-        throw(MOI.InvalidIndex(c))
-    end
-end
-
 function MOI.is_valid(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
@@ -729,7 +721,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintFunction,
     c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     return MOI.SingleVariable(MOI.VariableIndex(c.value))
 end
 
@@ -848,7 +840,7 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
@@ -865,7 +857,7 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
     _require_update(model)
@@ -882,7 +874,7 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
@@ -896,7 +888,7 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
@@ -910,7 +902,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     _update_if_necessary(model)
     lower = get_dblattrelement(model.inner, "LB", _info(model, c).column)
     return MOI.GreaterThan(lower)
@@ -920,7 +912,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     _update_if_necessary(model)
     upper = get_dblattrelement(model.inner, "UB", _info(model, c).column)
     return MOI.LessThan(upper)
@@ -930,7 +922,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     _update_if_necessary(model)
     lower = get_dblattrelement(model.inner, "LB", _info(model, c).column)
     return MOI.EqualTo(lower)
@@ -940,7 +932,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     _update_if_necessary(model)
     info = _info(model, c)
     lower = get_dblattrelement(model.inner, "LB", info.column)
@@ -980,7 +972,7 @@ function MOI.set(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}, s::S
 ) where {S<:SCALAR_SETS}
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     lower, upper = _bounds(s)
     info = _info(model, c)
     if lower !== nothing
@@ -1006,7 +998,7 @@ end
 function MOI.delete(
     model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     set_charattrelement!(model.inner, "VType", info.column, Char('C'))
     _require_update(model)
@@ -1019,7 +1011,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     return MOI.ZeroOne()
 end
 
@@ -1036,7 +1028,7 @@ end
 function MOI.delete(
     model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Integer}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     set_charattrelement!(model.inner, "VType", info.column, Char('C'))
     _require_update(model)
@@ -1049,7 +1041,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Integer}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     return MOI.Integer()
 end
 
@@ -1071,7 +1063,7 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semicontinuous{Float64}}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     set_charattrelement!(model.inner, "VType", info.column, Char('C'))
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
@@ -1086,7 +1078,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semicontinuous{Float64}}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     _update_if_necessary(model)
     lower = get_dblattrelement(model.inner, "LB", info.column)
@@ -1112,7 +1104,7 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semiinteger{Float64}}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     set_charattrelement!(model.inner, "VType", info.column, Char('C'))
     set_dblattrelement!(model.inner, "LB", info.column, -Inf)
@@ -1127,7 +1119,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semiinteger{Float64}}
 )
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     _update_if_necessary(model)
     lower = get_dblattrelement(model.inner, "LB", info.column)
@@ -1139,7 +1131,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintName,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}
 ) where {S}
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     if S <: MOI.LessThan
         return info.lessthan_name
@@ -1155,7 +1147,7 @@ function MOI.set(
     model::Optimizer, ::MOI.ConstraintName,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}, name::String
 ) where {S}
-    _throw_if_invalid(model, c)
+    MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     if S <: MOI.LessThan
         info.lessthan_name = name
