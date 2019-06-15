@@ -2048,12 +2048,14 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraints)
 end
 
 function MOI.get(model::Optimizer, ::MOI.ObjectiveFunctionType)
-    if model.objective_type == SCALAR_AFFINE
+    if model.objective_type == SINGLE_VARIABLE
+        return MOI.SINGLE_VARIABLE
+    elseif model.objective_type == SCALAR_AFFINE
         return MOI.ScalarAffineFunction{Float64}
-    elseif model.objective_type == SCALAR_QUADRATIC
+    else
+        @assert model.objective_type == SCALAR_QUADRATIC
         return MOI.ScalarQuadraticFunction{Float64}
     end
-    error("Unknown objective type")
 end
 
 function MOI.modify(
