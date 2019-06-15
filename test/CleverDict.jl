@@ -9,7 +9,7 @@ Gurobi.index_to_key(::Type{MyKey}, index::Int) = MyKey(index)
 @testset "CleverDict" begin
     @testset "get/set" begin
         d = Gurobi.CleverDict{MyKey, String}()
-        key = Gurobi.new_item(d, "first")
+        key = Gurobi.add_item(d, "first")
         @test key == MyKey(1)
         @test d[key] == "first"
         @test haskey(d, key) == true
@@ -18,7 +18,7 @@ Gurobi.index_to_key(::Type{MyKey}, index::Int) = MyKey(index)
         @test_throws KeyError d[key]
         @test_throws KeyError d[key] = "key"
         @test haskey(d, key) == false
-        key2 = Gurobi.new_item(d, "second")
+        key2 = Gurobi.add_item(d, "second")
         @test key2 == MyKey(2)
         @test d[key2] == "second"
         @test d.vector === nothing
@@ -28,7 +28,7 @@ Gurobi.index_to_key(::Type{MyKey}, index::Int) = MyKey(index)
 
         empty!(d)
 
-        key = Gurobi.new_item(d, "first")
+        key = Gurobi.add_item(d, "first")
         @test key == MyKey(1)
         @test d[key] == "first"
         d[key] = "zeroth"
@@ -39,7 +39,7 @@ Gurobi.index_to_key(::Type{MyKey}, index::Int) = MyKey(index)
         @test_throws KeyError d[key]
         @test_throws KeyError d[key] = "key"
         @test haskey(d, key) == false
-        key2 = Gurobi.new_item(d, "second")
+        key2 = Gurobi.add_item(d, "second")
         @test key2 == MyKey(2)
         @test d[key2] == "second"
         @test d.vector === nothing
@@ -48,9 +48,9 @@ Gurobi.index_to_key(::Type{MyKey}, index::Int) = MyKey(index)
 
     @testset "LinearIndex" begin
         d = Gurobi.CleverDict{MyKey, String}()
-        key = Gurobi.new_item(d, "first")
+        key = Gurobi.add_item(d, "first")
         @test d[Gurobi.LinearIndex(1)] == "first"
-        key2 = Gurobi.new_item(d, "second")
+        key2 = Gurobi.add_item(d, "second")
         @test d[Gurobi.LinearIndex(2)] == "second"
         @test length(d) == 2
         delete!(d, key)
@@ -63,20 +63,20 @@ Gurobi.index_to_key(::Type{MyKey}, index::Int) = MyKey(index)
 
     @testset "keys/values" begin
         d = Gurobi.CleverDict{MyKey, String}()
-        key = Gurobi.new_item(d, "first")
-        key2 = Gurobi.new_item(d, "second")
+        key = Gurobi.add_item(d, "first")
+        key2 = Gurobi.add_item(d, "second")
         @test collect(keys(d)) == [MyKey(1), MyKey(2)]
         @test collect(values(d)) == ["first", "second"]
         delete!(d, key)
-        key3 = Gurobi.new_item(d, "third")
+        key3 = Gurobi.add_item(d, "third")
         @test collect(keys(d)) == [MyKey(2), MyKey(3)]
         @test collect(values(d)) == ["second", "third"]
     end
 
     @testset "iterate" begin
         d = Gurobi.CleverDict{MyKey, String}()
-        key = Gurobi.new_item(d, "first")
-        key2 = Gurobi.new_item(d, "second")
+        key = Gurobi.add_item(d, "first")
+        key2 = Gurobi.add_item(d, "second")
         my_keys = MyKey[]
         my_values = String[]
         for (k, v) in d
@@ -86,7 +86,7 @@ Gurobi.index_to_key(::Type{MyKey}, index::Int) = MyKey(index)
         @test my_keys == [MyKey(1), MyKey(2)]
         @test my_values == ["first", "second"]
         delete!(d, key)
-        key3 = Gurobi.new_item(d, "third")
+        key3 = Gurobi.add_item(d, "third")
         my_keys = MyKey[]
         my_values = String[]
         for (k, v) in d
@@ -99,8 +99,8 @@ Gurobi.index_to_key(::Type{MyKey}, index::Int) = MyKey(index)
 
     @testset "iterate ii" begin
         d = Gurobi.CleverDict{MyKey, String}()
-        key = Gurobi.new_item(d, "first")
-        key2 = Gurobi.new_item(d, "second")
+        key = Gurobi.add_item(d, "first")
+        key2 = Gurobi.add_item(d, "second")
         my_keys = MyKey[]
         my_values = String[]
         for (k, v) in d
@@ -111,7 +111,7 @@ Gurobi.index_to_key(::Type{MyKey}, index::Int) = MyKey(index)
         @test my_values == ["first", "second"]
         delete!(d, key)
         @test d[Gurobi.LinearIndex(1)] == "second"
-        key3 = Gurobi.new_item(d, "third")
+        key3 = Gurobi.add_item(d, "third")
         my_keys = MyKey[]
         my_values = String[]
         for (k, v) in d
@@ -126,12 +126,12 @@ Gurobi.index_to_key(::Type{MyKey}, index::Int) = MyKey(index)
         d = Gurobi.CleverDict{MyKey, String}()
         @test length(d) == 0
         @test delete!(d, MyKey(0)) == nothing
-        k1 = Gurobi.new_item(d, "a")
-        k2 = Gurobi.new_item(d, "b")
+        k1 = Gurobi.add_item(d, "a")
+        k2 = Gurobi.add_item(d, "b")
         d[Gurobi.LinearIndex(2)] == "b"
         delete!(d, k1)
         d[Gurobi.LinearIndex(1)] == "b"
-        k3 = Gurobi.new_item(d, "c")
+        k3 = Gurobi.add_item(d, "c")
         @test d[k3] == "c"
         @test d[Gurobi.LinearIndex(1)] == "b"
         @test d[Gurobi.LinearIndex(2)] == "c"

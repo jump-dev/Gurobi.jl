@@ -46,11 +46,11 @@ function key_to_index(key::K) where {K}
 end
 
 """
-    new_item(c::CleverDict{K, V}, val::Val)::K where {K, V}
+    add_item(c::CleverDict{K, V}, val::Val)::K where {K, V}
 
 Set `val` in the next available key, and return that key.
 """
-function new_item(c::CleverDict{K, V}, val::V)::K where {K, V}
+function add_item(c::CleverDict{K, V}, val::V)::K where {K, V}
     c.last_index += 1
     key = index_to_key(K, c.last_index)
     if c.dict === nothing

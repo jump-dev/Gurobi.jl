@@ -25,8 +25,8 @@ mutable struct VariableInfo
     lessthan_name::String
     greaterthan_interval_or_equalto_name::String
     type_constraint_name::String
-    function VariableInfo()
-        return new(MOI.VariableIndex(-1), 0, NONE, CONTINUOUS, "", "", "", "")
+    function VariableInfo(index::MOI.VariableIndex, column::Int)
+        return new(index, column, NONE, CONTINUOUS, "", "", "", "")
     end
 end
 
@@ -395,8 +395,11 @@ function _info(model::Optimizer, key::MOI.VariableIndex)
 end
 
 function MOI.add_variable(model::Optimizer)
-    index = new_item(model.variable_info, VariableInfo())
+    # Initialize `VariableInfo` with a dummy `VariableIndex` and a column,
+    # because we need `add_item` to tell us what the `VariableIndex` is.
+    index = add_item(model.variable_info, VariableInfo(MOI.VariableIndex(0), 0))
     info = _info(model, index)
+    # Now, set `.index` and `.column`.
     info.index = index
     info.column = length(model.variable_info)
     add_cvar!(model.inner, 0.0)
@@ -410,8 +413,11 @@ function MOI.add_variables(model::Optimizer, N::Int)
     indices = Vector{MOI.VariableIndex}(undef, N)
     num_variables = length(model.variable_info)
     for i in 1:N
-        index = new_item(model.variable_info, VariableInfo())
+        # Initialize `VariableInfo` with a dummy `VariableIndex` and a column,
+        # because we need `add_item` to tell us what the `VariableIndex` is.
+        index = add_item(model.variable_info, VariableInfo(MOI.VariableIndex(0), 0))
         info = _info(model, index)
+        # Now, set `.index` and `.column`.
         info.index = index
         info.column = num_variables + i
         indices[i] = index
