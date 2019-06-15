@@ -1,11 +1,10 @@
 import MathOptInterface
 
 const MOI = MathOptInterface
+const CleverDicts = MOI.Utilities.CleverDicts
 
-include("CleverDict.jl")
-
-index_to_key(::Type{MOI.VariableIndex}, index::Int) = MOI.VariableIndex(index)
-key_to_index(key::MOI.VariableIndex) = key.value
+CleverDicts.index_to_key(::Type{MOI.VariableIndex}, index::Int) = MOI.VariableIndex(index)
+CleverDicts.key_to_index(key::MOI.VariableIndex) = key.value
 
 @enum(VariableType, CONTINUOUS, BINARY, INTEGER, SEMIINTEGER, SEMICONTINUOUS)
 @enum(BoundType, NONE, LESS_THAN, GREATER_THAN, LESS_AND_GREATER_THAN, INTERVAL, EQUAL_TO)
@@ -68,7 +67,7 @@ mutable struct Optimizer <: MOI.ModelLike
     # A mapping from the MOI.VariableIndex to the Gurobi column. VariableInfo
     # also stores some additional fields like what bounds have been added, the
     # variable type, and the names of SingleVariable-in-Set constraints.
-    variable_info::CleverDict{MOI.VariableIndex, VariableInfo}
+    variable_info::CleverDicts.CleverDict{MOI.VariableIndex, VariableInfo}
 
     # An index that is incremented for each new constraint (regardless of type).
     # We can check if a constraint is valid by checking if it is in the correct
@@ -116,7 +115,7 @@ mutable struct Optimizer <: MOI.ModelLike
         model.env = env
         model.silent = false
         model.params = Dict{String, Any}()
-        model.variable_info = CleverDict{MOI.VariableIndex, VariableInfo}()
+        model.variable_info = CleverDicts.CleverDict{MOI.VariableIndex, VariableInfo}()
         model.affine_constraint_info = Dict{Int, ConstraintInfo}()
         model.quadratic_constraint_info = Dict{Int, Int}()
         model.sos_constraint_info = Dict{Int, ConstraintInfo}()
@@ -170,7 +169,7 @@ function MOI.is_empty(model::Optimizer)
     model.needs_update && return false
     model.objective_type != SCALAR_AFFINE && return false
     model.is_feasibility == false && return false
-    length(model.variable_info) != 0 && return false
+    !isempty(model.variable_info) && return false
     length(model.affine_constraint_info) != 0 && return false
     length(model.quadratic_constraint_info) != 0 && return false
     length(model.sos_constraint_info) != 0 && return false
@@ -397,7 +396,9 @@ end
 function MOI.add_variable(model::Optimizer)
     # Initialize `VariableInfo` with a dummy `VariableIndex` and a column,
     # because we need `add_item` to tell us what the `VariableIndex` is.
-    index = add_item(model.variable_info, VariableInfo(MOI.VariableIndex(0), 0))
+    index = CleverDicts.add_item(
+        model.variable_info, VariableInfo(MOI.VariableIndex(0), 0)
+    )
     info = _info(model, index)
     # Now, set `.index` and `.column`.
     info.index = index
@@ -415,7 +416,9 @@ function MOI.add_variables(model::Optimizer, N::Int)
     for i in 1:N
         # Initialize `VariableInfo` with a dummy `VariableIndex` and a column,
         # because we need `add_item` to tell us what the `VariableIndex` is.
-        index = add_item(model.variable_info, VariableInfo(MOI.VariableIndex(0), 0))
+        index = CleverDicts.add_item(
+            model.variable_info, VariableInfo(MOI.VariableIndex(0), 0)
+        )
         info = _info(model, index)
         # Now, set `.index` and `.column`.
         info.index = index
@@ -621,8 +624,8 @@ function MOI.get(
             q_terms,
             MOI.ScalarQuadraticTerm(
                 new_v,
-                model.variable_info[LinearIndex(i + 1)].index,
-                model.variable_info[LinearIndex(j + 1)].index
+                model.variable_info[CleverDicts.LinearIndex(i + 1)].index,
+                model.variable_info[CleverDicts.LinearIndex(j + 1)].index
             )
         )
     end
@@ -1304,7 +1307,7 @@ function MOI.get(
             terms,
             MOI.ScalarAffineTerm(
                 val,
-                model.variable_info[LinearIndex(col)].index
+                model.variable_info[CleverDicts.LinearIndex(col)].index
             )
         )
     end
@@ -1514,7 +1517,7 @@ function MOI.get(
             affine_terms,
             MOI.ScalarAffineTerm(
                 coef,
-                model.variable_info[LinearIndex(col + 1)].index
+                model.variable_info[CleverDicts.LinearIndex(col + 1)].index
                 )
         )
     end
@@ -1525,8 +1528,8 @@ function MOI.get(
             quadratic_terms,
             MOI.ScalarQuadraticTerm(
                 new_coef,
-                model.variable_info[LinearIndex(i + 1)].index,
-                model.variable_info[LinearIndex(j + 1)].index
+                model.variable_info[CleverDicts.LinearIndex(i + 1)].index,
+                model.variable_info[CleverDicts.LinearIndex(j + 1)].index
             )
         )
     end
@@ -1656,7 +1659,7 @@ function MOI.get(
     sparse_a, _ = get_sos(model.inner, _info(model, c).row, 1)
     indices = SparseArrays.nonzeroinds(sparse_a[1, :])
     return MOI.VectorOfVariables(
-        [model.variable_info[LinearIndex(i)].index for i in indices]
+        [model.variable_info[CleverDicts.LinearIndex(i)].index for i in indices]
     )
 end
 
