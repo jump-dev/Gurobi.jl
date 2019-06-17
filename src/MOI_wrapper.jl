@@ -2020,7 +2020,7 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraints)
         elseif info.bound == GREATER_THAN
             push!(constraints, (MOI.SingleVariable, MOI.GreaterThan{Float64}))
         elseif info.bound == LESS_AND_GREATER_THAN
-            push!(constraints, (MOI.SingleVariable, MOI.LessTHan{Float64}))
+            push!(constraints, (MOI.SingleVariable, MOI.LessThan{Float64}))
             push!(constraints, (MOI.SingleVariable, MOI.GreaterThan{Float64}))
         elseif info.bound == EQUAL_TO
             push!(constraints, (MOI.SingleVariable, MOI.EqualTo{Float64}))
