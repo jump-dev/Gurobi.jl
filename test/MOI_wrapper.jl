@@ -83,6 +83,14 @@ end
     end
 
     @testset "start_values_test" begin
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag = 0)
+        x = MOI.add_variables(model, 2)
+        MOI.set(model, MOI.VariablePrimalStart(), x[1], 1.0)
+        MOI.set(model, MOI.VariablePrimalStart(), x[2], nothing)
+        @test MOI.get(model, MOI.VariablePrimalStart(), x[1]) == 1.0
+        @test MOI.get(model, MOI.VariablePrimalStart(), x[2]) === nothing
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.ObjectiveValue()) == 0.0
         # We don't support ConstraintDualStart or ConstraintPrimalStart yet.
         # @test_broken MOIT.start_values_test(Gurobi.Optimizer(GUROBI_ENV), OPTIMIZER)
     end

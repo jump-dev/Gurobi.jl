@@ -3,9 +3,6 @@ import MathOptInterface
 const MOI = MathOptInterface
 const CleverDicts = MOI.Utilities.CleverDicts
 
-CleverDicts.index_to_key(::Type{MOI.VariableIndex}, index::Int) = MOI.VariableIndex(index)
-CleverDicts.key_to_index(key::MOI.VariableIndex) = key.value
-
 @enum(VariableType, CONTINUOUS, BINARY, INTEGER, SEMIINTEGER, SEMICONTINUOUS)
 @enum(BoundType, NONE, LESS_THAN, GREATER_THAN, LESS_AND_GREATER_THAN, INTERVAL, EQUAL_TO)
 @enum(ObjectiveType, SINGLE_VARIABLE, SCALAR_AFFINE, SCALAR_QUADRATIC)
@@ -15,6 +12,7 @@ mutable struct VariableInfo
     column::Int
     bound::BoundType
     type::VariableType
+    start::Union{Float64, Nothing}
     name::String
     # Storage for constraint names associated with variables because Gurobi
     # can only store names for variables and proper constraints.
@@ -25,7 +23,7 @@ mutable struct VariableInfo
     greaterthan_interval_or_equalto_name::String
     type_constraint_name::String
     function VariableInfo(index::MOI.VariableIndex, column::Int)
-        return new(index, column, NONE, CONTINUOUS, "", "", "", "")
+        return new(index, column, NONE, CONTINUOUS, nothing, "", "", "", "")
     end
 end
 
@@ -1928,17 +1926,21 @@ MOI.get(model::Optimizer, ::MOI.RawSolver) = model.inner
 
 function MOI.set(
     model::Optimizer, ::MOI.VariablePrimalStart, x::MOI.VariableIndex,
-    value::Float64
+    value::Union{Nothing, Float64}
 )
-    set_dblattrelement!(model.inner, "Start", _info(model, x).column, value)
-    _require_update(model)
+    info = _info(model, x)
+    info.start = value
+    if value !== nothing
+        set_dblattrelement!(model.inner, "Start", info.column, value)
+        _require_update(model)
+    end
     return
 end
 
 function MOI.get(
     model::Optimizer, ::MOI.VariablePrimalStart, x::MOI.VariableIndex
 )
-    return get_dblattrelement(model.inner, "Start", _info(model, x).column)
+    return _info(model, x).start
 end
 
 MOI.supports(::Optimizer, ::MOI.ConstraintPrimalStart) = false
