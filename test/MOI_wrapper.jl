@@ -481,3 +481,52 @@ end
     MOI.set(model, MOI.RawParameter("OutputFlag"), 0)
     @test MOI.get(model, MOI.RawParameter("OutputFlag")) == 0
 end
+
+@testset "QCPDuals without needing to pass QCPDual=1" begin
+    @testset "QCPDual default" begin
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+        MOI.Utilities.loadfromstring!(model, """
+        variables: x, y, z
+        minobjective: 1.0 * x + 1.0 * y + 1.0 * z
+        c1: x + y == 2.0
+        c2: x + y + z >= 0.0
+        c3: 1.0 * x * x + -1.0 * y * y + -1.0 * z * z >= 0.0
+        c4: x >= 0.0
+        c5: y >= 0.0
+        c6: z >= 0.0
+        """)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
+        @test MOI.get(model, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+        @test MOI.get(model, MOI.DualStatus()) == MOI.FEASIBLE_POINT
+        c1 = MOI.get(model, MOI.ConstraintIndex, "c1")
+        c2 = MOI.get(model, MOI.ConstraintIndex, "c2")
+        c3 = MOI.get(model, MOI.ConstraintIndex, "c3")
+        @test MOI.get(model, MOI.ConstraintDual(), c1) ≈ 1.0 atol=1e-6
+        @test MOI.get(model, MOI.ConstraintDual(), c2) ≈ 0.0 atol=1e-6
+        @test MOI.get(model, MOI.ConstraintDual(), c3) ≈ 0.0 atol=1e-6
+    end
+    @testset "QCPDual=0" begin
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, QCPDual=0)
+        MOI.Utilities.loadfromstring!(model, """
+        variables: x, y, z
+        minobjective: 1.0 * x + 1.0 * y + 1.0 * z
+        c1: x + y == 2.0
+        c2: x + y + z >= 0.0
+        c3: 1.0 * x * x + -1.0 * y * y + -1.0 * z * z >= 0.0
+        c4: x >= 0.0
+        c5: y >= 0.0
+        c6: z >= 0.0
+        """)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
+        @test MOI.get(model, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+        @test MOI.get(model, MOI.DualStatus()) == MOI.NO_SOLUTION
+        c1 = MOI.get(model, MOI.ConstraintIndex, "c1")
+        c2 = MOI.get(model, MOI.ConstraintIndex, "c2")
+        c3 = MOI.get(model, MOI.ConstraintIndex, "c3")
+        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ConstraintDual(), c1)
+        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ConstraintDual(), c2)
+        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ConstraintDual(), c3)
+    end
+end

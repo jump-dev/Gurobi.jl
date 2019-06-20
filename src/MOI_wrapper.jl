@@ -106,7 +106,9 @@ mutable struct Optimizer <: MOI.ModelLike
 
     Note that we set the parameter `InfUnbdInfo` to `1` rather than the default
     of `0` so that we can query infeasibility certificates. Users are, however,
-    free to overide this as follows `Optimizer(InfUndbInfo=0)`.
+    free to over-ride this as follows `Optimizer(InfUndbInfo=0)`. In addition,
+    we also set `QCPDual` to `1` to enable duals in QCPs. Users can override
+    this by passing `Optimizer(QCPDual=0)`.
     """
     function Optimizer(env::Union{Nothing, Env} = nothing; kwargs...)
         model = new()
@@ -126,6 +128,9 @@ mutable struct Optimizer <: MOI.ModelLike
         end
         if !haskey(model.params, "InfUnbdInfo")
             MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
+        end
+        if !haskey(model.params, "QCPDual")
+            MOI.set(model, MOI.RawParameter("QCPDual"), 1)
         end
         return model
     end
@@ -1747,6 +1752,8 @@ end
 function MOI.get(model::Optimizer, ::MOI.DualStatus)
     stat = get_status(model.inner)
     if is_mip(model.inner)
+        return MOI.NO_SOLUTION
+    elseif is_qcp(model.inner) && MOI.get(model, MOI.RawParameter("QCPDual")) != 1
         return MOI.NO_SOLUTION
     elseif stat == :optimal
         return MOI.FEASIBLE_POINT
