@@ -134,3 +134,86 @@ function del_vars!(model::Model, idx::Vector{Cint})
         throw(GurobiError(model.env, ret))
     end
 end
+
+function get_vars(model::Model, start::Integer, len::Integer)
+# http://www.gurobi.com/documentation/8.1/refman/c_grbgetvars.html
+
+    # NR_CONTRAINTS
+    #--------------
+    m = num_constrs(model)
+    # NR_VARIABLES
+    #-------------
+    n = num_vars(model)
+
+    # INPUT VALIDATION
+    #-----------------
+    @assert start > 0               "Indexing in Julia starts from 1."
+    @assert start <= n              string("Index out of bounds: There are only ", n, " variables attached to this model.")
+    @assert len > 0                 "At least one variable must be selected; len > 0."
+    @assert start * len <= m * n    "Maximal amount of possible non-zero elements surpassed."
+
+    # FUNCTION CALLS
+    #---------------
+    numnzP = Ref{Cint}()
+    vbeg = Array{Cint}(undef, len)
+
+    ret = @grb_ccall(getvars, Cint, (
+                        Ptr{Cvoid},     #Model
+                        Ptr{Cint},      #numnzP
+                        Ptr{Cint},      #vbeg
+                        Ptr{Cint},      #vind
+                        Ptr{Cdouble},   #vval
+                        Cint,           #start
+                        Cint),          #len
+                        model, numnzP, vbeg, C_NULL, C_NULL, Cint(start - 1), Cint(len))
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+
+    nnz = numnzP[]
+    vind = Array{Cint}(undef, nnz)
+    vval = Array{Cdouble}(undef, nnz)
+
+    ret = @grb_ccall(getvars, Cint, (
+                        Ptr{Cvoid},     #Model
+                        Ptr{Cint},      #numnzP
+                        Ptr{Cint},      #vbeg
+                        Ptr{Cint},      #vind
+                        Ptr{Cdouble},   #vval
+                        Cint,           #start
+                        Cint),          #len
+                        model, numnzP, vbeg, vind, vval, Cint(start - 1), Cint(len))
+
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+
+    # ADJUSTING INDICES TO JULIA'S INDEXING.
+    #---------------------------------------
+    for i in 1:size(vbeg, 1)
+        vbeg[i] += 1
+    end
+
+    for i in 1:size(vind, 1)
+        vind[i] += 1
+    end
+
+    # SPARSE ARRAY
+    #-------------
+    push!(vbeg, nnz)
+    I = Array{Int64}(undef, nnz)
+    J = Array{Int64}(undef, nnz)
+    V = Array{Float64}(undef, nnz)
+    for i in 1:length(vbeg) - 1
+        for j in vbeg[i]:vbeg[i + 1]
+            I[j] = vind[j]
+            J[j] = i + start - 1
+            V[j] = vval[j]
+        end
+    end
+
+    pop!(vbeg)
+
+    # return vbeg, vind, vval
+    return SparseArrays.sparse(I, J, V, m, n)
+end
