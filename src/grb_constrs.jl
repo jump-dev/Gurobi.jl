@@ -208,7 +208,7 @@ function get_constrs(model::Model, start::Integer, len::Integer)
     V = Array{Float64}(undef, nnz)
     for i in 1:length(cbeg)-1
         for j in (cbeg[i]+1):cbeg[i+1]
-            I[j] = i
+            I[j] = i + start - 1
             J[j] = cind[j]+1
             V[j] = cval[j]
         end
