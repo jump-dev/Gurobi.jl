@@ -136,23 +136,14 @@ function del_vars!(model::Model, idx::Vector{Cint})
 end
 
 function get_vars(model::Model, start::Integer, len::Integer)
-# http://www.gurobi.com/documentation/8.1/refman/c_grbgetvars.html
 
-    # NR_CONTRAINTS
-    #--------------
     m = num_constrs(model)
-    # NR_VARIABLES
-    #-------------
     n = num_vars(model)
 
-    # INPUT VALIDATION
-    #-----------------
     @assert start > 0               "Indexing in Julia starts from 1."
     @assert start + len - 1 <= n    string("Index out of bounds: There are only ", n, " variables attached to this model.")
     @assert len > 0                 "At least one variable must be selected; len > 0."
 
-    # FUNCTION CALLS
-    #---------------
     numnzP = Ref{Cint}()
     vbeg = Array{Cint}(undef, len)
 
@@ -187,8 +178,6 @@ function get_vars(model::Model, start::Integer, len::Integer)
         throw(GurobiError(model.env, ret))
     end
 
-    # ADJUSTING INDICES TO JULIA'S INDEXING.
-    #---------------------------------------
     for i in 1:size(vbeg, 1)
         vbeg[i] += 1
     end
@@ -197,8 +186,6 @@ function get_vars(model::Model, start::Integer, len::Integer)
         vind[i] += 1
     end
 
-    # SPARSE ARRAY
-    #-------------
     push!(vbeg, nnz)
     I = Array{Int64}(undef, nnz)
     J = Array{Int64}(undef, nnz)
@@ -213,6 +200,5 @@ function get_vars(model::Model, start::Integer, len::Integer)
 
     pop!(vbeg)
 
-    # return vbeg, vind, vval
     return SparseArrays.sparse(I, J, V, m, n)
 end
