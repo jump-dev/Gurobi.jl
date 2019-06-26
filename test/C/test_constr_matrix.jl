@@ -31,4 +31,5 @@ using Gurobi, Test
     @test [Gurobi.get_constrs(simple_model, 2, 2)[2, :]...][2] == [Gurobi.get_vars(simple_model, 2, 2)[:, 2]...][2]
     @test Gurobi.get_constrs(simple_model, 2, 2)[3, :][4] == Gurobi.get_vars(simple_model, 3, 2)[:, 4][3]
     @test Gurobi.get_constrs(simple_model, 1, num_constrs(simple_model)) == Gurobi.get_vars(simple_model, 1, num_vars(simple_model))
+
 end
