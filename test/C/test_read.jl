@@ -28,7 +28,7 @@ using Gurobi, Test
     add_ivar!(simple_model, 0.0, 0.0, Inf)  # p1
     add_ivar!(simple_model, 0.0, 0.0, Inf)  # p2
     add_ivar!(simple_model, 0.0, 0.0, Inf)  # p3
-    add_cvar!(simple_model, 1.0, 0.0, Inf) # z
+    add_cvar!(simple_model, 1.0, 0.0, Inf)  # z
     update_model!(simple_model)
 
     add_constr!(simple_model, [3.0, 5.0, 4.0, -1.0], '<', 0.0)
