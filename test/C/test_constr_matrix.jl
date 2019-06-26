@@ -1,3 +1,15 @@
+# Test MIP
+#
+#   maximize z
+#
+#   s.t.  3 p1 + 5 p2 + 4 p3 - z = 0
+#         0.5 p1 + 2 p2 + 1 p3 <= 6
+#
+#         p1 is integer: 0 <= p1
+#         p1 is integer: 0 <= p2
+#         p1 is integer: 0 <= p3
+#         z is binary
+
 using Gurobi, Test
 
 @testset "constr_matrix" begin
@@ -10,7 +22,7 @@ using Gurobi, Test
     add_ivar!(simple_model, 0.0, 0.0, Inf)  # p1
     add_ivar!(simple_model, 0.0, 0.0, Inf)  # p2
     add_ivar!(simple_model, 0.0, 0.0, Inf)  # p3
-    add_cvar!(simple_model, 1.0, 0.0, Inf) # z
+    add_cvar!(simple_model, 1.0, 0.0, Inf)  # z
 
     update_model!(simple_model)
 
