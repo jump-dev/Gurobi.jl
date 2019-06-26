@@ -148,7 +148,7 @@ function get_vars(model::Model, start::Integer, len::Integer)
     # INPUT VALIDATION
     #-----------------
     @assert start > 0               "Indexing in Julia starts from 1."
-    @assert start + len <= n        string("Index out of bounds: There are only ", n, " variables attached to this model.")
+    @assert start + len - 1 <= n    string("Index out of bounds: There are only ", n, " variables attached to this model.")
     @assert len > 0                 "At least one variable must be selected; len > 0."
 
     # FUNCTION CALLS
