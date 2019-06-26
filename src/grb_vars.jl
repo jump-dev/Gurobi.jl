@@ -178,8 +178,8 @@ function get_vars(model::Model, start::Integer, len::Integer)
         throw(GurobiError(model.env, ret))
     end
 
-    vbeg[i] += 1
-    vind[i] .+= 1
+    vbeg .+= 1
+    vind .+= 1
     push!(vbeg, nnz)
 
     I = Array{Int64}(undef, nnz)
