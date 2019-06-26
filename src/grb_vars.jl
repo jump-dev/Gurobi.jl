@@ -178,15 +178,10 @@ function get_vars(model::Model, start::Integer, len::Integer)
         throw(GurobiError(model.env, ret))
     end
 
-    for i in 1:size(vbeg, 1)
-        vbeg[i] += 1
-    end
-
-    for i in 1:size(vind, 1)
-        vind[i] += 1
-    end
-
+    vbeg[i] += 1
+    vind[i] .+= 1
     push!(vbeg, nnz)
+
     I = Array{Int64}(undef, nnz)
     J = Array{Int64}(undef, nnz)
     V = Array{Float64}(undef, nnz)
@@ -198,7 +193,6 @@ function get_vars(model::Model, start::Integer, len::Integer)
         end
     end
 
-    pop!(vbeg)
-
     return SparseArrays.sparse(I, J, V, m, n)
+
 end
