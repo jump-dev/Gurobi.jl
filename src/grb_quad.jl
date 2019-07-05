@@ -7,7 +7,7 @@ function add_qpterms!(model::Model, qr::IVec, qc::IVec, qv::FVec)
 
     if nnz > 0
         ret = @grb_ccall(addqpterms, Cint, (
-            Ptr{Cvoid},    # model
+            Ptr{Cvoid},   # model
             Cint,         # nnz
             Ptr{Cint},    # qrow
             Ptr{Cint},    # qcol
