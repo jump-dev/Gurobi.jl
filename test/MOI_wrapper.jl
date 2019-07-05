@@ -31,8 +31,7 @@ end
         solver = Gurobi.Optimizer(OutputFlag=0)
         MOIT.contlineartest(solver, MOIT.TestConfig(), [
             # This requires interval constraint.
-            "linear10",
-            "linear10b",
+            "linear10", "linear10b",
             # This requires an infeasiblity certificate for a variable bound.
             "linear12"
         ])
