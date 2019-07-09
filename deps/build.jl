@@ -84,8 +84,10 @@ function diagnose_gurobi_install()
         catch ex
             if typeof(ex) <: SystemError
                 println("""
-                Aha! Your GUROBI_HOME environment variable is wrong. It needs to
-                point to a valid directory.
+                Aha! We tried looking in `$(dir)`, but something went wrong. Are
+                you sure that your GUROBI_HOME environment variable is correct?
+                When combined with the appropriate suffix (e.g., `lib` or
+                `bin`, it needs to point to a valid directory.
                 """)
             else
                 rethrow(ex)
