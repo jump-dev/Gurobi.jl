@@ -73,13 +73,24 @@ function diagnose_gurobi_install()
         println()
         println("Here are the files we searched:")
         dir = joinpath(ENV["GUROBI_HOME"], Sys.isunix() ? "lib" : "bin")
-        for file in readdir(dir)
-            println(" - ", joinpath(dir, file))
+        try
+            for file in readdir(dir)
+                println(" - ", joinpath(dir, file))
+            end
+            println("""
+            We were looking for (but could not find) a file named like
+            `libgurobiXXX.so`, `libgurobiXXX.dylib`, or `gurobiXXX.dll`
+            """)
+        catch ex
+            if typeof(ex) <: SystemError
+                println("""
+                Aha! Your GUROBI_HOME environment variable is wrong. It needs to
+                point to a valid directory.
+                """)
+            else
+                rethrow(ex)
+            end
         end
-        println("""
-        We were looking for (but could not find) a file named like
-        `libgurobiXXX.so`, `libgurobiXXX.dylib`, or `gurobiXXX.dll`
-        """)
     else
         try
             println("Looking for a version of Gurobi in your path:")
