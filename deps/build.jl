@@ -68,7 +68,9 @@ function diagnose_gurobi_install()
         - on Windows, this might be `C:\\Program Files\\gurobi810\\win64\\`
         - alternatively, on Windows, this might be `C:/Program Files/gurobi810/win64/`
         - on OSX, this might be `/Library/gurobi810/mac64/`
-        - on Unix, this might be `/opt/gurobi810/linux64/`
+        - on Unix, this might be `/home/my_user/gurobi810/linux64/`
+        Note: this has the be the full path, not a path relative to your current
+        directory or your home directory.
         """)
         println()
         println("Here are the files we searched:")
