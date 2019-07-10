@@ -55,33 +55,46 @@ for l in paths_to_try
 end
 
 function diagnose_gurobi_install()
-    println("Unable to locate Gurobi installation. Running some common diagnostics.")
-    println()
-    println("Gurobi.jl only supports the following versions:")
+    println("""
+    Unable to locate Gurobi installation. Running some common diagnostics.
+
+    Gurobi.jl only supports the following versions:
+    """)
     println.(" - ", ALIASES)
-    println("Did you download and install one of these versions from gurobi.com?")
-    println()
+    println("""
+
+    Did you download and install one of these versions from gurobi.com?
+
+    """)
     if haskey(ENV, "GUROBI_HOME")
-        println("Found GUROBI_HOME = " * ENV["GUROBI_HOME"])
+        dir = joinpath(ENV["GUROBI_HOME"], Sys.isunix() ? "lib" : "bin")
         println("""
+        Found GUROBI_HOME =  $(ENV["GUROBI_HOME"])
+
         Does this point to the correct install location?
         - on Windows, this might be `C:\\Program Files\\gurobi810\\win64\\`
         - alternatively, on Windows, this might be `C:/Program Files/gurobi810/win64/`
         - on OSX, this might be `/Library/gurobi810/mac64/`
         - on Unix, this might be `/home/my_user/gurobi810/linux64/`
-        Note: this has the be the full path, not a path relative to your current
+
+        Note: this has to be a full path, not a path relative to your current
         directory or your home directory.
+
+        We're going to look for the Gurobi library in this directory:
+            $(dir)
+
+        That directory has the following files:
         """)
-        println()
-        println("Here are the files we searched:")
-        dir = joinpath(ENV["GUROBI_HOME"], Sys.isunix() ? "lib" : "bin")
         try
             for file in readdir(dir)
                 println(" - ", joinpath(dir, file))
             end
             println("""
+
             We were looking for (but could not find) a file named like
-            `libgurobiXXX.so`, `libgurobiXXX.dylib`, or `gurobiXXX.dll`
+            `libgurobiXXX.so`, `libgurobiXXX.dylib`, or `gurobiXXX.dll`. You
+            should update your GUROBI_HOME environment variable to point to the
+            correct location.
             """)
         catch ex
             if typeof(ex) <: SystemError
@@ -97,7 +110,9 @@ function diagnose_gurobi_install()
         end
     else
         try
-            println("Looking for a version of Gurobi in your path:")
+            println("""
+            Looking for a version of Gurobi in your path:
+            """)
             # Try to call `gurobi_cl`. This should work if Gurobi is on the
             # system path. If it succeeds, it will print out the version.
             run(`gurobi_cl --version`)
@@ -110,6 +125,7 @@ function diagnose_gurobi_install()
             """)
         catch
             println("""
+
             We could not find a version of Gurobi in your path, and we could
             not find the environment variable `GUROBI_HOME` not. You should
             set the `GUROBI_HOME` environment variable to point to the install
@@ -127,8 +143,8 @@ end
 if !found && !haskey(ENV, "GUROBI_JL_SKIP_LIB_CHECK")
     diagnose_gurobi_install()
     error("""
-        Unable to locate Gurobi installation. If the advice above did not help,
-        open an issue at https://github.com/JuliaOpt/Gurobi.jl and post the full
-        print-out of this diagnostic attempt.
+    Unable to locate Gurobi installation. If the advice above did not help,
+    open an issue at https://github.com/JuliaOpt/Gurobi.jl and post the full
+    print-out of this diagnostic attempt.
     """)
 end
