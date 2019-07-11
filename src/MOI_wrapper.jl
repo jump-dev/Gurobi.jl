@@ -36,7 +36,7 @@ mutable struct ConstraintInfo
     ConstraintInfo(row::Int, set) = new(row, set, "")
 end
 
-mutable struct Optimizer <: MOI.ModelLike
+mutable struct Optimizer <: MOI.AbstractOptimizer
     # The low-level Gurobi model.
     inner::Model
     # The Gurobi environment. If `nothing`, a new environment will be created
