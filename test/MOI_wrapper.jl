@@ -325,7 +325,6 @@ end
 
         # Once it's called, no problem.
         Gurobi.compute_conflict(model)
-        println(model.inner.conflict)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == true
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == true
