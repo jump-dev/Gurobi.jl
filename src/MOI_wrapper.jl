@@ -1224,7 +1224,6 @@ function MOI.add_constraints(
         error("Number of functions does not equal number of sets.")
     end
     canonicalized_functions = MOI.Utilities.canonical.(f)
-
     # First pass: compute number of non-zeros to allocate space.
     nnz = 0
     for fi in canonicalized_functions
@@ -1242,7 +1241,7 @@ function MOI.add_constraints(
     senses = Vector{Cchar}(undef, length(f))
     rhss = Vector{Float64}(undef, length(f))
     # Second pass: loop through, passing views to _indices_and_coefficients.
-    for (i, (fi, si)) in enumerate(zip(f, s))
+    for (i, (fi, si)) in enumerate(zip(canonicalized_functions, s))
         senses[i], rhss[i] = _sense_and_rhs(si)
         row_starts[i + 1] = row_starts[i] + length(fi.terms)
         _indices_and_coefficients(
