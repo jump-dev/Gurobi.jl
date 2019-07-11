@@ -314,7 +314,7 @@ end
 
 @testset "Conflict refiner" begin
     @testset "Variable bounds (SingleVariable and LessThan/GreaterThan)" begin
-        model = Gurobi.Optimizer()
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
         c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(2.0))
         c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(1.0))
@@ -332,7 +332,7 @@ end
     end
 
     @testset "Variable bounds (ScalarAffine)" begin
-        model = Gurobi.Optimizer()
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
         c1 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.GreaterThan(2.0))
         c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.LessThan(1.0))
@@ -348,12 +348,12 @@ end
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == true
     end
 
-    @testset "Variable fixing (SingleVariable and EqualTo)" begin
-        model = Gurobi.Optimizer()
+    @testset "Variable bounds (Invali Interval)" begin
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
-        c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.EqualTo(1.0))
-        c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(2.0))
-
+        c1 = MOI.add_constraint(
+            model, MOI.SingleVariable(x), MOI.Interval(1.0, 0.0)
+        )
         # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
@@ -362,28 +362,10 @@ end
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == true
-        @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == true
-    end
-
-    @testset "Variable bounds (SingleVariable and Interval)" begin
-        model = Gurobi.Optimizer()
-        x = MOI.add_variable(model)
-        c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.Interval(1.0, 3.0))
-        c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(0.0))
-
-        # Getting the results before the conflict refiner has been called must return an error.
-        @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
-        @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
-
-        # Once it's called, no problem.
-        Gurobi.compute_conflict(model)
-        @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
-        @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == true
-        @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == true
     end
 
     @testset "Two conflicting constraints (GreaterThan, LessThan)" begin
-        model = Gurobi.Optimizer()
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
         y = MOI.add_variable(model)
         b1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(0.0))
@@ -407,7 +389,7 @@ end
     end
 
     @testset "Two conflicting constraints (EqualTo)" begin
-        model = Gurobi.Optimizer()
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
         y = MOI.add_variable(model)
         b1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(0.0))
@@ -431,7 +413,7 @@ end
     end
 
     @testset "Variables outside conflict" begin
-        model = Gurobi.Optimizer()
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
         y = MOI.add_variable(model)
         z = MOI.add_variable(model)
@@ -458,7 +440,7 @@ end
     end
 
     @testset "No conflict" begin
-        model = Gurobi.Optimizer()
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
         c1 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.GreaterThan(1.0))
         c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.LessThan(2.0))

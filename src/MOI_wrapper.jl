@@ -2348,12 +2348,14 @@ end
 """
     ConflictStatus()
 
-Return an `MOI.TerminationStatusCode` indicating the status of the last computed conflict.
-If a minimal conflict is found, it will return `MOI.OPTIMAL`. If the problem is feasible, it will
-return `MOI.INFEASIBLE`. If `compute_conflict` has not been called yet, it will return
+Return an `MOI.TerminationStatusCode` indicating the status of the last
+computed conflict. If a minimal conflict is found, it will return
+`MOI.OPTIMAL`. If the problem is feasible, it will return `MOI.INFEASIBLE`. If
+`compute_conflict` has not been called yet, it will return
 `MOI.OPTIMIZE_NOT_CALLED`.
 """
-struct ConflictStatus <: MOI.AbstractModelAttribute  end
+struct ConflictStatus <: MOI.AbstractModelAttribute end
+
 MOI.is_set_by_optimize(::ConflictStatus) = true
 
 function MOI.get(model::Optimizer, ::ConflictStatus)
@@ -2398,45 +2400,103 @@ end
 
 """
     ConstraintConflictStatus()
-A Boolean constraint attribute indicating whether the constraint participates in the last computed conflict.
+
+A Boolean constraint attribute indicating whether the constraint participates
+in the last computed conflict.
 """
 struct ConstraintConflictStatus <: MOI.AbstractConstraintAttribute end
+
 MOI.is_set_by_optimize(::ConstraintConflictStatus) = true
 
-function MOI.get(model::Optimizer, ::ConstraintConflictStatus, index::MOI.ConstraintIndex{<:MOI.SingleVariable, <:LQOI.LE})
+function MOI.get(
+    model::Optimizer, ::ConstraintConflictStatus,
+    index::MOI.ConstraintIndex{MOI.SingleVariable, <:MOI.LessThan}
+)
     _ensure_conflict_computed(model)
-    return !_is_feasible(model) && Bool(get_intattrelement(model.inner, "IISUB", LQOI.get_column(model, model[index])))
+    if _is_feasible(model)
+        return false
+    end
+    return get_intattrelement(model.inner, "IISUB", _info(model, index).column) > 0
 end
 
-function MOI.get(model::Optimizer, ::ConstraintConflictStatus, index::MOI.ConstraintIndex{<:MOI.SingleVariable, <:LQOI.GE})
+function MOI.get(
+    model::Optimizer, ::ConstraintConflictStatus,
+    index::MOI.ConstraintIndex{MOI.SingleVariable, <:MOI.GreaterThan}
+)
     _ensure_conflict_computed(model)
-    return !_is_feasible(model) && Bool(get_intattrelement(model.inner, "IISLB", LQOI.get_column(model, model[index])))
+    if _is_feasible(model)
+        return false
+    end
+    return get_intattrelement(model.inner, "IISLB", _info(model, index).column) > 0
 end
 
-function MOI.get(model::Optimizer, ::ConstraintConflictStatus, index::MOI.ConstraintIndex{<:MOI.SingleVariable, <:Union{LQOI.EQ, LQOI.IV}})
+function MOI.get(
+    model::Optimizer, ::ConstraintConflictStatus,
+    index::MOI.ConstraintIndex{
+        MOI.SingleVariable, <:Union{MOI.EqualTo, MOI.Interval}
+    }
+)
     _ensure_conflict_computed(model)
-    return !_is_feasible(model) && (
-        Bool(get_intattrelement(model.inner, "IISUB", LQOI.get_column(model, model[index]))) || Bool(get_intattrelement(model.inner, "IISLB", model[index])))
+    if _is_feasible(model)
+        return false
+    end
+    if get_intattrelement(model.inner, "IISLB", _info(model, index).column) > 0
+        return true
+    end
+    return get_intattrelement(model.inner, "IISUB", _info(model, index).column) > 0
 end
 
-function MOI.get(model::Optimizer, ::ConstraintConflictStatus, index::MOI.ConstraintIndex{<:MOI.ScalarAffineFunction, <:Union{LQOI.LE, LQOI.GE, LQOI.EQ}})
+function MOI.get(
+    model::Optimizer, ::ConstraintConflictStatus,
+    index::MOI.ConstraintIndex{
+        MOI.ScalarAffineFunction{Float64},
+        <:Union{MOI.LessThan, MOI.GreaterThan, MOI.EqualTo}
+    }
+)
     _ensure_conflict_computed(model)
-    return !_is_feasible(model) && Bool(get_intattrelement(model.inner, "IISConstr", model[index]))
+    if _is_feasible(model)
+        return false
+    end
+    return get_intattrelement(model.inner, "IISConstr", _info(model, index).row) > 0
 end
 
-function MOI.get(model::Optimizer, ::ConstraintConflictStatus, index::MOI.ConstraintIndex{<:MOI.ScalarQuadraticFunction, <:Union{LQOI.LE, LQOI.GE}})
+function MOI.get(
+    model::Optimizer, ::ConstraintConflictStatus,
+    index::MOI.ConstraintIndex{
+        MOI.ScalarQuadraticFunction{Float64},
+        <:Union{MOI.LessThan, MOI.GreaterThan}
+    }
+)
     _ensure_conflict_computed(model)
-    return !_is_feasible(model) && Bool(get_intattrelement(model.inner, "IISQConstr", model[index]))
+    if _is_feasible(model)
+        return false
+    end
+    return get_intattrelement(model.inner, "IISQConstr", _info(model, index).row) > 0
 end
 
-function MOI.supports(::Optimizer, ::ConstraintConflictStatus, ::Type{MOI.ConstraintIndex{<:MOI.SingleVariable, <:LQOI.LinSets}})
+function MOI.supports(
+    ::Optimizer, ::ConstraintConflictStatus,
+    ::Type{<:MOI.ConstraintIndex{MOI.SingleVariable, <:SCALAR_SETS}}
+)
     return true
 end
 
-function MOI.supports(::Optimizer, ::ConstraintConflictStatus, ::Type{MOI.ConstraintIndex{<:MOI.ScalarAffineFunction, <:Union{LQOI.LE, LQOI.GE, LQOI.EQ}}})
+function MOI.supports(
+    ::Optimizer, ::ConstraintConflictStatus,
+    ::Type{<:MOI.ConstraintIndex{
+        MOI.ScalarAffineFunction{Float64},
+        <:Union{MOI.LessThan, MOI.GreaterThan, MOI.EqualTo}
+    }}
+)
     return true
 end
 
-function MOI.supports(::Optimizer, ::ConstraintConflictStatus, ::Type{MOI.ConstraintIndex{<:MOI.ScalarQuadraticFunction, <:Union{LQOI.LE, LQOI.GE}}})
+function MOI.supports(
+    ::Optimizer, ::ConstraintConflictStatus,
+    ::Type{<:MOI.ConstraintIndex{
+        MOI.ScalarQuadraticFunction{Float64},
+        <:Union{MOI.LessThan, MOI.GreaterThan}
+    }}
+)
     return true
 end
