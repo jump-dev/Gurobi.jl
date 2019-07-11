@@ -1826,7 +1826,6 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
-    _update_if_necessary(model)
     column = _info(model, c).column
     x = get_dblattrelement(model.inner, "X", column)
     ub = get_dblattrelement(model.inner, "UB", column)
@@ -1841,7 +1840,6 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
-    _update_if_necessary(model)
     column = _info(model, c).column
     x = get_dblattrelement(model.inner, "X", column)
     lb = get_dblattrelement(model.inner, "LB", column)
