@@ -119,7 +119,7 @@ function diagnose_gurobi_install()
             println("""
 
             We couldn't find the `GUROBI_HOME` environment variable, but we
-            found this version of Gurobi on your path. Is it version one of
+            found this version of Gurobi on your path. Is this version one of
             the supported versions listed above? If not, you should edit your
             `PATH` to point to the correct version.
             """)
@@ -127,8 +127,8 @@ function diagnose_gurobi_install()
             println("""
 
             We could not find a version of Gurobi in your path, and we could
-            not find the environment variable `GUROBI_HOME` not. You should
-            set the `GUROBI_HOME` environment variable to point to the install
+            not find the environment variable `GUROBI_HOME`. You should set 
+            the `GUROBI_HOME` environment variable to point to the install
             location. For example:
             - on Windows, this might be `C:\\Program Files\\gurobi810\\win64\\`
             - on OSX, this might be `/Library/gurobi810/mac64/`
