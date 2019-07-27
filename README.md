@@ -2,20 +2,19 @@
 
 The [Gurobi](http://www.gurobi.com) Optimizer is a commercial optimization solver for a variety of mathematical programming problems, including linear programming (LP), quadratic programming (QP), quadratically constrained programming (QCP), mixed integer linear programming (MILP), mixed-integer quadratic programming (MIQP), and mixed-integer quadratically constrained programming (MIQCP).
 
-The Gurobi solver is considered one of the best solvers (in terms of performance and success rate of tackling hard problems) in math programming, and its performance is comparable to (and sometimes superior to) CPLEX.
-Academic users can obtain a Gurobi license for free.
-
-This package is a wrapper of the Gurobi solver (through its C interface). Currently, this package supports the following types of problems:
-
-* Linear programming (LP)
-* Mixed Integer Linear Programming (MILP)
-* Quadratic programming (QP)
-* Mixed Integer Quadratic Programming (MIQP)
-* Quadratically constrained quadratic programming (QCQP)
-* Second order cone programming (SOCP)
-* Mixed integer second order cone programming (MISOCP)
-
 *The Gurobi wrapper for Julia is community driven and not officially supported by Gurobi. If you are a commercial customer interested in official support for Julia from Gurobi, let them know!*
+
+## Use with JuMP
+
+We highly recommend that you use the *Gurobi.jl* package with higher level packages such as [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl).
+
+This can be done using the ``Gurobi.Optimizer`` object. Here is how to create a *JuMP* model that uses Gurobi as the solver. Parameters are passed as keyword arguments:
+```julia
+using JuMP, Gurobi
+
+model = Model(with_optimizer(Gurobi.Optimizer, Presolve=0, OutputFlag=0))
+```
+See the [Gurobi Documentation](https://www.gurobi.com/documentation/8.1/refman/parameters.html) for a list and description of allowable parameters.
 
 ## Installation
 
@@ -51,17 +50,6 @@ julia> ENV["GUROBI_HOME"] = "/replace/this/with/the/path/to/gurobi"
 julia> import Pkg; Pkg.build("Gurobi")
 ```
 The Gurobi library (`gurobiXXX.dll` on Windows, `gurobiXXX.so` on Unix, and `gurobiXXX.dylib` in OSX where `XXX` is a version) will be searched for in ``GUROBI_HOME/lib`` on unix platforms and ``GUROBI_HOME\bin`` on Windows.
-
-## Use Other Packages
-
-We highly recommend that you use the *Gurobi.jl* package with higher level packages such as [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl) or [MathProgBase.jl](https://github.com/JuliaOpt/MathProgBase.jl).
-
-This can be done using the ``GurobiSolver`` object. Here is how to create a *JuMP* model that uses Gurobi as the solver. Parameters are passed as keyword arguments:
-```julia
-using JuMP, Gurobi
-
-model = Model(with_optimizer(Gurobi.Optimizer, Presolve=0))
-```
 
 *Most users should not need to use the low-level API detailed in the following sections.*
 
