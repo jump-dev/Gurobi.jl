@@ -195,7 +195,7 @@ function _require_update(model::Optimizer)
 end
 
 """
-    _require_update(model::Optimizer)
+    _update_if_necessary(model::Optimizer)
 
 Calls `update_model!`, but only if the `model.needs_update` flag is set.
 """
