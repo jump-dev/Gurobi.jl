@@ -1,109 +1,124 @@
 const MOI  = Gurobi.MOI
 const MOIT = MOI.Test
-const MOIB = MOI.Bridges
 
 const GUROBI_ENV = Gurobi.Env()
+const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
+    Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0), Float64
+)
+
+const CONFIG = MOIT.TestConfig()
 
 @testset "Unit Tests" begin
-    config = MOIT.TestConfig()
-    solver = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
-    MOIT.basic_constraint_tests(solver, config)
-    MOIT.unittest(solver, config,
-        ["solve_affine_interval", "solve_qcp_edge_cases"])
-    @testset "solve_affine_interval" begin
-        MOIT.solve_affine_interval(
-            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)),
-            config
-        )
-    end
-    @testset "solve_qcp_edge_cases" begin
-        MOIT.solve_qcp_edge_cases(solver,
-            MOIT.TestConfig(atol=1e-3)
-        )
-    end
-    MOIT.modificationtest(solver, config, [
-        "solve_func_scalaraffine_lessthan"
-    ])
+    MOIT.basic_constraint_tests(OPTIMIZER, CONFIG)
+    MOIT.unittest(OPTIMIZER, MOIT.TestConfig(atol=1e-6))
+    MOIT.modificationtest(OPTIMIZER, CONFIG)
 end
 
 @testset "Linear tests" begin
     @testset "Default Solver"  begin
-        solver = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
-        MOIT.contlineartest(solver, MOIT.TestConfig(), [
-            # This requires interval constraint.
-            "linear10", "linear10b",
+        MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis = true), [
             # This requires an infeasiblity certificate for a variable bound.
             "linear12"
         ])
     end
-    @testset "linear10" begin
-        MOIT.linear10test(
-            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)),
-            MOIT.TestConfig()
-        )
-        MOIT.linear10btest(
-            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)),
-            MOIT.TestConfig()
-        )
-    end
     @testset "No certificate" begin
-        MOIT.linear12test(
-            Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, InfUnbdInfo=0),
-            MOIT.TestConfig(infeas_certificates=false)
-        )
+        MOIT.linear12test(OPTIMIZER, MOIT.TestConfig(infeas_certificates=false))
     end
 end
 
 @testset "Quadratic tests" begin
-    MOIT.contquadratictest(
-        Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0),
-        MOIT.TestConfig(atol=1e-3, rtol=1e-3, duals=false, query=false)
-    )
+    MOIT.contquadratictest(OPTIMIZER, MOIT.TestConfig(atol=1e-3, rtol=1e-3), [
+        "ncqcp"  # Gurobi doesn't support non-convex problems.
+    ])
 end
 
 @testset "Linear Conic tests" begin
-    MOIT.lintest(
-        Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0),
-        MOIT.TestConfig()
-    )
+    MOIT.lintest(OPTIMIZER, CONFIG)
 end
 
 @testset "Integer Linear tests" begin
-    MOIT.intlineartest(
-        Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0),
-        MOIT.TestConfig(),
-        ["int3"]  # int3 has interval constriants
-    )
-    @testset "int3" begin
-        MOIT.int3test(
-            MOIB.SplitInterval{Float64}(Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)),
-            MOIT.TestConfig()
+    MOIT.intlineartest(OPTIMIZER, CONFIG, [
+        # Indicator sets not supported.
+        "indicator1", "indicator2", "indicator3"
+    ])
+end
+
+@testset "ModelLike tests" begin
+
+    @test MOI.get(OPTIMIZER, MOI.SolverName()) == "Gurobi"
+
+    @testset "default_objective_test" begin
+        MOIT.default_objective_test(OPTIMIZER)
+    end
+
+    @testset "default_status_test" begin
+        MOIT.default_status_test(OPTIMIZER)
+    end
+
+    @testset "nametest" begin
+        MOIT.nametest(OPTIMIZER)
+    end
+
+    @testset "validtest" begin
+        MOIT.validtest(OPTIMIZER)
+    end
+
+    @testset "emptytest" begin
+        MOIT.emptytest(OPTIMIZER)
+    end
+
+    @testset "orderedindicestest" begin
+        MOIT.orderedindicestest(OPTIMIZER)
+    end
+
+    @testset "copytest" begin
+        MOIT.copytest(
+            OPTIMIZER,
+            MOI.Bridges.full_bridge_optimizer(Gurobi.Optimizer(GUROBI_ENV), Float64)
         )
     end
-end
-@testset "ModelLike tests" begin
-    solver = Gurobi.Optimizer(GUROBI_ENV)
-    @test MOI.get(solver, MOI.SolverName()) == "Gurobi"
-    @testset "default_objective_test" begin
-         MOIT.default_objective_test(solver)
-     end
-     @testset "default_status_test" begin
-         MOIT.default_status_test(solver)
-     end
-    @testset "nametest" begin
-        MOIT.nametest(solver)
+
+    @testset "scalar_function_constant_not_zero" begin
+        MOIT.scalar_function_constant_not_zero(OPTIMIZER)
     end
-    @testset "validtest" begin
-        MOIT.validtest(solver)
+
+    @testset "start_values_test" begin
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag = 0)
+        x = MOI.add_variables(model, 2)
+        MOI.set(model, MOI.VariablePrimalStart(), x[1], 1.0)
+        MOI.set(model, MOI.VariablePrimalStart(), x[2], nothing)
+        @test MOI.get(model, MOI.VariablePrimalStart(), x[1]) == 1.0
+        @test MOI.get(model, MOI.VariablePrimalStart(), x[2]) === nothing
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.ObjectiveValue()) == 0.0
+        # We don't support ConstraintDualStart or ConstraintPrimalStart yet.
+        # @test_broken MOIT.start_values_test(Gurobi.Optimizer(GUROBI_ENV), OPTIMIZER)
     end
-    @testset "emptytest" begin
-        MOIT.emptytest(solver)
+
+    @testset "supports_constrainttest" begin
+        # supports_constrainttest needs VectorOfVariables-in-Zeros,
+        # MOIT.supports_constrainttest(Gurobi.Optimizer(GUROBI_ENV), Float64, Float32)
+        # but supports_constrainttest is broken via bridges:
+        MOI.empty!(OPTIMIZER)
+        MOI.add_variable(OPTIMIZER)
+        @test  MOI.supports_constraint(OPTIMIZER, MOI.SingleVariable, MOI.EqualTo{Float64})
+        @test  MOI.supports_constraint(OPTIMIZER, MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64})
+        # This test is broken for some reason:
+        @test_broken !MOI.supports_constraint(OPTIMIZER, MOI.ScalarAffineFunction{Int}, MOI.EqualTo{Float64})
+        @test !MOI.supports_constraint(OPTIMIZER, MOI.ScalarAffineFunction{Int}, MOI.EqualTo{Int})
+        @test !MOI.supports_constraint(OPTIMIZER, MOI.SingleVariable, MOI.EqualTo{Int})
+        @test  MOI.supports_constraint(OPTIMIZER, MOI.VectorOfVariables, MOI.Zeros)
+        @test !MOI.supports_constraint(OPTIMIZER, MOI.VectorOfVariables, MOI.EqualTo{Float64})
+        @test !MOI.supports_constraint(OPTIMIZER, MOI.SingleVariable, MOI.Zeros)
+        @test !MOI.supports_constraint(OPTIMIZER, MOI.VectorOfVariables, MOIT.UnknownVectorSet)
     end
-    @testset "orderedindicestest" begin
-        MOIT.orderedindicestest(solver)
+
+    @testset "set_lower_bound_twice" begin
+        MOIT.set_lower_bound_twice(OPTIMIZER, Float64)
     end
-    @testset "copytest" begin
-        MOIT.copytest(solver, Gurobi.Optimizer(GUROBI_ENV))
+
+    @testset "set_upper_bound_twice" begin
+        MOIT.set_upper_bound_twice(OPTIMIZER, Float64)
     end
 end
 
@@ -156,9 +171,9 @@ end
         function callback_function(cb_data::Gurobi.CallbackData, cb_where::Int32)
             push!(cb_calls, cb_where)
             if cb_where == Gurobi.CB_MIPSOL
-                Gurobi.loadcbsolution!(m, cb_data, cb_where)
-                x_val = MOI.get(m, MOI.VariablePrimal(), x)
-                y_val = MOI.get(m, MOI.VariablePrimal(), y)
+                Gurobi.load_callback_variable_primal(m, cb_data, cb_where)
+                x_val = MOI.get(m, Gurobi.CallbackVariablePrimal(), x)
+                y_val = MOI.get(m, Gurobi.CallbackVariablePrimal(), y)
                 # We have two constraints, one cutting off the top
                 # left corner and one cutting off the top right corner, e.g.
                 # (0,2) +---+---+ (2,2)
@@ -228,11 +243,7 @@ end
     # Given a collection of items with individual weights and values,
     # maximize the total value carried subject to the constraint that
     # the total weight carried is less than 10.
-    if VERSION >= v"0.7-"
-        Random.seed!(1)
-    else
-        srand(1)
-    end
+    Random.seed!(1)
     item_weights = rand(N)
     item_values = rand(N)
     MOI.add_constraint(m,
@@ -303,76 +314,57 @@ end
 
 @testset "Conflict refiner" begin
     @testset "Variable bounds (SingleVariable and LessThan/GreaterThan)" begin
-        model = Gurobi.Optimizer()
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
         c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(2.0))
         c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(1.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
-        println(model.inner.conflict)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == true
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == true
     end
-    
+
     @testset "Variable bounds (ScalarAffine)" begin
-        model = Gurobi.Optimizer()
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
         c1 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.GreaterThan(2.0))
         c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.LessThan(1.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == true
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == true
     end
 
-    @testset "Variable fixing (SingleVariable and EqualTo)" begin
-        model = Gurobi.Optimizer()
+    @testset "Variable bounds (Invali Interval)" begin
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
-        c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.EqualTo(1.0))
-        c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(2.0))
-
-        # Getting the results before the conflict refiner has been called must return an error. 
+        c1 = MOI.add_constraint(
+            model, MOI.SingleVariable(x), MOI.Interval(1.0, 0.0)
+        )
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == true
-        @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == true
-    end
-
-    @testset "Variable bounds (SingleVariable and Interval)" begin
-        model = Gurobi.Optimizer()
-        x = MOI.add_variable(model)
-        c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.Interval(1.0, 3.0))
-        c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(0.0))
-
-        # Getting the results before the conflict refiner has been called must return an error. 
-        @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
-        @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
-
-        # Once it's called, no problem. 
-        Gurobi.compute_conflict(model)
-        @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
-        @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == true
-        @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == true
     end
 
     @testset "Two conflicting constraints (GreaterThan, LessThan)" begin
-        model = Gurobi.Optimizer()
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
         y = MOI.add_variable(model)
         b1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(0.0))
@@ -382,11 +374,11 @@ end
         cf2 = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0, -1.0], [x, y]), 0.0)
         c2 = MOI.add_constraint(model, cf2, MOI.GreaterThan(1.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), b1) == true
@@ -396,7 +388,7 @@ end
     end
 
     @testset "Two conflicting constraints (EqualTo)" begin
-        model = Gurobi.Optimizer()
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
         y = MOI.add_variable(model)
         b1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(0.0))
@@ -406,11 +398,11 @@ end
         cf2 = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0, -1.0], [x, y]), 0.0)
         c2 = MOI.add_constraint(model, cf2, MOI.GreaterThan(1.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), b1) == true
@@ -420,7 +412,7 @@ end
     end
 
     @testset "Variables outside conflict" begin
-        model = Gurobi.Optimizer()
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
         y = MOI.add_variable(model)
         z = MOI.add_variable(model)
@@ -432,11 +424,11 @@ end
         cf2 = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0, -1.0, 1.0], [x, y, z]), 0.0)
         c2 = MOI.add_constraint(model, cf2, MOI.GreaterThan(1.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMAL
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), b1) == true
@@ -447,19 +439,139 @@ end
     end
 
     @testset "No conflict" begin
-        model = Gurobi.Optimizer()
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         x = MOI.add_variable(model)
         c1 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.GreaterThan(1.0))
         c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.LessThan(2.0))
 
-        # Getting the results before the conflict refiner has been called must return an error. 
+        # Getting the results before the conflict refiner has been called must return an error.
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem. 
+        # Once it's called, no problem.
         Gurobi.compute_conflict(model)
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.INFEASIBLE
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == false
         @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == false
     end
 end
+
+@testset "RawParameter" begin
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    @test MOI.get(model, MOI.RawParameter("OutputFlag")) == 1
+    MOI.set(model, MOI.RawParameter("OutputFlag"), 0)
+    @test MOI.get(model, MOI.RawParameter("OutputFlag")) == 0
+end
+
+@testset "QCPDuals without needing to pass QCPDual=1" begin
+    @testset "QCPDual default" begin
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+        MOI.Utilities.loadfromstring!(model, """
+        variables: x, y, z
+        minobjective: 1.0 * x + 1.0 * y + 1.0 * z
+        c1: x + y == 2.0
+        c2: x + y + z >= 0.0
+        c3: 1.0 * x * x + -1.0 * y * y + -1.0 * z * z >= 0.0
+        c4: x >= 0.0
+        c5: y >= 0.0
+        c6: z >= 0.0
+        """)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
+        @test MOI.get(model, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+        @test MOI.get(model, MOI.DualStatus()) == MOI.FEASIBLE_POINT
+        c1 = MOI.get(model, MOI.ConstraintIndex, "c1")
+        c2 = MOI.get(model, MOI.ConstraintIndex, "c2")
+        c3 = MOI.get(model, MOI.ConstraintIndex, "c3")
+        @test MOI.get(model, MOI.ConstraintDual(), c1) ≈ 1.0 atol=1e-6
+        @test MOI.get(model, MOI.ConstraintDual(), c2) ≈ 0.0 atol=1e-6
+        @test MOI.get(model, MOI.ConstraintDual(), c3) ≈ 0.0 atol=1e-6
+    end
+    @testset "QCPDual=0" begin
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, QCPDual=0)
+        MOI.Utilities.loadfromstring!(model, """
+        variables: x, y, z
+        minobjective: 1.0 * x + 1.0 * y + 1.0 * z
+        c1: x + y == 2.0
+        c2: x + y + z >= 0.0
+        c3: 1.0 * x * x + -1.0 * y * y + -1.0 * z * z >= 0.0
+        c4: x >= 0.0
+        c5: y >= 0.0
+        c6: z >= 0.0
+        """)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
+        @test MOI.get(model, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+        @test MOI.get(model, MOI.DualStatus()) == MOI.NO_SOLUTION
+        c1 = MOI.get(model, MOI.ConstraintIndex, "c1")
+        c2 = MOI.get(model, MOI.ConstraintIndex, "c2")
+        c3 = MOI.get(model, MOI.ConstraintIndex, "c3")
+        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ConstraintDual(), c1)
+        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ConstraintDual(), c2)
+        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ConstraintDual(), c3)
+    end
+end
+
+@testset "Add constraints" begin
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraints(
+        model,
+        [MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, x[i])], 0.0) for i in 1:2],
+        MOI.EqualTo.([0.0, 0.0])
+    )
+    @test MOI.get(model, MOI.NumberOfConstraints{
+        MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64}
+    }()) == 2
+end
+
+@testset "Extra name tests" begin
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    @testset "Variables" begin
+        MOI.empty!(model)
+        x = MOI.add_variables(model, 2)
+        MOI.set(model, MOI.VariableName(), x[1], "x1")
+        @test MOI.get(model, MOI.VariableIndex, "x1") == x[1]
+        MOI.set(model, MOI.VariableName(), x[1], "x2")
+        @test MOI.get(model, MOI.VariableIndex, "x1") === nothing
+        @test MOI.get(model, MOI.VariableIndex, "x2") == x[1]
+        MOI.set(model, MOI.VariableName(), x[2], "x1")
+        @test MOI.get(model, MOI.VariableIndex, "x1") == x[2]
+        MOI.set(model, MOI.VariableName(), x[1], "x1")
+        @test_throws ErrorException MOI.get(model, MOI.VariableIndex, "x1")
+    end
+
+    @testset "Variable bounds" begin
+        MOI.empty!(model)
+        x = MOI.add_variable(model)
+        c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(0.0))
+        c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(1.0))
+        MOI.set(model, MOI.ConstraintName(), c1, "c1")
+        @test MOI.get(model, MOI.ConstraintIndex, "c1") == c1
+        MOI.set(model, MOI.ConstraintName(), c1, "c2")
+        @test MOI.get(model, MOI.ConstraintIndex, "c1") === nothing
+        @test MOI.get(model, MOI.ConstraintIndex, "c2") == c1
+        MOI.set(model, MOI.ConstraintName(), c2, "c1")
+        @test MOI.get(model, MOI.ConstraintIndex, "c1") == c2
+        MOI.set(model, MOI.ConstraintName(), c1, "c1")
+        @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "c1")
+    end
+
+    @testset "Affine constraints" begin
+        MOI.empty!(model)
+        x = MOI.add_variable(model)
+        f = MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, x)], 0.0)
+        c1 = MOI.add_constraint(model, f, MOI.GreaterThan(0.0))
+        c2 = MOI.add_constraint(model, f, MOI.LessThan(1.0))
+        MOI.set(model, MOI.ConstraintName(), c1, "c1")
+        @test MOI.get(model, MOI.ConstraintIndex, "c1") == c1
+        MOI.set(model, MOI.ConstraintName(), c1, "c2")
+        @test MOI.get(model, MOI.ConstraintIndex, "c1") === nothing
+        @test MOI.get(model, MOI.ConstraintIndex, "c2") == c1
+        MOI.set(model, MOI.ConstraintName(), c2, "c1")
+        @test MOI.get(model, MOI.ConstraintIndex, "c1") == c2
+        MOI.set(model, MOI.ConstraintName(), c1, "c1")
+        @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "c1")
+    end
+end
+

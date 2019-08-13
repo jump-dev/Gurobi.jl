@@ -5,13 +5,14 @@ version = "0.7.0"
 
 [deps]
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
-LinQuadOptInterface = "f8899e07-120b-5979-ab1d-7b97bb9e1a48"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 MathProgBase = "fdba3010-5040-5b88-9595-932c9decdf73"
+OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-LinQuadOptInterface = "~0.6.0"
+MathOptInterface = "~0.9.0"
 MathProgBase = "~0.5.0, ~0.6, ~0.7"
 julia = "1"
 

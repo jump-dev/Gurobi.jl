@@ -83,6 +83,19 @@ function get_charattrelement(model::Gurobi.Model, name::String, element::Int)
     Char(a[])
 end
 
+function get_strattrelement(model::Gurobi.Model, name::String, element::Int)
+    @assert isascii(name)
+    a = Ref{Ptr{UInt8}}()
+    ret = @grb_ccall(getstrattrelement, Cint,
+        (Ptr{Cvoid}, Ptr{UInt8}, Cint, Ref{Ptr{UInt8}}),
+        model, name, element - 1, a
+    )
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    return unsafe_string(a[])
+end
+
 # Note: in attrarray API, the start argument is one-based (following Julia convention)
 
 function get_intattrarray!(r::Array{Cint}, model::Model, name::String, start::Integer)
@@ -234,6 +247,17 @@ function set_strattr!(model::Model, name::String, v::String)
         throw(GurobiError(model.env, ret))
     end
     nothing
+end
+
+function set_strattrelement!(model::Model, name::String, el::Int, v::String)
+    @assert isascii(name)
+    @assert isascii(v)
+    ret = @grb_ccall(setstrattrelement, Cint,
+        (Ptr{Cvoid}, Ptr{UInt8}, Cint, Ptr{UInt8}), model, name, el - 1, v)
+    if ret != 0
+        throw(GurobiError(model.env, ret))
+    end
+    return
 end
 
 # array element
