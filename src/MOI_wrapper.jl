@@ -490,11 +490,15 @@ function MOI.set(
     model::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex, name::String
 )
     info = _info(model, v)
-    info.name = name
-    if name != ""
-        set_strattrelement!(model.inner, "VarName", info.column, name)
-        _require_update(model)
+    if !isempty(info.name) && model.name_to_variable !== nothing
+        delete!(model.name_to_variable, info.name)
     end
+    info.name = name
+    if isempty(name)
+        return
+    end
+    set_strattrelement!(model.inner, "VarName", info.column, name)
+    _require_update(model)
     if model.name_to_variable === nothing
         return
     end
@@ -1176,15 +1180,22 @@ function MOI.set(
 ) where {S}
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
+    old_name = ""
     if S <: MOI.LessThan
+        old_name = info.lessthan_name
         info.lessthan_name = name
     elseif S <: Union{MOI.GreaterThan, MOI.Interval, MOI.EqualTo}
+        old_name = info.greaterthan_interval_or_equalto_name
         info.greaterthan_interval_or_equalto_name = name
     else
         @assert S <: Union{MOI.ZeroOne, MOI.Integer, MOI.Semiinteger, MOI.Semicontinuous}
+        info.type_constraint_name
         info.type_constraint_name = name
     end
-    if model.name_to_constraint_index === nothing
+    if model.name_to_constraint_index !== nothing
+        delete!(model.name_to_constraint_index, old_name)
+    end
+    if model.name_to_constraint_index === nothing || isempty(name)
         return
     end
     if haskey(model.name_to_constraint_index, name)
@@ -1352,12 +1363,15 @@ function MOI.set(
     name::String
 )
     info = _info(model, c)
+    if !isempty(info.name) && model.name_to_constraint_index !== nothing
+        delete!(model.name_to_constraint_index, info.name)
+    end
     info.name = name
-    if name != ""
+    if !isempty(name)
         set_strattrelement!(model.inner, "ConstrName", info.row, name)
         _require_update(model)
     end
-    if model.name_to_constraint_index === nothing
+    if model.name_to_constraint_index === nothing || isempty(name)
         return
     end
     if haskey(model.name_to_constraint_index, name)
@@ -1553,10 +1567,13 @@ function MOI.set(
     name::String
 ) where {S}
     info = _info(model, c)
+    if !isempty(info.name) && model.name_to_constraint_index !== nothing
+        delete!(model.name_to_constraint_index, info.name)
+    end
     set_strattrelement!(model.inner, "QCName", info.row, name)
     _require_update(model)
     info.name = name
-    if model.name_to_constraint_index === nothing
+    if model.name_to_constraint_index === nothing || isempty(name)
         return
     end
     if haskey(model.name_to_constraint_index, name)
@@ -1639,14 +1656,18 @@ function MOI.set(
     model::Optimizer, ::MOI.ConstraintName,
     c::MOI.ConstraintIndex{MOI.VectorOfVariables, <:Any}, name::String
 )
-    _info(model, c).name = name
-    if model.name_to_constraint_index === nothing
+    info = _info(model, c)
+    if !isempty(info.name) && model.name_to_constraint_index !== nothing
+        delete!(model.name_to_constraint_index, info.name)
+    end
+    info.name = name
+    if model.name_to_constraint_index === nothing || isempty(name)
         return
     end
     if haskey(model.name_to_constraint_index, name)
         model.name_to_constraint_index = nothing
     else
-        model.name_to_constraint_index[c] = name
+        model.name_to_constraint_index[name] = c
     end
     return
 end
