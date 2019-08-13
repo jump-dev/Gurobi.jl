@@ -495,7 +495,12 @@ function MOI.set(
         set_strattrelement!(model.inner, "VarName", info.column, name)
         _require_update(model)
     end
-    if model.name_to_variable !== nothing && !haskey(model.name_to_variable, name)
+    if model.name_to_variable === nothing
+        return
+    end
+    if haskey(model.name_to_variable, name)
+        model.name_to_variable = nothing
+    else
         model.name_to_variable[name] = v
     end
     return
@@ -1179,6 +1184,14 @@ function MOI.set(
         @assert S <: Union{MOI.ZeroOne, MOI.Integer, MOI.Semiinteger, MOI.Semicontinuous}
         info.type_constraint_name = name
     end
+    if model.name_to_constraint_index === nothing
+        return
+    end
+    if haskey(model.name_to_constraint_index, name)
+        model.name_to_constraint_index = nothing
+    else
+        model.name_to_constraint_index[name] = c
+    end
     return
 end
 
@@ -1344,10 +1357,13 @@ function MOI.set(
         set_strattrelement!(model.inner, "ConstrName", info.row, name)
         _require_update(model)
     end
-    if model.name_to_constraint_index !== nothing && !haskey(model.name_to_constraint_index, name)
-        model.name_to_constraint_index[c] = name
-    else
+    if model.name_to_constraint_index === nothing
+        return
+    end
+    if haskey(model.name_to_constraint_index, name)
         model.name_to_constraint_index = nothing
+    else
+        model.name_to_constraint_index[name] = c
     end
     return
 end
@@ -1356,59 +1372,7 @@ function MOI.get(model::Optimizer, ::Type{MOI.ConstraintIndex}, name::String)
     if model.name_to_constraint_index === nothing
         _rebuild_name_to_constraint_index(model)
     end
-    index = get(model.name_to_constraint_index, name, nothing)
-    if index === nothing
-        for S in (MOI.LessThan{Float64}, MOI.GreaterThan{Float64},
-            MOI.EqualTo{Float64}, MOI.Interval{Float64}, MOI.ZeroOne,
-            MOI.Integer, MOI.Semicontinuous{Float64}, MOI.Semiinteger{Float64}
-        )
-            index_2 = MOI.get(
-                model, MOI.ConstraintIndex{MOI.SingleVariable, S}, name
-            )
-            if index_2 === nothing
-                continue
-            else
-                if index === nothing
-                    index = index_2
-                else
-                    error("Duplicate name detected: ", name)
-                end
-            end
-        end
-    end
-    return index
-end
-
-function MOI.get(
-    model::Optimizer, C::Type{MOI.ConstraintIndex{MOI.SingleVariable, S}},
-    name::String
-) where {S}
-    index = nothing
-    for (key, info) in model.variable_info
-        constraint_name = ""
-        if info.bound in _bound_enums(S)
-            if S <: MOI.LessThan
-                constraint_name = info.lessthan_name
-            else
-                constraint_name = info.greaterthan_interval_or_equalto_name
-            end
-        elseif info.type in _type_enums(S)
-            constraint_name = info.type_constraint_name
-        end
-        if constraint_name == ""
-            continue
-        elseif constraint_name == name
-            if index === nothing
-                index = key
-            else
-                error("Duplicate name detected: ", name)
-            end
-        end
-    end
-    if index === nothing
-        return nothing
-    end
-    return MOI.ConstraintIndex{MOI.SingleVariable, S}(index.value)
+    return get(model.name_to_constraint_index, name, nothing)
 end
 
 function MOI.get(
@@ -1432,6 +1396,7 @@ function _rebuild_name_to_constraint_index(model::Optimizer)
     _rebuild_name_to_constraint_index_util(
         model, model.sos_constraint_info, MOI.VectorOfVariables
     )
+    _rebuild_name_to_constraint_index_variables(model)
     return
 end
 
@@ -1440,10 +1405,36 @@ function _rebuild_name_to_constraint_index_util(model::Optimizer, dict, F)
         info.name == "" && continue
         if haskey(model.name_to_constraint_index, info.name)
             model.name_to_constraint_index = nothing
-            error("Duplicate variable name detected: $(info.name)")
+            error("Duplicate constraint name detected: $(info.name)")
         end
         model.name_to_constraint_index[info.name] =
             MOI.ConstraintIndex{F, typeof(info.set)}(index)
+    end
+    return
+end
+
+function _rebuild_name_to_constraint_index_variables(model::Optimizer)
+    for (key, info) in model.variable_info
+        for S in (
+            MOI.LessThan{Float64}, MOI.GreaterThan{Float64},
+            MOI.EqualTo{Float64}, MOI.Interval{Float64}, MOI.ZeroOne,
+            MOI.Integer, MOI.Semicontinuous{Float64}, MOI.Semiinteger{Float64}
+        )
+            constraint_name = ""
+            if info.bound in _bound_enums(S)
+                constraint_name = S == MOI.LessThan{Float64} ?
+                    info.lessthan_name : info.greaterthan_interval_or_equalto_name
+            elseif info.type in _type_enums(S)
+                constraint_name = info.type_constraint_name
+            end
+            constraint_name == "" && continue
+            if haskey(model.name_to_constraint_index, constraint_name)
+                model.name_to_constraint_index = nothing
+                error("Duplicate constraint name detected: ", constraint_name)
+            end
+            model.name_to_constraint_index[constraint_name] =
+                MOI.ConstraintIndex{MOI.SingleVariable, S}(key.value)
+        end
     end
     return
 end
@@ -1565,10 +1556,13 @@ function MOI.set(
     set_strattrelement!(model.inner, "QCName", info.row, name)
     _require_update(model)
     info.name = name
-    if model.name_to_constraint_index !== nothing && !haskey(model.name_to_constraint_index, name)
-        model.name_to_constraint_index[c] = name
-    else
+    if model.name_to_constraint_index === nothing
+        return
+    end
+    if haskey(model.name_to_constraint_index, name)
         model.name_to_constraint_index = nothing
+    else
+        model.name_to_constraint_index[c] = name
     end
     return
 end
@@ -1646,10 +1640,13 @@ function MOI.set(
     c::MOI.ConstraintIndex{MOI.VectorOfVariables, <:Any}, name::String
 )
     _info(model, c).name = name
-    if model.name_to_constraint_index !== nothing && !haskey(model.name_to_constraint_index, name)
-        model.name_to_constraint_index[c] = name
-    else
+    if model.name_to_constraint_index === nothing
+        return
+    end
+    if haskey(model.name_to_constraint_index, name)
         model.name_to_constraint_index = nothing
+    else
+        model.name_to_constraint_index[c] = name
     end
     return
 end
