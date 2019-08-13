@@ -267,6 +267,7 @@ MOI.supports(::Optimizer, ::MOI.ObjectiveFunctionType) = true
 
 MOI.supports(::Optimizer, ::MOI.Name) = true
 MOI.supports(::Optimizer, ::MOI.Silent) = true
+MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
 MOI.supports(::Optimizer, ::MOI.ConstraintSet, c) = true
 MOI.supports(::Optimizer, ::MOI.ConstraintFunction, c) = true
 MOI.supports(::Optimizer, ::MOI.ConstraintPrimal, c) = true
@@ -284,6 +285,15 @@ end
 
 function MOI.get(model::Optimizer, param::MOI.RawParameter)
     return getparam(model.inner, param.name)
+end
+
+function MOI.set(model::Optimizer, ::MOI.TimeLimitSec, limit::Real)
+    MOI.set(model, MOI.RawParameter("TimeLimit"), limit)
+    return
+end
+
+function MOI.get(model::Optimizer, ::MOI.TimeLimitSec)
+    return MOI.get(model, MOI.RawParameter("TimeLimit"))
 end
 
 MOI.Utilities.supports_default_copy_to(::Optimizer, ::Bool) = true
