@@ -9,7 +9,17 @@ const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
 const CONFIG = MOIT.TestConfig()
 
 @testset "Unit Tests" begin
-    MOIT.basic_constraint_tests(OPTIMIZER, CONFIG)
+    MOIT.basic_constraint_tests(OPTIMIZER, CONFIG; exclude = [
+        (MOI.VectorOfVariables, MOI.GeometricMeanCone)
+    ])
+    # get(::ConstraintFunction) and get(::ConstraintSet) haven't been
+    # implemented for the geomean bridge in MOI.
+    MOIT.basic_constraint_tests(OPTIMIZER, CONFIG; include = [
+            (MOI.VectorOfVariables, MOI.GeometricMeanCone)
+        ],
+        get_constraint_function = false,
+        get_constraint_set = false
+    )
     MOIT.unittest(OPTIMIZER, MOIT.TestConfig(atol=1e-6))
     MOIT.modificationtest(OPTIMIZER, CONFIG)
 end
@@ -32,8 +42,15 @@ end
     ])
 end
 
-@testset "Linear Conic tests" begin
+@testset "Conic tests" begin
     MOIT.lintest(OPTIMIZER, CONFIG)
+    MOIT.soctest(OPTIMIZER, MOIT.TestConfig(duals = false), [
+        # Test currently requires INFEASIBLE, while Gurobi returns
+        # INFEASIBLE_OR_UNBOUNDED.
+        "soc3"
+    ])
+    MOIT.rsoctest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-6))
+    MOIT.geomeantest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-3))
 end
 
 @testset "Integer Linear tests" begin
