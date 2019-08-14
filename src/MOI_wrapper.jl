@@ -2063,7 +2063,7 @@ function MOI.get(
     indices = MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.SecondOrderCone}[
         MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.SecondOrderCone}(key)
         for (key, info) in model.quadratic_constraint_info
-            if info.set.dimension > 0
+            if typeof(info.set) == MOI.SecondOrderCone
     ]
     return sort!(indices, by = x -> x.value)
 end
