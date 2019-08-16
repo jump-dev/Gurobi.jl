@@ -886,23 +886,30 @@ end
 """
     _set_variable_lower_bound(model, info, value)
 
-This function is used to indirectly set the lower bound of a variable. We need
-to do it this way, because if we add a SecondOrderCone constraint.
+This function is used to indirectly set the lower bound of a variable.
+
+We need to do it this way to account for potential lower bounds of 0.0 added by
+VectorOfVariables-in-SecondOrderCone constraints.
+
+See also `_get_variable_lower_bound`.
 """
 function _set_variable_lower_bound(model, info, value)
     if info.num_soc_constraints == 0
-        # No SOC constraints. Set directly.
+        # No SOC constraints, set directly.
         @assert isnan(info.lower_bound_if_soc)
         set_dblattrelement!(model.inner, "LB", info.column, value)
         _require_update(model)
     elseif value >= 0.0
-        # Regardless of whether there are SOC constraints, set directly.
+        # Regardless of whether there are SOC constraints, this is a valid bound
+        # for the SOC constraint and should over-ride any previous bounds.
         info.lower_bound_if_soc = NaN
         set_dblattrelement!(model.inner, "LB", info.column, value)
         _require_update(model)
     elseif isnan(info.lower_bound_if_soc)
-        # Previously, we had a +ve lower bound. We're setting this with a -ve
-        # one, but there are still some SOC constraints.
+        # Previously, we had a +ve lower bound (i.e., it was set in the case
+        # above). Now we're setting this with a -ve one, but there are still
+        # some SOC constraints, so we cache `value` and set the variable lower
+        # bound to `0.0`.
         @assert value < 0.0
         set_dblattrelement!(model.inner, "LB", info.column, 0.0)
         _require_update(model)
@@ -915,9 +922,19 @@ function _set_variable_lower_bound(model, info, value)
     end
 end
 
+"""
+    _get_variable_lower_bound(model, info)
+
+Get the current variable lower bound, ignoring a potential bound of `0.0` set
+by a second order cone constraint.
+
+See also `_set_variable_lower_bound`.
+"""
 function _get_variable_lower_bound(model, info)
     if !isnan(info.lower_bound_if_soc)
-        # There is a value stored. Return that.
+        # There is a value stored. That means that we must have set a value that
+        # was < 0.
+        @assert info.lower_bound_if_soc < 0.0
         return info.lower_bound_if_soc
     end
     return get_dblattrelement(model.inner, "LB", info.column)
