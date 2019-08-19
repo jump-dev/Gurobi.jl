@@ -3,7 +3,9 @@ const MOIT = MOI.Test
 
 const GUROBI_ENV = Gurobi.Env()
 const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
-    Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0), Float64
+    # Note: we set `DualReductions = 0` so that we never return
+    # `INFEASIBLE_OR_UNBOUNDED`.
+    Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, DualReductions=0), Float64
 )
 
 const CONFIG = MOIT.TestConfig()
@@ -44,12 +46,8 @@ end
 
 @testset "Conic tests" begin
     MOIT.lintest(OPTIMIZER, CONFIG)
-    MOIT.soctest(OPTIMIZER, MOIT.TestConfig(duals = false), [
-        # Test currently requires INFEASIBLE, while Gurobi returns
-        # INFEASIBLE_OR_UNBOUNDED.
-        "soc3"
-    ])
-    MOIT.rsoctest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-6))
+    MOIT.soctest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-3))
+    MOIT.rsoctest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-3))
     MOIT.geomeantest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-3))
 end
 
