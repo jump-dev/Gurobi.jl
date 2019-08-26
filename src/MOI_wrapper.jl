@@ -1967,6 +1967,7 @@ function MOI.get(
     return _info(model, x).start
 end
 
+MOI.supports(::Optimizer, ::MOI.VariablePrimalStart) = true
 MOI.supports(::Optimizer, ::MOI.ConstraintPrimalStart) = false
 MOI.supports(::Optimizer, ::MOI.ConstraintDualStart) = false
 
