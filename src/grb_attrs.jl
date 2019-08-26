@@ -240,7 +240,6 @@ end
 
 function set_strattr!(model::Model, name::String, v::String)
     @assert isascii(name)
-    @assert isascii(v)
     ret = @grb_ccall(setstrattr, Cint,
         (Ptr{Cvoid}, Ptr{UInt8}, Ptr{UInt8}), model, name, v)
     if ret != 0
@@ -251,7 +250,6 @@ end
 
 function set_strattrelement!(model::Model, name::String, el::Int, v::String)
     @assert isascii(name)
-    @assert isascii(v)
     ret = @grb_ccall(setstrattrelement, Cint,
         (Ptr{Cvoid}, Ptr{UInt8}, Cint, Ptr{UInt8}), model, name, el - 1, v)
     if ret != 0
