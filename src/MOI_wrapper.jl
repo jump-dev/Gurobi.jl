@@ -2046,7 +2046,7 @@ function MOI.get(
 end
 
 function MOI.get(model::Optimizer, ::MOI.ListOfConstraints)
-    constraints = Set{Any}()
+    constraints = Set{Tuple{DataType, DataType}}()
     for info in values(model.variable_info)
         if info.bound == NONE
         elseif info.bound == LESS_THAN
