@@ -529,7 +529,7 @@ end
     model = Gurobi.Optimizer(GUROBI_ENV)
     @testset "Variables" begin
         MOI.empty!(model)
-        x = MOI.add_variables(model, 2)
+        x = MOI.add_variables(model, 3)
         MOI.set(model, MOI.VariableName(), x[1], "x1")
         @test MOI.get(model, MOI.VariableIndex, "x1") == x[1]
         MOI.set(model, MOI.VariableName(), x[1], "x2")
@@ -537,6 +537,8 @@ end
         @test MOI.get(model, MOI.VariableIndex, "x2") == x[1]
         MOI.set(model, MOI.VariableName(), x[2], "x1")
         @test MOI.get(model, MOI.VariableIndex, "x1") == x[2]
+        MOI.set(model, MOI.VariableName(), x[3], "xα")
+        @test MOI.get(model, MOI.VariableIndex, "xα") == x[3]
         MOI.set(model, MOI.VariableName(), x[1], "x1")
         @test_throws ErrorException MOI.get(model, MOI.VariableIndex, "x1")
     end
