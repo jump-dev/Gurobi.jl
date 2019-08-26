@@ -1967,9 +1967,10 @@ function MOI.get(
     return _info(model, x).start
 end
 
-MOI.supports(::Optimizer, ::MOI.VariablePrimalStart) = true
-MOI.supports(::Optimizer, ::MOI.ConstraintPrimalStart) = false
-MOI.supports(::Optimizer, ::MOI.ConstraintDualStart) = false
+function MOI.supports(
+    ::Gurobi.Optimizer, ::MOI.VariablePrimalStart, ::Type{MOI.VariableIndex})
+    return true
+end
 
 function MOI.get(model::Optimizer, ::MOI.NumberOfConstraints{F, S}) where {F, S}
     # TODO: this could be more efficient.
