@@ -65,3 +65,20 @@ end
     @test getcoeff(model, 1, 2) == 2.0
     @test getcoeff(model, 2, 2) == 0.0
 end
+
+@testset "Unicode support for names" begin
+    model = Gurobi.Model(Gurobi.Env(), "model")
+    Gurobi.add_cvar!(model, 0.0)
+    for str in [
+        "αβ", "Aα", "αA", "x̂", "xx̂", "x̂x", "¹", "x¹", "¹x", "₂", "x₂", "₂x",
+        "xß", "̂", "̄"
+    ]
+        Gurobi.set_strattr!(model, "ModelName", str)
+        Gurobi.update_model!(model)
+        @test str == Gurobi.get_strattr(model, "ModelName")
+
+        Gurobi.set_strattrelement!(model, "VarName", 1, str)
+        Gurobi.update_model!(model)
+        @test str == Gurobi.get_strattrelement(model, "VarName", 1)
+    end
+end
