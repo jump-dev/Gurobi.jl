@@ -263,18 +263,11 @@ const SCALAR_SETS = Union{
 
 MOI.supports(::Optimizer, ::MOI.VariableName, ::Type{MOI.VariableIndex}) = true
 MOI.supports(::Optimizer, ::MOI.ConstraintName, ::Type{<:MOI.ConstraintIndex}) = true
-MOI.supports(::Optimizer, ::MOI.ObjectiveFunctionType) = true
 
 MOI.supports(::Optimizer, ::MOI.Name) = true
 MOI.supports(::Optimizer, ::MOI.Silent) = true
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
-MOI.supports(::Optimizer, ::MOI.ConstraintSet, c) = true
-MOI.supports(::Optimizer, ::MOI.ConstraintFunction, c) = true
-MOI.supports(::Optimizer, ::MOI.ConstraintPrimal, c) = true
-MOI.supports(::Optimizer, ::MOI.ConstraintDual, c) = true
 MOI.supports(::Optimizer, ::MOI.ObjectiveSense) = true
-MOI.supports(::Optimizer, ::MOI.ListOfConstraintIndices) = true
-MOI.supports(::Optimizer, ::MOI.RawStatusString) = true
 MOI.supports(::Optimizer, ::MOI.RawParameter) = true
 
 function MOI.set(model::Optimizer, param::MOI.RawParameter, value)
@@ -1917,7 +1910,6 @@ MOI.get(model::Optimizer, ::MOI.BarrierIterations) = get_intattr(model.inner, "B
 MOI.get(model::Optimizer, ::MOI.NodeCount) = get_intattr(model.inner, "NodeCount")
 MOI.get(model::Optimizer, ::MOI.RelativeGap) = get_dblattr(model.inner, "MIPGap")
 
-MOI.supports(model::Optimizer, ::MOI.DualObjectiveValue) = true
 MOI.get(model::Optimizer, ::MOI.DualObjectiveValue) = get_dblattr(model.inner, "ObjBound")
 
 function MOI.get(model::Optimizer, ::MOI.ResultCount)
@@ -2419,10 +2411,6 @@ function MOI.get(model::Optimizer, ::ConflictStatus)
     end
 end
 
-function MOI.supports(::Optimizer, ::ConflictStatus)
-    return true
-end
-
 """
     ConstraintConflictStatus()
 
@@ -2497,31 +2485,4 @@ function MOI.get(
         return false
     end
     return get_intattrelement(model.inner, "IISQConstr", _info(model, index).row) > 0
-end
-
-function MOI.supports(
-    ::Optimizer, ::ConstraintConflictStatus,
-    ::Type{<:MOI.ConstraintIndex{MOI.SingleVariable, <:SCALAR_SETS}}
-)
-    return true
-end
-
-function MOI.supports(
-    ::Optimizer, ::ConstraintConflictStatus,
-    ::Type{<:MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},
-        <:Union{MOI.LessThan, MOI.GreaterThan, MOI.EqualTo}
-    }}
-)
-    return true
-end
-
-function MOI.supports(
-    ::Optimizer, ::ConstraintConflictStatus,
-    ::Type{<:MOI.ConstraintIndex{
-        MOI.ScalarQuadraticFunction{Float64},
-        <:Union{MOI.LessThan, MOI.GreaterThan}
-    }}
-)
-    return true
 end
