@@ -1,7 +1,7 @@
 name = "Gurobi"
 uuid = "2e9cd046-0924-5485-92f1-d5272153d98b"
 repo = "https://github.com/JuliaOpt/Gurobi.jl"
-version = "0.7.1"
+version = "0.7.2"
 
 [deps]
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
