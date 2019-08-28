@@ -2488,3 +2488,61 @@ function MOI.get(
     end
     return get_intattrelement(model.inner, "IISQConstr", _info(model, index).row) > 0
 end
+
+###
+### Constraint attributes
+###
+
+struct ConstraintAttribute <: MOI.AbstractConstraintAttribute
+    name::String
+end
+
+const constr_attr_type =
+    Dict( "Lazy" => Int, "DStart" => Real, "IISConstr" => Int,
+          "SARHSLow" => Real, "SARHSUp" => Real, "FarkasDual" => Real,
+          "Sense" => Char, "RHS" => Real, "ConstrName" => String, "Pi" => Real,
+          "Slack" => Real, " CBasis" => Int )
+const getter_for_type = Dict( Int => get_intattrelement,
+                              Real => get_dblattrelement,
+                              Char => get_charattrelement,
+                              String => get_strattrelement)
+const setter_for_type = Dict( Int => set_intattrelement!,
+                              Real => set_dblattrelement!,
+                              Char => set_charattrelement!,
+                              String => set_strattrelement! )
+
+"""
+       Set a constraint attribute.
+
+    Checks that the attribute exists and that value is correctly typed, but lets
+    Gurobi handle cases where an attribute's value cannot be set.
+
+    Caveat: might fail due to incorrect type for an attribute that cannot be set
+    anyway.
+"""
+function MOI.set(model::Optimizer, attr::ConstraintAttribute,
+                 ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},
+                                         <:Any},
+                 value::T) where T
+    @assert attr.name ∈ keys(constr_attr_type) "Unknown constraint attribute for Gurobi backend: $(attr.name)."
+    @assert T <: constr_attr_type[attr.name] "Attribute $(attr.name) is a $(constr_attr_type[attr.name]) but $T provided."
+    setter! = setter_for_type[constr_attr_type[attr.name]]
+    setter!(model.inner, attr.name, _info(model, ci).row, value)
+    _require_update(model) 
+    return
+end
+
+function MOI.get(model::Optimizer, attr::ConstraintAttribute,
+                 ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},
+                                         <:Any})
+    @assert attr.name ∈ keys(constr_attr_type) "Unknown constraint attribute for Gurobi backend: $(attr.name)."
+    getter = getter_for_type[constr_attr_type[attr.name]]
+    _update_if_necessary(model)
+    return getter(model.inner, attr.name, _info(model, ci).row)
+end
+
+# More user-friendly methods. 
+MOI.set(model::Optimizer, attr::String, ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}, value::T) where T =
+    MOI.set(model, ConstraintAttribute(attr), ci, value)
+
+MOI.get(model::Optimizer, attr::String, ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}) = MOI.get(model, ConstraintAttribute(attr), ci)
