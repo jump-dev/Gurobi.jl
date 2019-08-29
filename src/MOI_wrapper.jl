@@ -2512,7 +2512,7 @@ struct ConstraintAttribute <: MOI.AbstractConstraintAttribute
     name::String
 end
 
-MOI.supports(::Optimizer, attr::ConstraintAttribute) = attr.name ∈ CONSTR_ATTR_TYPE
+MOI.supports(::Optimizer, attr::ConstraintAttribute, ::Type{<:MOI.ConstraintIndex}) = attr.name ∈ keys(CONSTR_ATTR_TYPE)
 
 """
 MOI.set(model::Optimizer, attr::ConstraintAttribute,
@@ -2532,8 +2532,9 @@ function MOI.set(
     ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}},
     value::T
 ) where T
-    attr.name ∈ keys(CONSTR_ATTR_TYPE) || throw(MOI.UnsupportedAttribute(attr))
-    T <: CONSTR_ATTR_TYPE[attr.name] || throw(ArgumentError("Attribute $(attr.name) is a $(CONSTR_ATTR_TYPE[attr.name]) but $T provided."))
+    MOI.supports(model, attr, typeof(ci)) ||
+        throw(MOI.UnsupportedAttribute(attr))
+    T <: CONSTR_ATTR_TYPE[attr.name] || throw(ArgumentError("Attribute $(attr.name) is $(CONSTR_ATTR_TYPE[attr.name]) but $T provided."))
     setter! = SETTER_FOR_TYPE[CONSTR_ATTR_TYPE[attr.name]]
     setter!(model.inner, attr.name, _info(model, ci).row, value)
     _require_update(model) 
