@@ -2545,7 +2545,8 @@ function MOI.get(
     model::Optimizer, attr::ConstraintAttribute,
     ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}}
 )
-    attr.name ∈ keys(CONSTR_ATTR_TYPE) || throw(MOI.UnsupportedAttribute(attr))
+    MOI.supports(model, attr, typeof(ci)) ||
+        throw(MOI.UnsupportedAttribute(attr))
     getter = GETTER_FOR_TYPE[CONSTR_ATTR_TYPE[attr.name]]
     _update_if_necessary(model)
     return getter(model.inner, attr.name, _info(model, ci).row)
