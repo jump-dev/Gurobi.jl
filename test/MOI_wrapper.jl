@@ -578,3 +578,43 @@ end
     end
 end
 
+@testset "ConstraintAttribute" begin
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    MOI.Utilities.loadfromstring!(model, """
+variables: x
+minobjective: x
+c1: x >= 0.0
+c2: 2x >= 1.0
+c3: x in Integer()
+""")
+    c2 = MOI.get(model, MOI.ConstraintIndex, "c2")
+    c3 = MOI.get(model, MOI.ConstraintIndex, "c3")
+    # Linear constraints are supported - one test for each different type.
+    # Integer attribute
+    MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c2, 2)
+    @test MOI.get(model, Gurobi.ConstraintAttribute("Lazy"), c2) == 2
+    # Real attribute
+    MOI.set(model, Gurobi.ConstraintAttribute("RHS"), c2, 2.0)
+    @test MOI.get(model, Gurobi.ConstraintAttribute("RHS"), c2) == 2.0
+    # Char attribute
+    MOI.set(model, Gurobi.ConstraintAttribute("Sense"), c2, '<')
+    @test MOI.get(model, Gurobi.ConstraintAttribute("Sense"), c2) == '<'
+    # String attribute
+    MOI.set(model, Gurobi.ConstraintAttribute("ConstrName"), c2, "c4")
+    @test MOI.get(model, Gurobi.ConstraintAttribute("ConstrName"), c2) == "c4"
+    # Things that should fail follow.
+    # Non-linear constraints are not supported.
+    @test_throws(
+        MOI.SetAttributeNotAllowed(Gurobi.ConstraintAttribute("Lazy")),
+        MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c3, 1)
+    )
+    # Getting/setting a non-existing attribute.
+    attr = Gurobi.ConstraintAttribute("Non-existing")
+    @test_throws MOI.UnsupportedAttribute(attr) MOI.set(model, attr, c2, 1)
+    @test_throws MOI.UnsupportedAttribute(attr) MOI.get(model, attr, c2)
+    # Setting an attribute to a value of the wrong type.
+    @test_throws(
+        ArgumentError("Attribute Lazy is Integer but Float64 provided."),
+        MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c2, 1.0)
+    )
+end
