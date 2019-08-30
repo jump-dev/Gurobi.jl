@@ -2493,34 +2493,61 @@ end
 ### Constraint attributes
 ###
 
-# Gurobi constraint attributes as documented at https://www.gurobi.com/documentation/8.1/refman/linear_constraint_attribut.html
-const CONSTR_ATTR_TYPE =
-    Dict("Lazy" => Integer, "DStart" => Real, "IISConstr" => Integer,
-         "SARHSLow" => Real, "SARHSUp" => Real, "FarkasDual" => Real,
-         "Sense" => Char, "RHS" => Real, "ConstrName" => String, "Pi" => Real,
-         "Slack" => Real, " CBasis" => Integer)
-const GETTER_FOR_TYPE = Dict(Integer => Gurobi.get_intattrelement,
-                             Real => Gurobi.get_dblattrelement,
-                             Char => Gurobi.get_charattrelement,
-                             String => Gurobi.get_strattrelement)
-const SETTER_FOR_TYPE = Dict(Integer => Gurobi.set_intattrelement!,
-                             Real => Gurobi.set_dblattrelement!,
-                             Char => Gurobi.set_charattrelement!,
-                             String => Gurobi.set_strattrelement!)
+# Gurobi constraint attributes as documented at:
+# https://www.gurobi.com/documentation/8.1/refman/linear_constraint_attribut.html
+# The keys in CONSTR_ATTR_TYPE are listed in the order that they appear in the
+# documentation.
+
+# TODO(odow): abstract types are used for the values in the dictionary so that
+# we can check if the user passes in an appropriate type for the attribute.
+# This could be improved.
+
+const CONSTR_ATTR_TYPE = Dict(
+    "Sense" => Char,
+    "RHS" => Real,
+    "ConstrName" => String,
+    "Pi" => Real,
+    "Slack" => Real,
+    "CBasis" => Integer,
+    "DStart" => Real,
+    "Lazy" => Integer,
+    "IISConstr" => Integer,
+    "SARHSLow" => Real,
+    "SARHSUp" => Real,
+    "FarkasDual" => Real
+)
+
+const GETTER_FOR_TYPE = Dict(
+    Integer => Gurobi.get_intattrelement,
+    Real => Gurobi.get_dblattrelement,
+    Char => Gurobi.get_charattrelement,
+    String => Gurobi.get_strattrelement
+)
+
+const SETTER_FOR_TYPE = Dict(
+    Integer => Gurobi.set_intattrelement!,
+    Real => Gurobi.set_dblattrelement!,
+    Char => Gurobi.set_charattrelement!,
+    String => Gurobi.set_strattrelement!
+)
 
 struct ConstraintAttribute <: MOI.AbstractConstraintAttribute
     name::String
 end
 
-MOI.supports(::Optimizer, attr::ConstraintAttribute, ::Type{<:MOI.ConstraintIndex}) = attr.name ∈ keys(CONSTR_ATTR_TYPE)
+function MOI.supports(
+    ::Optimizer, attr::ConstraintAttribute, ::Type{<:MOI.ConstraintIndex}
+)
+    return attr.name ∈ keys(CONSTR_ATTR_TYPE)
+end
 
 """
-MOI.set(model::Optimizer, attr::ConstraintAttribute,
-        ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any},
-        value::T) where T
+    MOI.set(model::Optimizer, attr::ConstraintAttribute,
+            ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any},
+            value::T) where T
 
 Set a constraint attribute.
-    
+
 Checks that the attribute exists and that value is correctly typed, but lets
 Gurobi handle cases where an attribute's value cannot be set.
 
@@ -2534,10 +2561,14 @@ function MOI.set(
 ) where T
     MOI.supports(model, attr, typeof(ci)) ||
         throw(MOI.UnsupportedAttribute(attr))
-    T <: CONSTR_ATTR_TYPE[attr.name] || throw(ArgumentError("Attribute $(attr.name) is $(CONSTR_ATTR_TYPE[attr.name]) but $T provided."))
+    if !(T <: CONSTR_ATTR_TYPE[attr.name])
+        throw(ArgumentError(
+            "Attribute $(attr.name) is $(CONSTR_ATTR_TYPE[attr.name]) but $T provided."
+        ))
+    end
     setter! = SETTER_FOR_TYPE[CONSTR_ATTR_TYPE[attr.name]]
     setter!(model.inner, attr.name, _info(model, ci).row, value)
-    _require_update(model) 
+    _require_update(model)
     return
 end
 
