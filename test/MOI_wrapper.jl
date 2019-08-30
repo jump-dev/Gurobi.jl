@@ -604,10 +604,17 @@ c3: x in Integer()
     @test MOI.get(model, Gurobi.ConstraintAttribute("ConstrName"), c2) == "c4"
     # Things that should fail follow.
     # Non-linear constraints are not supported.
-    @test_throws MOI.SetAttributeNotAllowed MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c3, 1)
+    @test_throws(
+        MOI.SetAttributeNotAllowed(Gurobi.ConstraintAttribute("Lazy")),
+        MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c3, 1)
+    )
     # Getting/setting a non-existing attribute.
-    @test_throws MOI.UnsupportedAttribute MOI.set(model, Gurobi.ConstraintAttribute("Non-existing"), c2, 1)
-    @test_throws MOI.UnsupportedAttribute MOI.get(model, Gurobi.ConstraintAttribute("Non-existing"), c2)
+    attr = Gurobi.ConstraintAttribute("Non-existing")
+    @test_throws MOI.UnsupportedAttribute(attr) MOI.set(model, attr, c2, 1)
+    @test_throws MOI.UnsupportedAttribute(attr) MOI.get(model, attr, c2)
     # Setting an attribute to a value of the wrong type.
-    @test_throws ArgumentError MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c2, 1.0)
+    @test_throws(
+        ArgumentError("Attribute Lazy is Integer but Float64 provided."),
+        MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c2, 1.0)
+    )
 end
