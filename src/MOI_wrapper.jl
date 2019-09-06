@@ -2582,3 +2582,89 @@ function MOI.get(
     _update_if_necessary(model)
     return getter(model.inner, attr.name, _info(model, ci).row)
 end
+
+###
+### Variable attributes
+###
+
+# Gurobi variable attributes as documented at:
+# https://www.gurobi.com/documentation/8.1/refman/variable_attributes.html
+# The keys in VAR_ATTR_TYPE are listed in the order in which they appear in the
+# documentation.
+const VAR_ATTR_TYPE = Dict(
+    "LB" => Real,
+    "UB" => Real,
+    "Obj" => Real,
+    "VType" => Char,
+    "VarName" => String,
+    "X" => Real,
+    "Xn" => Real,
+    "RC" => Real,
+    "BarX" => Real,
+    "Start" => Real,
+    "VarHintVal" => Real,
+    "VarHintPri" => Integer,
+    "BranchPriority" => Integer,
+    "Partition" => Integer,
+    "VBasis" => Integer,
+    "PStart" => Real,
+    "IISLB" => Integer,
+    "IISUB" => Integer,
+    "PWLObjCvx" => Integer,
+    "SAOBJLow" => Real,
+    "SAObjUp" => Real,
+    "SALBLow" => Real,
+    "SALBUp" => Real,
+    "SAUBLow" => Real,
+    "SAUBUp" => Real,
+    "UnbdRay" => Real,
+)
+
+struct VariableAttribute <: MOI.AbstractVariableAttribute
+    name::String
+end
+
+function MOI.supports(
+    ::Optimizer, attr::VariableAttribute, ::Type{<:MOI.VariableIndex}
+)
+    return attr.name ∈ keys(VAR_ATTR_TYPE)
+end
+
+"""
+    MOI.set(model::Optimizer, attr::VariableAttribute,
+            vi::MOI.VariableIndex, value::T) where T
+
+Set a variable attribute.
+
+Checks that the attribute exists and that value is correctly typed, but lets
+Gurobi handle cases where an attribute's value cannot be set.
+
+Caveat: might fail due to incorrect type for an attribute that cannot be set
+anyway.
+"""
+function MOI.set(
+    model::Optimizer, attr::VariableAttribute,
+    vi::MOI.VariableIndex, value::T
+) where T
+    MOI.supports(model, attr, typeof(vi)) ||
+        throw(MOI.UnsupportedAttribute(attr))
+    if !(T <: VAR_ATTR_TYPE[attr.name])
+        throw(ArgumentError(
+            "Attribute $(attr.name) is $(VAR_ATTR_TYPE[attr.name]) but $T provided."
+        ))
+    end
+    setter! = SETTER_FOR_TYPE[VAR_ATTR_TYPE[attr.name]]
+    setter!(model.inner, attr.name, _info(model, vi).column, value)
+    _require_update(model)
+    return
+end
+
+function MOI.get(
+    model::Optimizer, attr::VariableAttribute, vi::MOI.VariableIndex
+)
+    MOI.supports(model, attr, typeof(vi)) ||
+        throw(MOI.UnsupportedAttribute(attr))
+    getter = GETTER_FOR_TYPE[VAR_ATTR_TYPE[attr.name]]
+    _update_if_necessary(model)
+    return getter(model.inner, attr.name, _info(model, vi).column)
+end

@@ -618,3 +618,38 @@ c3: x in Integer()
         MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c2, 1.0)
     )
 end
+
+@testset "VariableAttribute" begin
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    MOI.Utilities.loadfromstring!(model, """
+variables: x
+minobjective: x
+c1: x >= 0.0
+c2: 2x >= 1.0
+c3: x in Integer()
+""")
+    x = MOI.get(model, MOI.VariableIndex, "x")
+    # Setting attributes of each type
+    # Integer attribute
+    MOI.set(model, Gurobi.VariableAttribute("VarHintPri"), x, 2)
+    @test MOI.get(model, Gurobi.VariableAttribute("VarHintPri"), x) == 2
+    # Real Attribute
+    MOI.set(model, Gurobi.VariableAttribute("LB"), x, 2.0)
+    @test MOI.get(model, Gurobi.VariableAttribute("LB"), x) == 2.0
+    # Char Attribute
+    MOI.set(model, Gurobi.VariableAttribute("VType"), x, 'B')
+    @test MOI.get(model, Gurobi.VariableAttribute("VType"), x) == 'B'
+    # String Attribute
+    MOI.set(model, Gurobi.VariableAttribute("VarName"), x, "my_var")
+    @test MOI.get(model, Gurobi.VariableAttribute("VarName"), x) == "my_var"
+    # Things that should fail follow.
+    # Getting/setting a non-existing attribute.
+    attr = Gurobi.VariableAttribute("Non-existing")
+    @test_throws MOI.UnsupportedAttribute(attr) MOI.set(model, attr, x, 1)
+    @test_throws MOI.UnsupportedAttribute(attr) MOI.get(model, attr, x)
+    # Setting an attribute to a value of the wrong type.
+    @test_throws(
+        ArgumentError("Attribute BranchPriority is Integer but Float64 provided."),
+        MOI.set(model, Gurobi.VariableAttribute("BranchPriority"), x, 1.0)
+    )
+end
