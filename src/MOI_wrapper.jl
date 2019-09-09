@@ -2517,14 +2517,14 @@ const CONSTR_ATTR_TYPE = Dict(
     "FarkasDual" => Real
 )
 
-const GETTER_FOR_TYPE = Dict(
+const GETTER_FOR_ELEM_ATTR_TYPE = Dict(
     Integer => Gurobi.get_intattrelement,
     Real => Gurobi.get_dblattrelement,
     Char => Gurobi.get_charattrelement,
     String => Gurobi.get_strattrelement
 )
 
-const SETTER_FOR_TYPE = Dict(
+const SETTER_FOR_ELEM_ATTR_TYPE = Dict(
     Integer => Gurobi.set_intattrelement!,
     Real => Gurobi.set_dblattrelement!,
     Char => Gurobi.set_charattrelement!,
@@ -2566,7 +2566,7 @@ function MOI.set(
             "Attribute $(attr.name) is $(CONSTR_ATTR_TYPE[attr.name]) but $T provided."
         ))
     end
-    setter! = SETTER_FOR_TYPE[CONSTR_ATTR_TYPE[attr.name]]
+    setter! = SETTER_FOR_ELEM_ATTR_TYPE[CONSTR_ATTR_TYPE[attr.name]]
     setter!(model.inner, attr.name, _info(model, ci).row, value)
     _require_update(model)
     return
@@ -2578,7 +2578,7 @@ function MOI.get(
 )
     MOI.supports(model, attr, typeof(ci)) ||
         throw(MOI.UnsupportedAttribute(attr))
-    getter = GETTER_FOR_TYPE[CONSTR_ATTR_TYPE[attr.name]]
+    getter = GETTER_FOR_ELEM_ATTR_TYPE[CONSTR_ATTR_TYPE[attr.name]]
     _update_if_necessary(model)
     return getter(model.inner, attr.name, _info(model, ci).row)
 end
@@ -2653,7 +2653,7 @@ function MOI.set(
             "Attribute $(attr.name) is $(VAR_ATTR_TYPE[attr.name]) but $T provided."
         ))
     end
-    setter! = SETTER_FOR_TYPE[VAR_ATTR_TYPE[attr.name]]
+    setter! = SETTER_FOR_ELEM_ATTR_TYPE[VAR_ATTR_TYPE[attr.name]]
     setter!(model.inner, attr.name, _info(model, vi).column, value)
     _require_update(model)
     return
@@ -2664,7 +2664,125 @@ function MOI.get(
 )
     MOI.supports(model, attr, typeof(vi)) ||
         throw(MOI.UnsupportedAttribute(attr))
-    getter = GETTER_FOR_TYPE[VAR_ATTR_TYPE[attr.name]]
+    getter = GETTER_FOR_ELEM_ATTR_TYPE[VAR_ATTR_TYPE[attr.name]]
     _update_if_necessary(model)
     return getter(model.inner, attr.name, _info(model, vi).column)
+end
+
+###
+### Model attributes
+###
+
+# Gurobi model attributes as documented at:
+# https://www.gurobi.com/documentation/8.1/refman/model_attributes.html
+# The keys in MODEL_ATTR_TYPE are listed in the order in which they appear in
+# the documentation.
+const MODEL_ATTR_TYPE = Dict(
+    "NumConstrs" => Integer,
+    "NumVars" => Integer,
+    "NumSOS" => Integer,
+    "NumQConstrs" => Integer,
+    "NumGenConstrs" => Integer,
+    "NumNZs" => Integer,
+    "DNumNZs" => Real,
+    "NumQNZs" => Integer,
+    "NumQCNZs" => Integer,
+    "NumIntVars" => Integer,
+    "NumBinVars" => Integer,
+    "NumPWLObjVars" => Integer,
+    "ModelName" => String,
+    "ModelSense" => Integer,
+    "ObjCon" => Real,
+    "ObjVal" => Real,
+    "ObjBound" => Real,
+    "ObjBoundC" => Real,
+    "PoolObjBound" => Real,
+    "PoolObjVal" => Real,
+    "MIPGap" => Real,
+    "Runtime" => Real,
+    "Status" => Integer,
+    "SolCount" => Integer,
+    "IterCount" => Real,
+    "BarIterCount" => Integer,
+    "NodeCount" => Real,
+    "IsMIP" => Integer,
+    "IsQP" => Integer,
+    "IsQCP" => Integer,
+    "IsMultiObj" => Integer,
+    "IISMinimal" => Integer,
+    "MaxCoeff" => Real,
+    "MinCoeff" => Real,
+    "MaxBound" => Real,
+    "MinBound" => Real,
+    "MaxObjCoeff" => Real,
+    "MinObjCoeff" => Real,
+    "MaxRHS" => Real,
+    "MinRHS" => Real,
+    "MaxQCCoeff" => Real,
+    "MinQCCoeff" => Real,
+    "MaxQCLCoeff" => Real,
+    "MinQCLCoeff" => Real,
+    "MaxQCRHS" => Real,
+    "MinQCRHS" => Real,
+    "MaxQObjCoeff" => Real,
+    "MinQObjCoeff" => Real,
+    "Kappa" => Real,
+    "KappaExact" => Real,
+    "FarkasProof" => Real,
+    "TuneResultCount" => Integer,
+    "NumStart" => Integer,
+    "LicenseExpiration" => Integer,
+    "JobID" => String,
+    "Server" => String,
+)
+
+const GETTER_FOR_MODEL_ATTR_TYPE = Dict(
+    Integer => Gurobi.get_intattr,
+    Real => Gurobi.get_dblattr,
+    String => Gurobi.get_strattr,
+)
+
+const SETTER_FOR_MODEL_ATTR_TYPE = Dict(
+    Integer => Gurobi.set_intattr!,
+    Real => Gurobi.set_dblattr!,
+    String => Gurobi.set_strattr!
+)
+
+struct ModelAttribute <: MOI.AbstractModelAttribute
+    name::String
+end
+
+function MOI.supports(::Optimizer, attr::ModelAttribute)
+    return attr.name ∈ keys(MODEL_ATTR_TYPE)
+end
+
+"""
+    MOI.set(model::Optimizer, attr::ModelAttribute, value::T) where T
+
+Set a model attribute.
+
+Checks that the attribute exists and that value is correctly typed, but lets
+Gurobi handle cases where an attribute's value cannot be set.
+
+Caveat: might fail due to incorrect type for an attribute that cannot be set
+anyway.
+"""
+function MOI.set(model::Optimizer, attr::ModelAttribute, value::T) where T
+    MOI.supports(model, attr) || throw(MOI.UnsupportedAttribute(attr))
+    if !(T <: MODEL_ATTR_TYPE[attr.name])
+        throw(ArgumentError(
+            "Attribute $(attr.name) is $(MODEL_ATTR_TYPE[attr.name]) but $T provided."
+        ))
+    end
+    setter! = SETTER_FOR_MODEL_ATTR_TYPE[MODEL_ATTR_TYPE[attr.name]]
+    setter!(model.inner, attr.name, value)
+    _require_update(model)
+    return
+end
+
+function MOI.get(model::Optimizer, attr::ModelAttribute)
+    MOI.supports(model, attr) || throw(MOI.UnsupportedAttribute(attr))
+    getter = GETTER_FOR_MODEL_ATTR_TYPE[MODEL_ATTR_TYPE[attr.name]]
+    _update_if_necessary(model)
+    return getter(model.inner, attr.name)
 end

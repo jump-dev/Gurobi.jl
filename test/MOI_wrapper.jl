@@ -653,3 +653,34 @@ c3: x in Integer()
         MOI.set(model, Gurobi.VariableAttribute("BranchPriority"), x, 1.0)
     )
 end
+
+@testset "ModelAttribute" begin
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    MOI.Utilities.loadfromstring!(model, """
+variables: x
+minobjective: x
+c1: x >= 0.0
+c2: 2x >= 1.0
+c3: x in Integer()
+""")
+    # Setting attributes of each type
+    # Integer attribute
+    MOI.set(model, Gurobi.ModelAttribute("ModelSense"), -1)
+    @test MOI.get(model, Gurobi.ModelAttribute("ModelSense")) == -1
+    # Real Attribute
+    MOI.set(model, Gurobi.ModelAttribute("ObjCon"), 3.0)
+    @test MOI.get(model, Gurobi.ModelAttribute("ObjCon")) == 3.0
+    # String Attribute
+    MOI.set(model, Gurobi.ModelAttribute("ModelName"), "My model")
+    @test MOI.get(model, Gurobi.ModelAttribute("ModelName")) == "My model"
+    # Things that should fail follow.
+    # Getting/setting a non-existing attribute.
+    attr = Gurobi.ModelAttribute("Non-existing")
+    @test_throws MOI.UnsupportedAttribute(attr) MOI.set(model, attr, 1)
+    @test_throws MOI.UnsupportedAttribute(attr) MOI.get(model, attr)
+    # Setting an attribute to a value of the wrong type.
+    @test_throws(
+        ArgumentError("Attribute NumStart is Integer but Float64 provided."),
+        MOI.set(model, Gurobi.ModelAttribute("NumStart"), 4.0)
+    )
+end
