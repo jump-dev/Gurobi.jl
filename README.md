@@ -51,6 +51,43 @@ julia> import Pkg; Pkg.build("Gurobi")
 ```
 The Gurobi library (`gurobiXXX.dll` on Windows, `gurobiXXX.so` on Unix, and `gurobiXXX.dylib` in OSX where `XXX` is a version) will be searched for in ``GUROBI_HOME/lib`` on unix platforms and ``GUROBI_HOME\bin`` on Windows.
 
+## Reusing the same Gurobi environment for multiple solves
+
+When using this package via other packages such as [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl), the default behavior is to obtain a new Gurobi license token every time a model is created and solved. If you are using Gurobi in a setting where the number of concurrent Gurobi uses is limited (e.g. ["Single-Use" or "Floating-Use" licenses](http://www.gurobi.com/products/licensing-pricing/licensing-overview)), you might instead prefer to obtain a single license token that is shared by all models that your program solves. You can do this by passing a Gurobi Environment object as the first parameter to `Gurobi.Optimizer`. For example, the follow code snippet solves multiple problems with JuMP using the same license token:
+
+```julia
+using JuMP, Gurobi
+
+const GRB_ENV = Gurobi.Env()
+
+model1 = Model(with_optimizer(Gurobi.Optimizer, GRB_ENV))
+...
+
+# The solvers can have different options too
+model2 = Model(with_optimizer(Gurobi.Optimizer, GRB_ENV, OutputFlag=0))
+...
+```
+
+## Accessing Gurobi-specific attributes via JuMP
+
+You can get and set Gurobi-specific variable, constraint, and model attributes via JuMP as follows:
+```julia
+using JuMP, Gurobi
+
+model = JuMP.direct_model(Gurobi.Optimizer(OutputFlag=0))
+@variable(model, x >= 0)
+@constraint(model, c, 2x >= 1)
+@objective(model, Min, x)
+MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c, 2)
+optimize!(model)
+
+MOI.get(model, Gurobi.VariableAttribute("LB"), x)  # Returns 0.0
+
+MOI.get(model, Gurobi.ModelAttribute("NumConstrs")) # Returns 1
+```
+Note that we are using [JuMP in direct-mode](https://www.juliaopt.org/JuMP.jl/v0.20.0/solvers/#Direct-mode-1). 
+A complete list of supported Gurobi attributes can be found in [their online documentation](https://www.gurobi.com/documentation/8.1/refman/attributes.html).
+
 *Most users should not need to use the low-level API detailed in the following sections.*
 
 ## API Overview
@@ -477,19 +514,3 @@ optimize(model)
 ```
 
 SOCP constraints of the form ``x'x <= y^2`` and ``x'x <= yz`` can be added using this method as well.
-
-### Reusing the same Gurobi environment for multiple solves
-
-When using this package via other packages such as [MathProgBase.jl](https://github.com/JuliaOpt/MathProgBase.jl) and [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl), the default behavior is to obtain a new Gurobi license token every time a model is created and solved. If you are using Gurobi in a setting where the number of concurrent Gurobi uses is limited (e.g. ["Single-Use" or "Floating-Use" licenses](http://www.gurobi.com/products/licensing-pricing/licensing-overview)), you might instead prefer to obtain a single license token that is shared by all models that your program solves. You can do this by passing a Gurobi Environment object as the first parameter to `GurobiSolver`. For example, the follow code snippet solves multiple problems with JuMP using the same license token:
-
-```julia
-using JuMP, Gurobi
-env = Gurobi.Env()
-
-model1 = Model(with_optimizer(Gurobi.Optimizer, env))
-...
-
-# The solvers can have different options too
-model2 = Model(with_optimizer(Gurobi.Optimizer, env, OutputFlag=0))
-...
-```
