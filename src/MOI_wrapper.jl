@@ -93,8 +93,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
 
     # Mappings from variable and constraint names to their indices. These are
     # lazily built on-demand, so most of the time, they are `nothing`.
-    name_to_variable::Union{Nothing, Dict{String, MOI.VariableIndex}}
-    name_to_constraint_index::Union{Nothing, Dict{String, MOI.ConstraintIndex}}
+    name_to_variable::Union{Nothing, Dict{String, Union{Nothing, MOI.VariableIndex}}}
+    name_to_constraint_index::Union{Nothing, Dict{String, Union{Nothing, MOI.ConstraintIndex}}}
 
     # These two flags allow us to distinguish between FEASIBLE_POINT and
     # INFEASIBILITY_CERTIFICATE when querying VariablePrimal and ConstraintDual.
@@ -456,6 +456,9 @@ function MOI.delete(model::Optimizer, v::MOI.VariableIndex)
         end
     end
     model.name_to_variable = nothing
+    # We throw away name_to_constraint_index so we will rebuild SingleVariable
+    # constraint names without v.
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -463,20 +466,27 @@ function MOI.get(model::Optimizer, ::Type{MOI.VariableIndex}, name::String)
     if model.name_to_variable === nothing
         _rebuild_name_to_variable(model)
     end
-    return get(model.name_to_variable, name, nothing)
+    if haskey(model.name_to_variable, name)
+        variable = model.name_to_variable[name]
+        if variable === nothing
+            error("Duplicate variable name detected: $(name)")
+        end
+        return variable
+    end
+    return nothing
 end
 
 function _rebuild_name_to_variable(model::Optimizer)
-    model.name_to_variable = Dict{String, MOI.VariableIndex}()
+    model.name_to_variable = Dict{String, Union{Nothing, MOI.VariableIndex}}()
     for (index, info) in model.variable_info
         if info.name == ""
             continue
         end
         if haskey(model.name_to_variable, info.name)
-            model.name_to_variable = nothing
-            error("Duplicate variable name detected: $(info.name)")
+            model.name_to_variable[info.name] = nothing
+        else
+            model.name_to_variable[info.name] = index
         end
-        model.name_to_variable[info.name] = index
     end
     return
 end
@@ -489,23 +499,10 @@ function MOI.set(
     model::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex, name::String
 )
     info = _info(model, v)
-    if !isempty(info.name) && model.name_to_variable !== nothing
-        delete!(model.name_to_variable, info.name)
-    end
     info.name = name
-    if isempty(name)
-        return
-    end
     set_strattrelement!(model.inner, "VarName", info.column, name)
     _require_update(model)
-    if model.name_to_variable === nothing
-        return
-    end
-    if haskey(model.name_to_variable, name)
-        model.name_to_variable = nothing
-    else
-        model.name_to_variable[name] = v
-    end
+    model.name_to_variable = nothing
     return
 end
 
@@ -880,6 +877,7 @@ function MOI.delete(
         info.bound = NONE
     end
     info.lessthan_name = ""
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -953,6 +951,7 @@ function MOI.delete(
         info.bound = NONE
     end
     info.greaterthan_interval_or_equalto_name = ""
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -967,6 +966,7 @@ function MOI.delete(
     _require_update(model)
     info.bound = NONE
     info.greaterthan_interval_or_equalto_name = ""
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -981,6 +981,7 @@ function MOI.delete(
     _require_update(model)
     info.bound = NONE
     info.greaterthan_interval_or_equalto_name = ""
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -1090,6 +1091,7 @@ function MOI.delete(
     _require_update(model)
     info.type = CONTINUOUS
     info.type_constraint_name = ""
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -1120,6 +1122,7 @@ function MOI.delete(
     _require_update(model)
     info.type = CONTINUOUS
     info.type_constraint_name = ""
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -1157,6 +1160,7 @@ function MOI.delete(
     _require_update(model)
     info.type = CONTINUOUS
     info.type_constraint_name = ""
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -1198,6 +1202,7 @@ function MOI.delete(
     _require_update(model)
     info.type = CONTINUOUS
     info.type_constraint_name = ""
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -1247,17 +1252,7 @@ function MOI.set(
         info.type_constraint_name
         info.type_constraint_name = name
     end
-    if model.name_to_constraint_index !== nothing
-        delete!(model.name_to_constraint_index, old_name)
-    end
-    if model.name_to_constraint_index === nothing || isempty(name)
-        return
-    end
-    if haskey(model.name_to_constraint_index, name)
-        model.name_to_constraint_index = nothing
-    else
-        model.name_to_constraint_index[name] = c
-    end
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -1362,8 +1357,8 @@ function MOI.delete(
             info.row -= 1
         end
     end
-    model.name_to_constraint_index = nothing
     delete!(model.affine_constraint_info, c.value)
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -1418,22 +1413,12 @@ function MOI.set(
     name::String
 )
     info = _info(model, c)
-    if !isempty(info.name) && model.name_to_constraint_index !== nothing
-        delete!(model.name_to_constraint_index, info.name)
-    end
     info.name = name
     if !isempty(name)
         set_strattrelement!(model.inner, "ConstrName", info.row, name)
         _require_update(model)
     end
-    if model.name_to_constraint_index === nothing || isempty(name)
-        return
-    end
-    if haskey(model.name_to_constraint_index, name)
-        model.name_to_constraint_index = nothing
-    else
-        model.name_to_constraint_index[name] = c
-    end
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -1441,7 +1426,14 @@ function MOI.get(model::Optimizer, ::Type{MOI.ConstraintIndex}, name::String)
     if model.name_to_constraint_index === nothing
         _rebuild_name_to_constraint_index(model)
     end
-    return get(model.name_to_constraint_index, name, nothing)
+    if haskey(model.name_to_constraint_index, name)
+        constr = model.name_to_constraint_index[name]
+        if constr === nothing
+            error("Duplicate constraint name detected: $(name)")
+        end
+        return constr
+    end
+    return nothing
 end
 
 function MOI.get(
@@ -1455,7 +1447,7 @@ function MOI.get(
 end
 
 function _rebuild_name_to_constraint_index(model::Optimizer)
-    model.name_to_constraint_index = Dict{String, Int}()
+    model.name_to_constraint_index = Dict{String, Union{Nothing, MOI.ConstraintIndex}}()
     _rebuild_name_to_constraint_index_util(
         model, model.affine_constraint_info, MOI.ScalarAffineFunction{Float64}
     )
@@ -1471,13 +1463,14 @@ end
 
 function _rebuild_name_to_constraint_index_util(model::Optimizer, dict, F)
     for (index, info) in dict
-        info.name == "" && continue
-        if haskey(model.name_to_constraint_index, info.name)
-            model.name_to_constraint_index = nothing
-            error("Duplicate constraint name detected: $(info.name)")
+        if info.name == ""
+            continue
+        elseif haskey(model.name_to_constraint_index, info.name)
+            model.name_to_constraint_index[info.name] = nothing
+        else
+            model.name_to_constraint_index[info.name] =
+                MOI.ConstraintIndex{F, typeof(info.set)}(index)
         end
-        model.name_to_constraint_index[info.name] =
-            MOI.ConstraintIndex{F, typeof(info.set)}(index)
     end
     return
 end
@@ -1496,13 +1489,14 @@ function _rebuild_name_to_constraint_index_variables(model::Optimizer)
             elseif info.type in _type_enums(S)
                 constraint_name = info.type_constraint_name
             end
-            constraint_name == "" && continue
-            if haskey(model.name_to_constraint_index, constraint_name)
-                model.name_to_constraint_index = nothing
-                error("Duplicate constraint name detected: ", constraint_name)
+            if constraint_name == ""
+                continue
+            elseif haskey(model.name_to_constraint_index, constraint_name)
+                model.name_to_constraint_index[constraint_name] = nothing
+            else
+                model.name_to_constraint_index[constraint_name] =
+                    MOI.ConstraintIndex{MOI.SingleVariable, S}(key.value)
             end
-            model.name_to_constraint_index[constraint_name] =
-                MOI.ConstraintIndex{MOI.SingleVariable, S}(key.value)
         end
     end
     return
@@ -1560,8 +1554,8 @@ function MOI.delete(
             info_2.row -= 1
         end
     end
-    model.name_to_constraint_index = nothing
     delete!(model.quadratic_constraint_info, c.value)
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -1619,21 +1613,10 @@ function MOI.set(
     name::String
 ) where {S}
     info = _info(model, c)
-    if !isempty(info.name) && model.name_to_constraint_index !== nothing
-        delete!(model.name_to_constraint_index, info.name)
-    end
-    _update_if_necessary(model)
+    info.name = name
     set_strattrelement!(model.inner, "QCName", info.row, name)
     _require_update(model)
-    info.name = name
-    if model.name_to_constraint_index === nothing || isempty(name)
-        return
-    end
-    if haskey(model.name_to_constraint_index, name)
-        model.name_to_constraint_index = nothing
-    else
-        model.name_to_constraint_index[c] = name
-    end
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -1695,6 +1678,7 @@ function MOI.delete(
         end
     end
     delete!(model.sos_constraint_info, c.value)
+    model.name_to_constraint_index = nothing
     return
 end
 
@@ -1710,18 +1694,8 @@ function MOI.set(
     c::MOI.ConstraintIndex{MOI.VectorOfVariables, <:Any}, name::String
 )
     info = _info(model, c)
-    if !isempty(info.name) && model.name_to_constraint_index !== nothing
-        delete!(model.name_to_constraint_index, info.name)
-    end
     info.name = name
-    if model.name_to_constraint_index === nothing || isempty(name)
-        return
-    end
-    if haskey(model.name_to_constraint_index, name)
-        model.name_to_constraint_index = nothing
-    else
-        model.name_to_constraint_index[name] = c
-    end
+    model.name_to_constraint_index = nothing
     return
 end
 
