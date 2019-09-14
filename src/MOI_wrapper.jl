@@ -1885,7 +1885,7 @@ function MOI.get(
     column = _info(model, c).column
     x = get_dblattrelement(model.inner, "X", column)
     ub = get_dblattrelement(model.inner, "UB", column)
-    if x ≈ ub
+    if isapprox(x, ub, atol = get_dbl_param(model.inner, "FeasibilityTol"))
         return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", column)
     else
         return 0.0
@@ -1896,11 +1896,11 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
-    info = _info(model, c)
-    x = get_dblattrelement(model.inner, "X", info.column)
-    lb = _get_variable_lower_bound(model, info)
-    if x ≈ lb
-        return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", info.column)
+    column = _info(model, c).column
+    x = get_dblattrelement(model.inner, "X", column)
+    lb = get_dblattrelement(model.inner, "LB", column)
+    if isapprox(x, lb, atol = get_dbl_param(model.inner, "FeasibilityTol"))
+        return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", column)
     else
         return 0.0
     end
