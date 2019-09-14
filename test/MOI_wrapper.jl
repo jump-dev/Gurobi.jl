@@ -46,7 +46,11 @@ end
 
 @testset "Conic tests" begin
     MOIT.lintest(OPTIMIZER, CONFIG)
-    MOIT.soctest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-3))
+    MOIT.soctest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-3), ["soc3"])
+    MOIT.soc3test(
+        OPTIMIZER,
+        MOIT.TestConfig(duals = false, infeas_certificates = false, atol = 1e-3)
+    )
     MOIT.rsoctest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-3))
     MOIT.geomeantest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-3))
 end
