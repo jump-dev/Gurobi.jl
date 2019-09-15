@@ -1614,6 +1614,7 @@ function MOI.set(
 ) where {S}
     info = _info(model, c)
     info.name = name
+    _update_if_necessary(model)
     set_strattrelement!(model.inner, "QCName", info.row, name)
     _require_update(model)
     model.name_to_constraint_index = nothing
