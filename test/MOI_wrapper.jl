@@ -3,13 +3,25 @@ const MOIT = MOI.Test
 
 const GUROBI_ENV = Gurobi.Env()
 const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
-    Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0), Float64
+    # Note: we set `DualReductions = 0` so that we never return
+    # `INFEASIBLE_OR_UNBOUNDED`.
+    Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, DualReductions=0), Float64
 )
 
 const CONFIG = MOIT.TestConfig()
 
 @testset "Unit Tests" begin
-    MOIT.basic_constraint_tests(OPTIMIZER, CONFIG)
+    MOIT.basic_constraint_tests(OPTIMIZER, CONFIG; exclude = [
+        (MOI.VectorOfVariables, MOI.GeometricMeanCone)
+    ])
+    # get(::ConstraintFunction) and get(::ConstraintSet) haven't been
+    # implemented for the geomean bridge in MOI.
+    MOIT.basic_constraint_tests(OPTIMIZER, CONFIG; include = [
+            (MOI.VectorOfVariables, MOI.GeometricMeanCone)
+        ],
+        get_constraint_function = false,
+        get_constraint_set = false
+    )
     MOIT.unittest(OPTIMIZER, MOIT.TestConfig(atol=1e-6))
     MOIT.modificationtest(OPTIMIZER, CONFIG)
 end
@@ -32,8 +44,15 @@ end
     ])
 end
 
-@testset "Linear Conic tests" begin
+@testset "Conic tests" begin
     MOIT.lintest(OPTIMIZER, CONFIG)
+    MOIT.soctest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-3), ["soc3"])
+    MOIT.soc3test(
+        OPTIMIZER,
+        MOIT.TestConfig(duals = false, infeas_certificates = false, atol = 1e-3)
+    )
+    MOIT.rsoctest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-3))
+    MOIT.geomeantest(OPTIMIZER, MOIT.TestConfig(duals = false, atol=1e-3))
 end
 
 @testset "Integer Linear tests" begin
@@ -683,4 +702,149 @@ c3: x in Integer()
         ArgumentError("Attribute NumStart is Integer but Float64 provided."),
         MOI.set(model, Gurobi.ModelAttribute("NumStart"), 4.0)
     )
+end
+
+@testset "SOC hide lower bound constraint" begin
+    model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+    @testset "No initial bound" begin
+        MOI.empty!(model)
+        t = MOI.add_variable(model)
+        x = MOI.add_variables(model, 2)
+        MOI.add_constraints(
+            model, MOI.SingleVariable.(x), MOI.GreaterThan.(3.0:4.0)
+        )
+        c_soc = MOI.add_constraint(
+            model, MOI.VectorOfVariables([t; x]), MOI.SecondOrderCone(3)
+        )
+        MOI.set(model, MOI.ObjectiveFunction{MOI.SingleVariable}(), MOI.SingleVariable(t))
+        MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
+        MOI.delete(model, c_soc)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.TerminationStatus()) == MOI.DUAL_INFEASIBLE
+    end
+    @testset "non-negative initial bound" begin
+        MOI.empty!(model)
+        t = MOI.add_variable(model)
+        x = MOI.add_variables(model, 2)
+        MOI.add_constraint(model, MOI.SingleVariable(t), MOI.GreaterThan(1.0))
+        MOI.add_constraints(
+            model, MOI.SingleVariable.(x), MOI.GreaterThan.(3.0:4.0)
+        )
+        c_soc = MOI.add_constraint(
+            model, MOI.VectorOfVariables([t; x]), MOI.SecondOrderCone(3)
+        )
+        MOI.set(model, MOI.ObjectiveFunction{MOI.SingleVariable}(), MOI.SingleVariable(t))
+        MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
+        MOI.delete(model, c_soc)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 1.0
+    end
+    @testset "negative initial bound" begin
+        MOI.empty!(model)
+        t = MOI.add_variable(model)
+        x = MOI.add_variables(model, 2)
+        MOI.add_constraint(model, MOI.SingleVariable(t), MOI.GreaterThan(-1.0))
+        MOI.add_constraints(
+            model, MOI.SingleVariable.(x), MOI.GreaterThan.(3.0:4.0)
+        )
+        c_soc = MOI.add_constraint(
+            model, MOI.VectorOfVariables([t; x]), MOI.SecondOrderCone(3)
+        )
+        MOI.optimize!(model)
+        MOI.set(model, MOI.ObjectiveFunction{MOI.SingleVariable}(), MOI.SingleVariable(t))
+        MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
+        MOI.delete(model, c_soc)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == -1.0
+    end
+    @testset "non-negative post bound" begin
+        MOI.empty!(model)
+        t = MOI.add_variable(model)
+        x = MOI.add_variables(model, 2)
+        MOI.add_constraints(
+            model, MOI.SingleVariable.(x), MOI.GreaterThan.(3.0:4.0)
+        )
+        MOI.add_constraint(
+            model, MOI.VectorOfVariables([t; x]), MOI.SecondOrderCone(3)
+        )
+        c_lb = MOI.add_constraint(model, MOI.SingleVariable(t), MOI.GreaterThan(6.0))
+        MOI.set(model, MOI.ObjectiveFunction{MOI.SingleVariable}(), MOI.SingleVariable(t))
+        MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 6.0
+        MOI.delete(model, c_lb)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
+    end
+    @testset "negative post bound" begin
+        MOI.empty!(model)
+        t = MOI.add_variable(model)
+        x = MOI.add_variables(model, 2)
+        MOI.add_constraints(
+            model, MOI.SingleVariable.(x), MOI.GreaterThan.(3.0:4.0)
+        )
+        c_soc = MOI.add_constraint(
+            model, MOI.VectorOfVariables([t; x]), MOI.SecondOrderCone(3)
+        )
+        MOI.add_constraint(model, MOI.SingleVariable(t), MOI.GreaterThan(-6.0))
+        MOI.set(model, MOI.ObjectiveFunction{MOI.SingleVariable}(), MOI.SingleVariable(t))
+        MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
+        MOI.delete(model, c_soc)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == -6.0
+    end
+    @testset "negative post bound II" begin
+        MOI.empty!(model)
+        t = MOI.add_variable(model)
+        x = MOI.add_variables(model, 2)
+        MOI.add_constraints(
+            model, MOI.SingleVariable.(x), MOI.GreaterThan.(3.0:4.0)
+        )
+        c_soc = MOI.add_constraint(
+            model, MOI.VectorOfVariables([t; x]), MOI.SecondOrderCone(3)
+        )
+        c_lb = MOI.add_constraint(model, MOI.SingleVariable(t), MOI.GreaterThan(-6.0))
+        MOI.set(model, MOI.ObjectiveFunction{MOI.SingleVariable}(), MOI.SingleVariable(t))
+        MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
+        MOI.delete(model, c_lb)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
+        MOI.delete(model, c_soc)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.TerminationStatus()) == MOI.DUAL_INFEASIBLE
+    end
+    @testset "2 SOC's" begin
+        MOI.empty!(model)
+        t = MOI.add_variable(model)
+        x = MOI.add_variables(model, 2)
+        MOI.add_constraint(model, MOI.SingleVariable(t), MOI.GreaterThan(-1.0))
+        MOI.add_constraints(
+            model, MOI.SingleVariable.(x), MOI.GreaterThan.([4.0, 3.0])
+        )
+        c_soc_1 = MOI.add_constraint(
+            model, MOI.VectorOfVariables([t, x[1]]), MOI.SecondOrderCone(2)
+        )
+        c_soc_2 = MOI.add_constraint(
+            model, MOI.VectorOfVariables([t, x[2]]), MOI.SecondOrderCone(2)
+        )
+        MOI.optimize!(model)
+        MOI.set(model, MOI.ObjectiveFunction{MOI.SingleVariable}(), MOI.SingleVariable(t))
+        MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 4.0
+        MOI.delete(model, c_soc_1)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 3.0
+        MOI.delete(model, c_soc_2)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == -1.0
+    end
 end
