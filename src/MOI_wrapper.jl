@@ -906,17 +906,17 @@ function _set_variable_lower_bound(model, info, value)
         set_dblattrelement!(model.inner, "LB", info.column, value)
         _require_update(model)
     elseif isnan(info.lower_bound_if_soc)
-        # Previously, we had a +ve lower bound (i.e., it was set in the case
-        # above). Now we're setting this with a -ve one, but there are still
-        # some SOC constraints, so we cache `value` and set the variable lower
-        # bound to `0.0`.
+        # Previously, we had a non-negative lower bound (i.e., it was set in the
+        # case above). Now we're setting this with a negative one, but there are
+        # still some SOC constraints, so we cache `value` and set the variable
+        # lower bound to `0.0`.
         @assert value < 0.0
         set_dblattrelement!(model.inner, "LB", info.column, 0.0)
         _require_update(model)
         info.lower_bound_if_soc = value
     else
-        # Previously, we had a -ve lower bound. We're setting this with another
-        # -ve one, but there are still some SOC constraints.
+        # Previously, we had a negative lower bound. We're setting this with
+        # another negative one, but there are still some SOC constraints.
         @assert info.lower_bound_if_soc < 0.0
         info.lower_bound_if_soc = value
     end

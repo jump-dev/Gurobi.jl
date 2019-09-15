@@ -724,7 +724,7 @@ end
         MOI.optimize!(model)
         @test MOI.get(model, MOI.TerminationStatus()) == MOI.DUAL_INFEASIBLE
     end
-    @testset "+ve initial bound" begin
+    @testset "non-negative initial bound" begin
         MOI.empty!(model)
         t = MOI.add_variable(model)
         x = MOI.add_variables(model, 2)
@@ -743,7 +743,7 @@ end
         MOI.optimize!(model)
         @test MOI.get(model, MOI.VariablePrimal(), t) == 1.0
     end
-    @testset "-ve initial bound" begin
+    @testset "negative initial bound" begin
         MOI.empty!(model)
         t = MOI.add_variable(model)
         x = MOI.add_variables(model, 2)
@@ -762,7 +762,7 @@ end
         MOI.optimize!(model)
         @test MOI.get(model, MOI.VariablePrimal(), t) == -1.0
     end
-    @testset "+ve post bound" begin
+    @testset "non-negative post bound" begin
         MOI.empty!(model)
         t = MOI.add_variable(model)
         x = MOI.add_variables(model, 2)
@@ -781,7 +781,7 @@ end
         MOI.optimize!(model)
         @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
     end
-    @testset "-ve post bound" begin
+    @testset "negative post bound" begin
         MOI.empty!(model)
         t = MOI.add_variable(model)
         x = MOI.add_variables(model, 2)
@@ -800,7 +800,7 @@ end
         MOI.optimize!(model)
         @test MOI.get(model, MOI.VariablePrimal(), t) == -6.0
     end
-    @testset "-ve post bound II" begin
+    @testset "negative post bound II" begin
         MOI.empty!(model)
         t = MOI.add_variable(model)
         x = MOI.add_variables(model, 2)
