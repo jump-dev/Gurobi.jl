@@ -848,3 +848,64 @@ end
         @test MOI.get(model, MOI.VariablePrimal(), t) == -1.0
     end
 end
+
+@testset "Duplicate names" begin
+    @testset "Variables" begin
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        (x, y, z) = MOI.add_variables(model, 3)
+        MOI.set(model, MOI.VariableName(), x, "x")
+        MOI.set(model, MOI.VariableName(), y, "x")
+        MOI.set(model, MOI.VariableName(), z, "z")
+        @test MOI.get(model, MOI.VariableIndex, "z") == z
+        @test_throws ErrorException MOI.get(model, MOI.VariableIndex, "x")
+        MOI.set(model, MOI.VariableName(), y, "y")
+        @test MOI.get(model, MOI.VariableIndex, "x") == x
+        @test MOI.get(model, MOI.VariableIndex, "y") == y
+        MOI.set(model, MOI.VariableName(), z, "x")
+        @test_throws ErrorException MOI.get(model, MOI.VariableIndex, "x")
+        MOI.delete(model, x)
+        @test MOI.get(model, MOI.VariableIndex, "x") == z
+    end
+    @testset "SingleVariable" begin
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        x = MOI.add_variables(model, 3)
+        c = MOI.add_constraints(model, MOI.SingleVariable.(x), MOI.GreaterThan(0.0))
+        MOI.set(model, MOI.ConstraintName(), c[1], "x")
+        MOI.set(model, MOI.ConstraintName(), c[2], "x")
+        MOI.set(model, MOI.ConstraintName(), c[3], "z")
+        @test MOI.get(model, MOI.ConstraintIndex, "z") == c[3]
+        @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "x")
+        MOI.set(model, MOI.ConstraintName(), c[2], "y")
+        @test MOI.get(model, MOI.ConstraintIndex, "x") == c[1]
+        @test MOI.get(model, MOI.ConstraintIndex, "y") == c[2]
+        MOI.set(model, MOI.ConstraintName(), c[3], "x")
+        @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "x")
+        MOI.delete(model, c[1])
+        @test MOI.get(model, MOI.ConstraintIndex, "x") == c[3]
+        MOI.set(model, MOI.ConstraintName(), c[2], "x")
+        @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "x")
+        MOI.delete(model, x[3])
+        @test MOI.get(model, MOI.ConstraintIndex, "x") == c[2]
+    end
+    @testset "ScalarAffineFunction" begin
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        x = MOI.add_variables(model, 3)
+        fs = [
+            MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, xi)], 0.0)
+            for xi in x
+        ]
+        c = MOI.add_constraints(model, fs, MOI.GreaterThan(0.0))
+        MOI.set(model, MOI.ConstraintName(), c[1], "x")
+        MOI.set(model, MOI.ConstraintName(), c[2], "x")
+        MOI.set(model, MOI.ConstraintName(), c[3], "z")
+        @test MOI.get(model, MOI.ConstraintIndex, "z") == c[3]
+        @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "x")
+        MOI.set(model, MOI.ConstraintName(), c[2], "y")
+        @test MOI.get(model, MOI.ConstraintIndex, "x") == c[1]
+        @test MOI.get(model, MOI.ConstraintIndex, "y") == c[2]
+        MOI.set(model, MOI.ConstraintName(), c[3], "x")
+        @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "x")
+        MOI.delete(model, c[1])
+        @test MOI.get(model, MOI.ConstraintIndex, "x") == c[3]
+    end
+end
