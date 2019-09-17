@@ -1882,8 +1882,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
-    column = _info(model, c).column
-    reduced_cost = get_dblattrelement(model.inner, "RC", column)
+    reduced_cost = get_dblattrelement(model.inner, "RC", _info(model, c).column)
     sense = MOI.get(model, MOI.ObjectiveSense())
     if sense == MOI.MIN_SENSE && reduced_cost < 0
         return reduced_cost
@@ -1899,8 +1898,7 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
-    column = _info(model, c).column
-    reduced_cost = get_dblattrelement(model.inner, "RC", column)
+    reduced_cost = get_dblattrelement(model.inner, "RC", _info(model, c).column)
     sense = MOI.get(model, MOI.ObjectiveSense())
     if sense == MOI.MIN_SENSE && reduced_cost > 0
         return reduced_cost
