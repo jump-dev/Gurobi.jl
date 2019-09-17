@@ -1884,12 +1884,20 @@ function MOI.get(
 )
     reduced_cost = get_dblattrelement(model.inner, "RC", _info(model, c).column)
     sense = MOI.get(model, MOI.ObjectiveSense())
+    # The following is a heuristic for determining whether the reduced cost
+    # applies to the lower or upper bound. It can be wrong by at most
+    # `FeasibilityTol`.
     if sense == MOI.MIN_SENSE && reduced_cost < 0
+        # If minimizing, the reduced cost must be negative (ignoring
+        # tolerances).
         return reduced_cost
     elseif sense == MOI.MAX_SENSE && reduced_cost > 0
+        # If minimizing, the reduced cost must be positive (ignoring
+        # tolerances). However, because of the MOI dual convention, we return a
+        # negative value.
         return -reduced_cost
     else
-        # There is probably a `x >= l` constraint with a non-zero reduced cost.
+        # The reduced cost, if non-zero, must related to the lower bound.
         return 0.0
     end
 end
@@ -1900,12 +1908,20 @@ function MOI.get(
 )
     reduced_cost = get_dblattrelement(model.inner, "RC", _info(model, c).column)
     sense = MOI.get(model, MOI.ObjectiveSense())
+    # The following is a heuristic for determining whether the reduced cost
+    # applies to the lower or upper bound. It can be wrong by at most
+    # `FeasibilityTol`.
     if sense == MOI.MIN_SENSE && reduced_cost > 0
+        # If minimizing, the reduced cost must be negative (ignoring
+        # tolerances).
         return reduced_cost
     elseif sense == MOI.MAX_SENSE && reduced_cost < 0
+        # If minimizing, the reduced cost must be positive (ignoring
+        # tolerances). However, because of the MOI dual convention, we return a
+        # negative value.
         return -reduced_cost
     else
-        # There is probably a `x <= u` constraint with a non-zero reduced cost.
+        # The reduced cost, if non-zero, must related to the lower bound.
         return 0.0
     end
 end
