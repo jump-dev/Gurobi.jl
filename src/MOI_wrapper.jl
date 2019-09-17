@@ -1883,11 +1883,14 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
     column = _info(model, c).column
-    x = get_dblattrelement(model.inner, "X", column)
-    ub = get_dblattrelement(model.inner, "UB", column)
-    if isapprox(x, ub, atol = get_dbl_param(model.inner, "FeasibilityTol"))
-        return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", column)
+    reduced_cost = get_dblattrelement(model.inner, "RC", column)
+    sense = MOI.get(model, MOI.ObjectiveSense())
+    if sense == MOI.MIN_SENSE && reduced_cost < 0
+        return reduced_cost
+    elseif sense == MOI.MAX_SENSE && reduced_cost > 0
+        return -reduced_cost
     else
+        # There is probably a `x >= l` constraint with a non-zero reduced cost.
         return 0.0
     end
 end
@@ -1897,11 +1900,14 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
     column = _info(model, c).column
-    x = get_dblattrelement(model.inner, "X", column)
-    lb = get_dblattrelement(model.inner, "LB", column)
-    if isapprox(x, lb, atol = get_dbl_param(model.inner, "FeasibilityTol"))
-        return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", column)
+    reduced_cost = get_dblattrelement(model.inner, "RC", column)
+    sense = MOI.get(model, MOI.ObjectiveSense())
+    if sense == MOI.MIN_SENSE && reduced_cost > 0
+        return reduced_cost
+    elseif sense == MOI.MAX_SENSE && reduced_cost < 0
+        return -reduced_cost
     else
+        # There is probably a `x <= u` constraint with a non-zero reduced cost.
         return 0.0
     end
 end
