@@ -1882,12 +1882,22 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
-    column = _info(model, c).column
-    x = get_dblattrelement(model.inner, "X", column)
-    ub = get_dblattrelement(model.inner, "UB", column)
-    if x ≈ ub
-        return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", column)
+    reduced_cost = get_dblattrelement(model.inner, "RC", _info(model, c).column)
+    sense = MOI.get(model, MOI.ObjectiveSense())
+    # The following is a heuristic for determining whether the reduced cost
+    # applies to the lower or upper bound. It can be wrong by at most
+    # `FeasibilityTol`.
+    if sense == MOI.MIN_SENSE && reduced_cost < 0
+        # If minimizing, the reduced cost must be negative (ignoring
+        # tolerances).
+        return reduced_cost
+    elseif sense == MOI.MAX_SENSE && reduced_cost > 0
+        # If minimizing, the reduced cost must be positive (ignoring
+        # tolerances). However, because of the MOI dual convention, we return a
+        # negative value.
+        return -reduced_cost
     else
+        # The reduced cost, if non-zero, must related to the lower bound.
         return 0.0
     end
 end
@@ -1896,12 +1906,22 @@ function MOI.get(
     model::Optimizer, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
-    info = _info(model, c)
-    x = get_dblattrelement(model.inner, "X", info.column)
-    lb = _get_variable_lower_bound(model, info)
-    if x ≈ lb
-        return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", info.column)
+    reduced_cost = get_dblattrelement(model.inner, "RC", _info(model, c).column)
+    sense = MOI.get(model, MOI.ObjectiveSense())
+    # The following is a heuristic for determining whether the reduced cost
+    # applies to the lower or upper bound. It can be wrong by at most
+    # `FeasibilityTol`.
+    if sense == MOI.MIN_SENSE && reduced_cost > 0
+        # If minimizing, the reduced cost must be negative (ignoring
+        # tolerances).
+        return reduced_cost
+    elseif sense == MOI.MAX_SENSE && reduced_cost < 0
+        # If minimizing, the reduced cost must be positive (ignoring
+        # tolerances). However, because of the MOI dual convention, we return a
+        # negative value.
+        return -reduced_cost
     else
+        # The reduced cost, if non-zero, must related to the lower bound.
         return 0.0
     end
 end
