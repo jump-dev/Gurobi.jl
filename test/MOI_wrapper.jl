@@ -105,6 +105,8 @@ end
         model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag = 0)
         x = MOI.add_variables(model, 2)
         @test MOI.supports(model, MOI.VariablePrimalStart(), MOI.VariableIndex)
+        @test MOI.get(model, MOI.VariablePrimalStart(), x[1]) === nothing
+        @test MOI.get(model, MOI.VariablePrimalStart(), x[2]) === nothing
         MOI.set(model, MOI.VariablePrimalStart(), x[1], 1.0)
         MOI.set(model, MOI.VariablePrimalStart(), x[2], nothing)
         @test MOI.get(model, MOI.VariablePrimalStart(), x[1]) == 1.0
