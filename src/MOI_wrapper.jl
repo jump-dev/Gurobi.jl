@@ -2009,17 +2009,17 @@ function MOI.set(
 )
     info = _info(model, x)
     info.start = value
-    if value !== nothing
-        set_dblattrelement!(model.inner, "Start", info.column, value)
-        _require_update(model)
-    end
+    grb_value = value !== nothing ? value : GRB_UNDEFINED
+    set_dblattrelement!(model.inner, "Start", info.column, grb_value)
+    _require_update(model)
     return
 end
 
 function MOI.get(
     model::Optimizer, ::MOI.VariablePrimalStart, x::MOI.VariableIndex
 )
-    return _info(model, x).start
+    grb_value = _info(model, x).start
+    return grb_value === GRB_UNDEFINED ? nothing : grb_value
 end
 
 function MOI.supports(
