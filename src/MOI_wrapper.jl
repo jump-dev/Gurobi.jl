@@ -2018,8 +2018,7 @@ end
 function MOI.get(
     model::Optimizer, ::MOI.VariablePrimalStart, x::MOI.VariableIndex
 )
-    grb_value = _info(model, x).start
-    return grb_value === GRB_UNDEFINED ? nothing : grb_value
+    return _info(model, x).start
 end
 
 function MOI.supports(

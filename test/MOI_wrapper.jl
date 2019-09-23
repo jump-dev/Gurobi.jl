@@ -107,10 +107,18 @@ end
         @test MOI.supports(model, MOI.VariablePrimalStart(), MOI.VariableIndex)
         @test MOI.get(model, MOI.VariablePrimalStart(), x[1]) === nothing
         @test MOI.get(model, MOI.VariablePrimalStart(), x[2]) === nothing
+        Gurobi._update_if_necessary(model)
+        @test Gurobi.get_dblattrelement(
+            model.inner, "Start", Gurobi._info(model, x[1]).column
+        ) == Gurobi.GRB_UNDEFINED
         MOI.set(model, MOI.VariablePrimalStart(), x[1], 1.0)
         MOI.set(model, MOI.VariablePrimalStart(), x[2], nothing)
         @test MOI.get(model, MOI.VariablePrimalStart(), x[1]) == 1.0
         @test MOI.get(model, MOI.VariablePrimalStart(), x[2]) === nothing
+        Gurobi._update_if_necessary(model)
+        @test Gurobi.get_dblattrelement(
+            model.inner, "Start", Gurobi._info(model, x[2]).column
+        ) == Gurobi.GRB_UNDEFINED
         MOI.optimize!(model)
         @test MOI.get(model, MOI.ObjectiveValue()) == 0.0
         # We don't support ConstraintDualStart or ConstraintPrimalStart yet.
