@@ -306,10 +306,11 @@ function MOI.get(model::Optimizer, ::MOI.ListOfVariableAttributesSet)
 end
 
 function MOI.get(model::Optimizer, ::MOI.ListOfModelAttributesSet)
-    attributes = [
-        MOI.ObjectiveSense(),
-        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
-    ]
+    attributes = Any[MOI.ObjectiveSense()]
+    typ = MOI.get(model, MOI.ObjectiveFunctionType())
+    if typ !== nothing
+        push!(attributes, MOI.ObjectiveFunction{typ}())
+    end
     if MOI.get(model, MOI.Name()) != ""
         push!(attributes, MOI.Name())
     end
@@ -510,6 +511,16 @@ end
 ### Objectives
 ###
 
+function _zero_objective(model::Optimizer)
+    num_vars = length(model.variable_info)
+    obj = zeros(Float64, num_vars)
+    _update_if_necessary(model)
+    delq!(model.inner)
+    set_dblattrarray!(model.inner, "Obj", 1, num_vars, obj)
+    set_dblattr!(model.inner, "ObjCon", 0.0)
+    _require_update(model)
+end
+
 function MOI.set(
     model::Optimizer, ::MOI.ObjectiveSense, sense::MOI.OptimizationSense
 )
@@ -520,6 +531,7 @@ function MOI.set(
         set_sense!(model.inner, :maximize)
         model.is_feasibility = false
     elseif sense == MOI.FEASIBILITY_SENSE
+        _zero_objective(model)
         set_sense!(model.inner, :minimize)
         model.is_feasibility = true
     else
@@ -2150,8 +2162,10 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraints)
 end
 
 function MOI.get(model::Optimizer, ::MOI.ObjectiveFunctionType)
-    if model.objective_type == SINGLE_VARIABLE
-        return MOI.SINGLE_VARIABLE
+    if model.is_feasibility
+        return nothing
+    elseif model.objective_type == SINGLE_VARIABLE
+        return MOI.SingleVariable
     elseif model.objective_type == SCALAR_AFFINE
         return MOI.ScalarAffineFunction{Float64}
     else
