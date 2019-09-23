@@ -1,5 +1,8 @@
 # Common stuff
 
+# Floating point constant for GRB.UNDEFINED.
+const GRB_UNDEFINED = 1e101
+
 ## convenient types and type conversion functions
 
 const GChars          = Union{Cchar, Char}
