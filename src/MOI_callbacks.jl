@@ -15,7 +15,11 @@ struct CallbackFunction <: MOI.AbstractOptimizerAttribute end
 
 function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
     model.has_generic_callback = true
-    set_callback_func!(model.inner, f)
+    set_callback_func!(model.inner, (cb_data, cb_where) -> begin
+        model.callback_state = CB_GENERIC
+        f(cb_data, cb_where)
+        model.callback_state = CB_NONE
+    end)
     update_model!(model.inner)
     return
 end
@@ -53,6 +57,7 @@ function default_moi_callback(model::Optimizer)
         if cb_where == CB_MIPSOL
             cbget_mipsol_sol(model, cb_data, cb_where)
             if model.lazy_callback !== nothing
+                model.callback_state = CB_LAZY
                 model.lazy_callback(cb_data)
             end
         elseif cb_where == CB_MIPNODE
@@ -61,15 +66,19 @@ function default_moi_callback(model::Optimizer)
             end
             cbget_mipsol_rel(model, cb_data, cb_where)
             if model.lazy_callback !== nothing
+                model.callback_state = CB_LAZY
                 model.lazy_callback(cb_data)
             end
             if model.user_cut_callback !== nothing
+                model.callback_state = CB_USER_CUT
                 model.user_cut_callback(cb_data)
             end
             if model.heuristic_callback !== nothing
+                model.callback_state = CB_HEURISTIC
                 model.heuristic_callback(cb_data)
             end
         end
+        model.callback_state = CB_NONE
     end
 end
 
@@ -96,6 +105,9 @@ function MOI.submit(
     f::MOI.ScalarAffineFunction{Float64},
     s::Union{MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, MOI.EqualTo{Float64}}
 )
+    if model.callback_state != CB_LAZY && model.callback_state != CB_GENERIC
+        error("`MOI.LazyConstraint` can only be called from LazyConstraintCallback.")
+    end
     indices, coefficients = _indices_and_coefficients(model, f)
     sense, rhs = _sense_and_rhs(s)
     return cblazy(cb.callback_data, Cint.(indices), coefficients, Char(sense), rhs)
@@ -116,6 +128,9 @@ function MOI.submit(
     f::MOI.ScalarAffineFunction{Float64},
     s::Union{MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, MOI.EqualTo{Float64}}
 )
+    if model.callback_state != CB_USER_CUT && model.callback_state != CB_GENERIC
+        error("`MOI.UserCut` can only be called from UserCutCallback.")
+    end
     indices, coefficients = _indices_and_coefficients(model, f)
     sense, rhs = _sense_and_rhs(s)
     return cbcut(cb.callback_data, Cint.(indices), coefficients, Char(sense), rhs)
@@ -136,6 +151,9 @@ function MOI.submit(
     variables::Vector{MOI.VariableIndex},
     values::MOI.Vector{Float64}
 )
+    if model.callback_state != CB_HEURISTIC && model.callback_state != CB_GENERIC
+        error("`MOI.HeuristicSolution` can only be called from HeuristicCallback.")
+    end
     solution = fill(GRB_UNDEFINED, MOI.get(model, MOI.NumberOfVariables()))
     for (var, value) in zip(variables, values)
         solution[_info(model, var).column] = value

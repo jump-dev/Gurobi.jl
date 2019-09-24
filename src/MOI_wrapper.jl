@@ -6,6 +6,7 @@ const CleverDicts = MOI.Utilities.CleverDicts
 @enum(VariableType, CONTINUOUS, BINARY, INTEGER, SEMIINTEGER, SEMICONTINUOUS)
 @enum(BoundType, NONE, LESS_THAN, GREATER_THAN, LESS_AND_GREATER_THAN, INTERVAL, EQUAL_TO)
 @enum(ObjectiveType, SINGLE_VARIABLE, SCALAR_AFFINE, SCALAR_QUADRATIC)
+@enum(CallbackState, CB_NONE, CB_GENERIC, CB_LAZY, CB_USER_CUT, CB_HEURISTIC)
 
 const SCALAR_SETS = Union{
     MOI.GreaterThan{Float64}, MOI.LessThan{Float64},
@@ -103,8 +104,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
 
     # Callback fields.
     callback_variable_primal::Vector{Float64}
-    optimize_in_progress::Bool
     has_generic_callback::Bool
+    callback_state::CallbackState
     lazy_callback::Union{Nothing, Function}
     user_cut_callback::Union{Nothing, Function}
     heuristic_callback::Union{Nothing, Function}
@@ -178,7 +179,7 @@ function MOI.empty!(model::Optimizer)
     model.has_unbounded_ray = false
     model.has_infeasibility_cert = false
     empty!(model.callback_variable_primal)
-    model.optimize_in_progress = false
+    model.callback_state = CB_NONE
     model.has_generic_callback = false
     model.lazy_callback = nothing
     model.user_cut_callback = nothing
@@ -199,7 +200,7 @@ function MOI.is_empty(model::Optimizer)
     model.has_unbounded_ray && return false
     model.has_infeasibility_cert && return false
     length(model.callback_variable_primal) != 0 && return false
-    model.optimize_in_progress && return false
+    model.callback_state != CB_NONE && return false
     model.has_generic_callback && return false
     model.lazy_callback !== nothing && return false
     model.user_cut_callback !== nothing && return false
@@ -1773,11 +1774,7 @@ function MOI.optimize!(model::Optimizer)
         model.has_generic_callback = false
     end
 
-    # The actual call to optimize, setting optimize_in_progress for the
-    # callbacks.
-    model.optimize_in_progress = true
     optimize(model.inner)
-    model.optimize_in_progress = false
 
     # Post-optimize caching to speed up the checks in VariablePrimal and
     # ConstraintDual.
@@ -1790,7 +1787,7 @@ function MOI.optimize!(model::Optimizer)
 end
 
 function _throw_if_optimize_in_progress(model, attr)
-    if model.optimize_in_progress
+    if model.callback_state != CB_NONE
         throw(MOI.OptimizeInProgress(attr))
     end
 end
