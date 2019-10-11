@@ -20,7 +20,7 @@ end
 
 const ALIASES = [
     "gurobi81", "gurobi80",
-    "gurobi75", "gurobi70"
+    "gurobi75", "gurobi70", "gurobi90"
 ]
 
 paths_to_try = copy(ALIASES)

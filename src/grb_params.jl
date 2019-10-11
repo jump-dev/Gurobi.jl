@@ -94,7 +94,8 @@ const GRB_INT_PARAMS =[
     "MultiObjMethod",
     "MultiObjPre",
     "PoolSolutions",
-    "PoolSearchMode"]
+    "PoolSearchMode",
+    "NonConvex"]
 
 # This list was obtained through AWK (with Gurobi 5.6)
 # command:
