@@ -2063,7 +2063,7 @@ end
 
 function MOI.get(model::Optimizer, attr::MOI.SimplexIterations)
     _throw_if_optimize_in_progress(model, attr)
-    return get_intattr(model.inner, "IterCount")
+    return get_dblattr(model.inner, "IterCount")
 end
 
 function MOI.get(model::Optimizer, attr::MOI.BarrierIterations)
@@ -2073,7 +2073,7 @@ end
 
 function MOI.get(model::Optimizer, attr::MOI.NodeCount)
     _throw_if_optimize_in_progress(model, attr)
-    return get_intattr(model.inner, "NodeCount")
+    return get_dblattr(model.inner, "NodeCount")
 end
 
 function MOI.get(model::Optimizer, attr::MOI.RelativeGap)
