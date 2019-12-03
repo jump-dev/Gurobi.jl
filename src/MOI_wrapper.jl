@@ -463,6 +463,9 @@ end
 function MOI.delete(model::Optimizer, v::MOI.VariableIndex)
     _update_if_necessary(model)
     info = _info(model, v)
+    if info.num_soc_constraints > 0
+        throw(MOI.DeleteNotAllowed(v))
+    end
     del_vars!(model.inner, Cint[info.column])
     _require_update(model)
     delete!(model.variable_info, v)
@@ -1672,11 +1675,11 @@ function MOI.is_valid(
     c::MOI.ConstraintIndex{MOI.VectorOfVariables, S}
 ) where {S}
     info = get(model.sos_constraint_info, c.value, nothing)
-    if info === nothing
+    if info === nothing || typeof(info.set) != S
         return false
-    else
-        return typeof(info.set) == S
     end
+    f = MOI.get(model, MOI.ConstraintFunction(), c)
+    return all(MOI.is_valid.(model, f.variables))
 end
 
 function MOI.add_constraint(
@@ -1832,6 +1835,9 @@ end
 
 function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
     _throw_if_optimize_in_progress(model, attr)
+    if attr.N != 1
+        return MOI.NO_SOLUTION
+    end
     stat = get_status(model.inner)
     if stat == :optimal
         return MOI.FEASIBLE_POINT
@@ -1864,6 +1870,9 @@ end
 
 function MOI.get(model::Optimizer, attr::MOI.DualStatus)
     _throw_if_optimize_in_progress(model, attr)
+    if attr.N != 1
+        return MOI.NO_SOLUTION
+    end
     stat = get_status(model.inner)
     if is_mip(model.inner)
         return MOI.NO_SOLUTION
@@ -1898,6 +1907,7 @@ end
 
 function MOI.get(model::Optimizer, attr::MOI.VariablePrimal, x::MOI.VariableIndex)
     _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     if model.has_unbounded_ray
         return get_dblattrelement(model.inner, "UnbdRay", _info(model, x).column)
     else
@@ -1910,6 +1920,7 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any}
 )
     _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     return MOI.get(model, MOI.VariablePrimal(), MOI.VariableIndex(c.value))
 end
 
@@ -1918,6 +1929,7 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}
 )
     _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     row = _info(model, c).row
     _update_if_necessary(model)
     rhs = get_dblattrelement(model.inner, "RHS", row)
@@ -1930,6 +1942,7 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, <:Any}
 )
     _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     row = _info(model, c).row
     _update_if_necessary(model)
     rhs = get_dblattrelement(model.inner, "QCRHS", row)
@@ -1946,6 +1959,7 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
     _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     reduced_cost = get_dblattrelement(model.inner, "RC", _info(model, c).column)
     sense = MOI.get(model, MOI.ObjectiveSense())
     # The following is a heuristic for determining whether the reduced cost
@@ -1971,6 +1985,7 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
     _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     reduced_cost = get_dblattrelement(model.inner, "RC", _info(model, c).column)
     sense = MOI.get(model, MOI.ObjectiveSense())
     # The following is a heuristic for determining whether the reduced cost
@@ -1996,6 +2011,7 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
 )
     _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", _info(model, c).column)
 end
 
@@ -2004,6 +2020,7 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
 )
     _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", _info(model, c).column)
 end
 
@@ -2012,6 +2029,7 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}
 )
     _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
         return -_dual_multiplier(model) * get_dblattrelement(model.inner, "FarkasDual", _info(model, c).row)
     end
@@ -2023,11 +2041,13 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, <:Any}
 )
     _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     return _dual_multiplier(model) * get_dblattrelement(model.inner, "QCPi", _info(model, c).row)
 end
 
 function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
     _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     return get_dblattr(model.inner, "ObjVal")
 end
 
@@ -2063,6 +2083,7 @@ end
 
 function MOI.get(model::Optimizer, attr::MOI.DualObjectiveValue)
     _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     return get_dblattr(model.inner, "ObjBound")
 end
 

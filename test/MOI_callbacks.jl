@@ -108,7 +108,9 @@ end
     end
     @testset "UserCut" begin
         model, x, y = callback_simple_model()
+        cb = nothing
         MOI.set(model, MOI.LazyConstraintCallback(), cb_data -> begin
+            cb = cb_data
             MOI.submit(
                 model,
                 MOI.UserCut(cb_data),
@@ -117,15 +119,18 @@ end
             )
         end)
         @test_throws(
-            ErrorException(
-                "`MOI.UserCut` can only be called from UserCutCallback."
+            MOI.InvalidCallbackUsage(
+                MOI.LazyConstraintCallback(),
+                MOI.UserCut(cb)
             ),
             MOI.optimize!(model)
         )
     end
     @testset "HeuristicSolution" begin
         model, x, y = callback_simple_model()
+        cb = nothing
         MOI.set(model, MOI.LazyConstraintCallback(), cb_data -> begin
+            cb = cb_data
             MOI.submit(
                 model,
                 MOI.HeuristicSolution(cb_data),
@@ -134,8 +139,9 @@ end
             )
         end)
         @test_throws(
-            ErrorException(
-                "`MOI.HeuristicSolution` can only be called from HeuristicCallback."
+            MOI.InvalidCallbackUsage(
+                MOI.LazyConstraintCallback(),
+                MOI.HeuristicSolution(cb)
             ),
             MOI.optimize!(model)
         )
@@ -170,7 +176,9 @@ end
     end
     @testset "LazyConstraint" begin
         model, x, item_weights = callback_knapsack_model()
+        cb = nothing
         MOI.set(model, MOI.UserCutCallback(), cb_data -> begin
+            cb = cb_data
             MOI.submit(
                 model,
                 MOI.LazyConstraint(cb_data),
@@ -179,15 +187,18 @@ end
             )
         end)
         @test_throws(
-            ErrorException(
-                "`MOI.LazyConstraint` can only be called from LazyConstraintCallback."
+            MOI.InvalidCallbackUsage(
+                MOI.UserCutCallback(),
+                MOI.LazyConstraint(cb)
             ),
             MOI.optimize!(model)
         )
     end
     @testset "HeuristicSolution" begin
         model, x, item_weights = callback_knapsack_model()
+        cb = nothing
         MOI.set(model, MOI.UserCutCallback(), cb_data -> begin
+            cb = cb_data
             MOI.submit(
                 model,
                 MOI.HeuristicSolution(cb_data),
@@ -196,8 +207,9 @@ end
             )
         end)
         @test_throws(
-            ErrorException(
-                "`MOI.HeuristicSolution` can only be called from HeuristicCallback."
+            MOI.InvalidCallbackUsage(
+                MOI.UserCutCallback(),
+                MOI.HeuristicSolution(cb)
             ),
             MOI.optimize!(model)
         )
@@ -234,7 +246,9 @@ end
     end
     @testset "LazyConstraint" begin
         model, x, item_weights = callback_knapsack_model()
+        cb = nothing
         MOI.set(model, MOI.HeuristicCallback(), cb_data -> begin
+            cb = cb_data
             MOI.submit(
                 model,
                 MOI.LazyConstraint(cb_data),
@@ -243,15 +257,18 @@ end
             )
         end)
         @test_throws(
-            ErrorException(
-                "`MOI.LazyConstraint` can only be called from LazyConstraintCallback."
+            MOI.InvalidCallbackUsage(
+                MOI.HeuristicCallback(),
+                MOI.LazyConstraint(cb)
             ),
             MOI.optimize!(model)
         )
     end
     @testset "UserCut" begin
         model, x, item_weights = callback_knapsack_model()
+        cb = nothing
         MOI.set(model, MOI.HeuristicCallback(), cb_data -> begin
+            cb = cb_data
             MOI.submit(
                 model,
                 MOI.UserCut(cb_data),
@@ -260,8 +277,9 @@ end
             )
         end)
         @test_throws(
-            ErrorException(
-                "`MOI.UserCut` can only be called from UserCutCallback."
+            MOI.InvalidCallbackUsage(
+                MOI.HeuristicCallback(),
+                MOI.UserCut(cb)
             ),
             MOI.optimize!(model)
         )

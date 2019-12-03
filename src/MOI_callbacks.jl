@@ -105,8 +105,12 @@ function MOI.submit(
     f::MOI.ScalarAffineFunction{Float64},
     s::Union{MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, MOI.EqualTo{Float64}}
 )
-    if model.callback_state != CB_LAZY && model.callback_state != CB_GENERIC
-        error("`MOI.LazyConstraint` can only be called from LazyConstraintCallback.")
+    if model.callback_state == CB_USER_CUT
+        throw(MOI.InvalidCallbackUsage(MOI.UserCutCallback(), cb))
+    elseif model.callback_state == CB_HEURISTIC
+        throw(MOI.InvalidCallbackUsage(MOI.HeuristicCallback(), cb))
+    elseif !iszero(f.constant)
+        throw(MOI.ScalarFunctionConstantNotZero{Float64, typeof(f), typeof(s)}(f.constant))
     end
     indices, coefficients = _indices_and_coefficients(model, f)
     sense, rhs = _sense_and_rhs(s)
@@ -128,8 +132,12 @@ function MOI.submit(
     f::MOI.ScalarAffineFunction{Float64},
     s::Union{MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, MOI.EqualTo{Float64}}
 )
-    if model.callback_state != CB_USER_CUT && model.callback_state != CB_GENERIC
-        error("`MOI.UserCut` can only be called from UserCutCallback.")
+    if model.callback_state == CB_LAZY
+        throw(MOI.InvalidCallbackUsage(MOI.LazyConstraintCallback(), cb))
+    elseif model.callback_state == CB_HEURISTIC
+        throw(MOI.InvalidCallbackUsage(MOI.HeuristicCallback(), cb))
+    elseif !iszero(f.constant)
+        throw(MOI.ScalarFunctionConstantNotZero{Float64, typeof(f), typeof(s)}(f.constant))
     end
     indices, coefficients = _indices_and_coefficients(model, f)
     sense, rhs = _sense_and_rhs(s)
@@ -151,8 +159,10 @@ function MOI.submit(
     variables::Vector{MOI.VariableIndex},
     values::MOI.Vector{Float64}
 )
-    if model.callback_state != CB_HEURISTIC && model.callback_state != CB_GENERIC
-        error("`MOI.HeuristicSolution` can only be called from HeuristicCallback.")
+    if model.callback_state == CB_LAZY
+        throw(MOI.InvalidCallbackUsage(MOI.LazyConstraintCallback(), cb))
+    elseif model.callback_state == CB_USER_CUT
+        throw(MOI.InvalidCallbackUsage(MOI.UserCutCallback(), cb))
     end
     solution = fill(GRB_UNDEFINED, MOI.get(model, MOI.NumberOfVariables()))
     for (var, value) in zip(variables, values)
