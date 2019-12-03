@@ -1,7 +1,7 @@
 name = "Gurobi"
 uuid = "2e9cd046-0924-5485-92f1-d5272153d98b"
 repo = "https://github.com/JuliaOpt/Gurobi.jl"
-version = "0.7.3"
+version = "0.7.4"
 
 [deps]
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -11,6 +11,7 @@ MathProgBase = "fdba3010-5040-5b88-9595-932c9decdf73"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
+Compat = "2"
 MathOptInterface = "~0.9.7"
 MathProgBase = "~0.5.0, ~0.6, ~0.7"
 julia = "1"
