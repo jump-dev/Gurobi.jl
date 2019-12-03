@@ -6,6 +6,7 @@ const CleverDicts = MOI.Utilities.CleverDicts
 @enum(VariableType, CONTINUOUS, BINARY, INTEGER, SEMIINTEGER, SEMICONTINUOUS)
 @enum(BoundType, NONE, LESS_THAN, GREATER_THAN, LESS_AND_GREATER_THAN, INTERVAL, EQUAL_TO)
 @enum(ObjectiveType, SINGLE_VARIABLE, SCALAR_AFFINE, SCALAR_QUADRATIC)
+@enum(CallbackState, CB_NONE, CB_GENERIC, CB_LAZY, CB_USER_CUT, CB_HEURISTIC)
 
 const SCALAR_SETS = Union{
     MOI.GreaterThan{Float64}, MOI.LessThan{Float64},
@@ -101,8 +102,13 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     has_unbounded_ray::Bool
     has_infeasibility_cert::Bool
 
-    # A helper cache for calling CallbackVariablePrimal.
+    # Callback fields.
     callback_variable_primal::Vector{Float64}
+    has_generic_callback::Bool
+    callback_state::CallbackState
+    lazy_callback::Union{Nothing, Function}
+    user_cut_callback::Union{Nothing, Function}
+    heuristic_callback::Union{Nothing, Function}
 
     """
         Optimizer(env = nothing; kwargs...)
@@ -128,7 +134,6 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         model.affine_constraint_info = Dict{Int, ConstraintInfo}()
         model.quadratic_constraint_info = Dict{Int, ConstraintInfo}()
         model.sos_constraint_info = Dict{Int, ConstraintInfo}()
-        model.last_constraint_index = 0
         model.callback_variable_primal = Float64[]
         MOI.empty!(model)  # MOI.empty!(model) re-sets the `.inner` field.
         for (name, value) in kwargs
@@ -174,6 +179,11 @@ function MOI.empty!(model::Optimizer)
     model.has_unbounded_ray = false
     model.has_infeasibility_cert = false
     empty!(model.callback_variable_primal)
+    model.callback_state = CB_NONE
+    model.has_generic_callback = false
+    model.lazy_callback = nothing
+    model.user_cut_callback = nothing
+    model.heuristic_callback = nothing
     return
 end
 
@@ -190,6 +200,11 @@ function MOI.is_empty(model::Optimizer)
     model.has_unbounded_ray && return false
     model.has_infeasibility_cert && return false
     length(model.callback_variable_primal) != 0 && return false
+    model.callback_state != CB_NONE && return false
+    model.has_generic_callback && return false
+    model.lazy_callback !== nothing && return false
+    model.user_cut_callback !== nothing && return false
+    model.heuristic_callback !== nothing && return false
     return true
 end
 
@@ -448,6 +463,9 @@ end
 function MOI.delete(model::Optimizer, v::MOI.VariableIndex)
     _update_if_necessary(model)
     info = _info(model, v)
+    if info.num_soc_constraints > 0
+        throw(MOI.DeleteNotAllowed(v))
+    end
     del_vars!(model.inner, Cint[info.column])
     _require_update(model)
     delete!(model.variable_info, v)
@@ -1657,11 +1675,11 @@ function MOI.is_valid(
     c::MOI.ConstraintIndex{MOI.VectorOfVariables, S}
 ) where {S}
     info = get(model.sos_constraint_info, c.value, nothing)
-    if info === nothing
+    if info === nothing || typeof(info.set) != S
         return false
-    else
-        return typeof(info.set) == S
     end
+    f = MOI.get(model, MOI.ConstraintFunction(), c)
+    return all(MOI.is_valid.(model, f.variables))
 end
 
 function MOI.add_constraint(
@@ -1737,16 +1755,44 @@ end
 ### Optimize methods.
 ###
 
+function check_moi_callback_validity(model::Optimizer)
+    has_moi_callback =
+        model.lazy_callback !== nothing ||
+        model.user_cut_callback !== nothing ||
+        model.heuristic_callback !== nothing
+    if has_moi_callback && model.has_generic_callback
+        error("Cannot use Gurobi.CallbackFunction as well as MOI.AbstractCallbackFunction")
+    end
+    return has_moi_callback
+end
+
 function MOI.optimize!(model::Optimizer)
     # Note: although Gurobi will call update regardless, we do it now so that
     # the appropriate `needs_update` flag is set.
     _update_if_necessary(model)
+
+    # Initialize callbacks if necessary.
+    if check_moi_callback_validity(model)
+        MOI.set(model, CallbackFunction(), default_moi_callback(model))
+        model.has_generic_callback = false
+    end
+
     optimize(model.inner)
+
+    # Post-optimize caching to speed up the checks in VariablePrimal and
+    # ConstraintDual.
     model.has_infeasibility_cert =
-    MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
+        MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
     model.has_unbounded_ray =
         MOI.get(model, MOI.PrimalStatus()) == MOI.INFEASIBILITY_CERTIFICATE
+
     return
+end
+
+function _throw_if_optimize_in_progress(model, attr)
+    if model.callback_state != CB_NONE
+        throw(MOI.OptimizeInProgress(attr))
+    end
 end
 
 # These strings are taken directly from the following page of the online Gurobi
@@ -1769,7 +1815,8 @@ const RAW_STATUS_STRINGS = [
     (MOI.OBJECTIVE_LIMIT, "User specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached.")
 ]
 
-function MOI.get(model::Optimizer, ::MOI.RawStatusString)
+function MOI.get(model::Optimizer, attr::MOI.RawStatusString)
+    _throw_if_optimize_in_progress(model, attr)
     status_code = get_status_code(model.inner)
     if 1 <= status_code <= length(RAW_STATUS_STRINGS)
         return RAW_STATUS_STRINGS[status_code][2]
@@ -1777,7 +1824,8 @@ function MOI.get(model::Optimizer, ::MOI.RawStatusString)
     return MOI.OTHER_ERROR
 end
 
-function MOI.get(model::Optimizer, ::MOI.TerminationStatus)
+function MOI.get(model::Optimizer, attr::MOI.TerminationStatus)
+    _throw_if_optimize_in_progress(model, attr)
     status_code = get_status_code(model.inner)
     if 1 <= status_code <= length(RAW_STATUS_STRINGS)
         return RAW_STATUS_STRINGS[status_code][1]
@@ -1785,7 +1833,11 @@ function MOI.get(model::Optimizer, ::MOI.TerminationStatus)
     return MOI.OTHER_ERROR
 end
 
-function MOI.get(model::Optimizer, ::MOI.PrimalStatus)
+function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
+    _throw_if_optimize_in_progress(model, attr)
+    if attr.N != 1
+        return MOI.NO_SOLUTION
+    end
     stat = get_status(model.inner)
     if stat == :optimal
         return MOI.FEASIBLE_POINT
@@ -1816,7 +1868,11 @@ function _has_dual_ray(model::Optimizer)
     end
 end
 
-function MOI.get(model::Optimizer, ::MOI.DualStatus)
+function MOI.get(model::Optimizer, attr::MOI.DualStatus)
+    _throw_if_optimize_in_progress(model, attr)
+    if attr.N != 1
+        return MOI.NO_SOLUTION
+    end
     stat = get_status(model.inner)
     if is_mip(model.inner)
         return MOI.NO_SOLUTION
@@ -1849,7 +1905,9 @@ function _has_primal_ray(model::Optimizer)
     end
 end
 
-function MOI.get(model::Optimizer, ::MOI.VariablePrimal, x::MOI.VariableIndex)
+function MOI.get(model::Optimizer, attr::MOI.VariablePrimal, x::MOI.VariableIndex)
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     if model.has_unbounded_ray
         return get_dblattrelement(model.inner, "UnbdRay", _info(model, x).column)
     else
@@ -1858,16 +1916,20 @@ function MOI.get(model::Optimizer, ::MOI.VariablePrimal, x::MOI.VariableIndex)
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintPrimal,
+    model::Optimizer, attr::MOI.ConstraintPrimal,
     c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any}
 )
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     return MOI.get(model, MOI.VariablePrimal(), MOI.VariableIndex(c.value))
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintPrimal,
+    model::Optimizer, attr::MOI.ConstraintPrimal,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}
 )
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     row = _info(model, c).row
     _update_if_necessary(model)
     rhs = get_dblattrelement(model.inner, "RHS", row)
@@ -1876,9 +1938,11 @@ function MOI.get(
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintPrimal,
+    model::Optimizer, attr::MOI.ConstraintPrimal,
     c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, <:Any}
 )
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     row = _info(model, c).row
     _update_if_necessary(model)
     rhs = get_dblattrelement(model.inner, "QCRHS", row)
@@ -1891,9 +1955,11 @@ function _dual_multiplier(model::Optimizer)
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintDual,
+    model::Optimizer, attr::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     reduced_cost = get_dblattrelement(model.inner, "RC", _info(model, c).column)
     sense = MOI.get(model, MOI.ObjectiveSense())
     # The following is a heuristic for determining whether the reduced cost
@@ -1915,9 +1981,11 @@ function MOI.get(
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintDual,
+    model::Optimizer, attr::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     reduced_cost = get_dblattrelement(model.inner, "RC", _info(model, c).column)
     sense = MOI.get(model, MOI.ObjectiveSense())
     # The following is a heuristic for determining whether the reduced cost
@@ -1939,23 +2007,29 @@ function MOI.get(
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintDual,
+    model::Optimizer, attr::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
 )
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", _info(model, c).column)
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintDual,
+    model::Optimizer, attr::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
 )
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", _info(model, c).column)
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintDual,
+    model::Optimizer, attr::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}
 )
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
         return -_dual_multiplier(model) * get_dblattrelement(model.inner, "FarkasDual", _info(model, c).row)
     end
@@ -1963,23 +2037,58 @@ function MOI.get(
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintDual,
+    model::Optimizer, attr::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, <:Any}
 )
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
     return _dual_multiplier(model) * get_dblattrelement(model.inner, "QCPi", _info(model, c).row)
 end
 
-MOI.get(model::Optimizer, ::MOI.ObjectiveValue) = get_dblattr(model.inner, "ObjVal")
-MOI.get(model::Optimizer, ::MOI.ObjectiveBound) = get_dblattr(model.inner, "ObjBound")
-MOI.get(model::Optimizer, ::MOI.SolveTime) = get_dblattr(model.inner, "RunTime")
-MOI.get(model::Optimizer, ::MOI.SimplexIterations) = get_intattr(model.inner, "IterCount")
-MOI.get(model::Optimizer, ::MOI.BarrierIterations) = get_intattr(model.inner, "BarIterCount")
-MOI.get(model::Optimizer, ::MOI.NodeCount) = get_intattr(model.inner, "NodeCount")
-MOI.get(model::Optimizer, ::MOI.RelativeGap) = get_dblattr(model.inner, "MIPGap")
+function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
+    return get_dblattr(model.inner, "ObjVal")
+end
 
-MOI.get(model::Optimizer, ::MOI.DualObjectiveValue) = get_dblattr(model.inner, "ObjBound")
+function MOI.get(model::Optimizer, attr::MOI.ObjectiveBound)
+    _throw_if_optimize_in_progress(model, attr)
+    return get_dblattr(model.inner, "ObjBound")
+end
 
-function MOI.get(model::Optimizer, ::MOI.ResultCount)
+function MOI.get(model::Optimizer, attr::MOI.SolveTime)
+    _throw_if_optimize_in_progress(model, attr)
+    return get_dblattr(model.inner, "RunTime")
+end
+
+function MOI.get(model::Optimizer, attr::MOI.SimplexIterations)
+    _throw_if_optimize_in_progress(model, attr)
+    return get_intattr(model.inner, "IterCount")
+end
+
+function MOI.get(model::Optimizer, attr::MOI.BarrierIterations)
+    _throw_if_optimize_in_progress(model, attr)
+    return get_intattr(model.inner, "BarIterCount")
+end
+
+function MOI.get(model::Optimizer, attr::MOI.NodeCount)
+    _throw_if_optimize_in_progress(model, attr)
+    return get_intattr(model.inner, "NodeCount")
+end
+
+function MOI.get(model::Optimizer, attr::MOI.RelativeGap)
+    _throw_if_optimize_in_progress(model, attr)
+    return get_dblattr(model.inner, "MIPGap")
+end
+
+function MOI.get(model::Optimizer, attr::MOI.DualObjectiveValue)
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
+    return get_dblattr(model.inner, "ObjBound")
+end
+
+function MOI.get(model::Optimizer, attr::MOI.ResultCount)
+    _throw_if_optimize_in_progress(model, attr)
     if model.has_infeasibility_cert || model.has_unbounded_ray
         return 1
     end
@@ -2361,58 +2470,6 @@ function MOI.get(
     else
         error("VBasis value of $(vbasis) isn't defined.")
     end
-end
-
-# ==============================================================================
-#    Callbacks in Gurobi
-# ==============================================================================
-
-struct CallbackFunction <: MOI.AbstractOptimizerAttribute end
-
-function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
-    set_callback_func!(model.inner, f)
-    update_model!(model.inner)
-    return
-end
-
-struct CallbackVariablePrimal <: MOI.AbstractVariableAttribute end
-
-function load_callback_variable_primal(model, cb_data, cb_where)
-    if cb_where != CB_MIPSOL
-        error("`load_callback_variable_primal` must be called from `CB_MIPSOL`.")
-    end
-    resize!(model.callback_variable_primal, length(model.variable_info))
-    cbget_mipsol_sol(cb_data, cb_where, model.callback_variable_primal)
-    return
-end
-
-# Note: you must call load_callback_variable_primal first.
-function MOI.get(
-    model::Optimizer, ::CallbackVariablePrimal, x::MOI.VariableIndex
-)
-    return model.callback_variable_primal[_info(model, x).column]
-end
-
-"""
-    function cblazy!(
-        cb_data::CallbackData, model::Optimizer,
-        f::MOI.ScalarAffineFunction{Float64},
-        s::Union{MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, MOI.EqualTo{Float64}}
-    )
-
-Add a lazy cut to the model `m`.
-
-You must have the option `LazyConstraints` set  via `Optimizer(LazyConstraint=1)`.
-This can only be called in a callback from `CB_MIPSOL`.
-"""
-function cblazy!(
-    cb_data::CallbackData, model::Optimizer,
-    f::MOI.ScalarAffineFunction{Float64},
-    s::Union{MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, MOI.EqualTo{Float64}}
-)
-    indices, coefficients = _indices_and_coefficients(model, f)
-    sense, rhs = _sense_and_rhs(s)
-    return cblazy(cb_data, Cint.(indices), coefficients, Char(sense), rhs)
 end
 
 """

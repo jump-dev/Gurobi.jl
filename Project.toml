@@ -11,7 +11,7 @@ MathProgBase = "fdba3010-5040-5b88-9595-932c9decdf73"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-MathOptInterface = "~0.9.1"
+MathOptInterface = "~0.9.7"
 MathProgBase = "~0.5.0, ~0.6, ~0.7"
 julia = "1"
 
