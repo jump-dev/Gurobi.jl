@@ -882,3 +882,11 @@ end
     MOI.optimize!(model)
     @test MOI.get(model, MOI.ObjectiveValue()) == 0.0
 end
+
+@testset "Attributes" begin
+    model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag = 0)
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.NodeCount()) == 0
+    @test MOI.get(model, MOI.BarrierIterations()) == 0
+    @test MOI.get(model, MOI.SimplexIterations()) == 0
+end
