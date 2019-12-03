@@ -114,7 +114,8 @@ function MOI.submit(
     end
     indices, coefficients = _indices_and_coefficients(model, f)
     sense, rhs = _sense_and_rhs(s)
-    return cblazy(cb.callback_data, Cint.(indices), coefficients, Char(sense), rhs)
+    cblazy(cb.callback_data, Cint.(indices), coefficients, Char(sense), rhs)
+    return
 end
 
 # ==============================================================================
@@ -141,7 +142,8 @@ function MOI.submit(
     end
     indices, coefficients = _indices_and_coefficients(model, f)
     sense, rhs = _sense_and_rhs(s)
-    return cbcut(cb.callback_data, Cint.(indices), coefficients, Char(sense), rhs)
+    cbcut(cb.callback_data, Cint.(indices), coefficients, Char(sense), rhs)
+    return
 end
 
 # ==============================================================================

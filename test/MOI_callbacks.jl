@@ -63,7 +63,7 @@ end
             x_val = MOI.get(model, MOI.CallbackVariablePrimal(cb_data), x)
             y_val = MOI.get(model, MOI.CallbackVariablePrimal(cb_data), y)
             if y_val - x_val > 1 + 1e-6
-                MOI.submit(
+                @test MOI.submit(
                     model,
                     MOI.LazyConstraint(cb_data),
                     MOI.ScalarAffineFunction{Float64}(
@@ -71,16 +71,16 @@ end
                         0.0
                     ),
                     MOI.LessThan{Float64}(1.0)
-                )
+                ) === nothing
             elseif y_val + x_val > 3 + 1e-6
-                MOI.submit(
+                @test MOI.submit(
                     model,
                     MOI.LazyConstraint(cb_data),
                     MOI.ScalarAffineFunction{Float64}(
                         MOI.ScalarAffineTerm.([1.0, 1.0], [x, y]),
                         0.0
                     ), MOI.LessThan{Float64}(3.0)
-                )
+                ) === nothing
             end
         end)
         MOI.optimize!(model)
@@ -162,12 +162,12 @@ end
                 end
             end
             if accumulated > 10.0
-                MOI.submit(
+                @test MOI.submit(
                     model,
                     MOI.UserCut(cb_data),
                     MOI.ScalarAffineFunction{Float64}(terms, 0.0),
                     MOI.LessThan{Float64}(length(terms) - 1)
-                )
+                ) === nothing
                 user_cut_submitted = true
             end
         end)
