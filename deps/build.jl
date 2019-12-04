@@ -1,3 +1,11 @@
+if haskey(ENV, "GITHUB_ACTIONS")
+    # We're being run as part of a Github action. The most likely case is that
+    # this is the auto-merge action as part of the General registry.
+    # For now, skip the installation.
+    @info("Detected a Github action. Skipping installation.")
+    exit(0)
+end
+
 using Libdl
 
 const DEPS_FILE = joinpath(@__DIR__, "deps.jl")
@@ -128,7 +136,7 @@ function diagnose_gurobi_install()
             println("""
 
             We could not find a version of Gurobi in your path, and we could
-            not find the environment variable `GUROBI_HOME`. You should set 
+            not find the environment variable `GUROBI_HOME`. You should set
             the `GUROBI_HOME` environment variable to point to the install
             location. For example:
             - on Windows, this might be `C:\\Program Files\\gurobi810\\win64\\`
