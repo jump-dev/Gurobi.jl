@@ -140,6 +140,7 @@ const GRB_STR_PARAMS = [
     "ServerPool",
     "ServerPassword",
     "LogFile",
+    "WorkerPool",
     "ResultFile",
     "Dummy"]
 
