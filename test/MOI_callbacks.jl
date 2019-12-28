@@ -10,7 +10,6 @@ function callback_simple_model()
         Cuts = 0,
         Presolve = 0,
         Heuristics = 0,
-        LazyConstraints = 1
     )
     MOI.Utilities.loadfromstring!(model, """
         variables: x, y
@@ -333,6 +332,7 @@ end
                 end
             end
         end
+        MOI.set(model, MOI.RawParameter("LazyConstraints"), 1)
         MOI.set(model, Gurobi.CallbackFunction(), callback_function)
         MOI.optimize!(model)
         @test MOI.get(model, MOI.VariablePrimal(), x) == 1
