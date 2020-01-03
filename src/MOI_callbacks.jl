@@ -95,6 +95,7 @@ end
 # ==============================================================================
 
 function MOI.set(model::Optimizer, ::MOI.LazyConstraintCallback, cb::Function)
+    MOI.set(model, MOI.RawParameter("LazyConstraints"), 1)
     model.lazy_callback = cb
     return
 end
