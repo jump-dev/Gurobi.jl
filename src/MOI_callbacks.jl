@@ -11,7 +11,7 @@ Note: before accessing `MOI.CallbackVariablePrimal`, you must call either
 `Gurobi.cbget_mipsol_sol(model, cb_data, cb_where)` or
 `Gurobi.cbget_mipsol_rel(model, cb_data, cb_where)`.
 """
-struct CallbackFunction <: MOI.AbstractOptimizerAttribute end
+struct CallbackFunction <: MOI.AbstractCallback end
 
 function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
     model.has_generic_callback = true
@@ -23,6 +23,7 @@ function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
     update_model!(model.inner)
     return
 end
+MOI.supports(::Optimizer, ::CallbackFunction) = true
 
 """
     cbget_mipsol_sol(model::Optimizer, cb_data, cb_where)
@@ -99,6 +100,7 @@ function MOI.set(model::Optimizer, ::MOI.LazyConstraintCallback, cb::Function)
     model.lazy_callback = cb
     return
 end
+MOI.supports(::Optimizer, ::MOI.LazyConstraintCallback) = true
 
 function MOI.submit(
     model::Optimizer,
@@ -118,6 +120,7 @@ function MOI.submit(
     cblazy(cb.callback_data, Cint.(indices), coefficients, Char(sense), rhs)
     return
 end
+MOI.supports(::Optimizer, ::MOI.LazyConstraint{CallbackData}) = true
 
 # ==============================================================================
 #    MOI.UserCutCallback
@@ -127,6 +130,7 @@ function MOI.set(model::Optimizer, ::MOI.UserCutCallback, cb::Function)
     model.user_cut_callback = cb
     return
 end
+MOI.supports(::Optimizer, ::MOI.UserCutCallback) = true
 
 function MOI.submit(
     model::Optimizer,
@@ -146,6 +150,7 @@ function MOI.submit(
     cbcut(cb.callback_data, Cint.(indices), coefficients, Char(sense), rhs)
     return
 end
+MOI.supports(::Optimizer, ::MOI.UserCut{CallbackData}) = true
 
 # ==============================================================================
 #    MOI.HeuristicCallback
@@ -155,6 +160,7 @@ function MOI.set(model::Optimizer, ::MOI.HeuristicCallback, cb::Function)
     model.heuristic_callback = cb
     return
 end
+MOI.supports(::Optimizer, ::MOI.HeuristicCallback) = true
 
 function MOI.submit(
     model::Optimizer,
@@ -174,3 +180,4 @@ function MOI.submit(
     obj = cbsolution(cb.callback_data, solution)
     return obj < GRB_INFINITY ? MOI.HEURISTIC_SOLUTION_ACCEPTED : MOI.HEURISTIC_SOLUTION_REJECTED
 end
+MOI.supports(::Optimizer, ::MOI.HeuristicSolution{CallbackData}) = true
