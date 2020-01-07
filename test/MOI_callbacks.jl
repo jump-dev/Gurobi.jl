@@ -61,6 +61,7 @@ end
             lazy_called = true
             x_val = MOI.get(model, MOI.CallbackVariablePrimal(cb_data), x)
             y_val = MOI.get(model, MOI.CallbackVariablePrimal(cb_data), y)
+            @test MOI.supports(model, MOI.LazyConstraint(cb_data))
             if y_val - x_val > 1 + 1e-6
                 @test MOI.submit(
                     model,
@@ -82,6 +83,7 @@ end
                 ) === nothing
             end
         end)
+        @test MOI.supports(model, MOI.LazyConstraintCallback())
         MOI.optimize!(model)
         @test lazy_called
         @test MOI.get(model, MOI.VariablePrimal(), x) == 1
@@ -160,6 +162,7 @@ end
                     accumulated += item_weights[i]
                 end
             end
+            @test MOI.supports(model, MOI.UserCut(cb_data))
             if accumulated > 10.0
                 @test MOI.submit(
                     model,
@@ -170,6 +173,7 @@ end
                 user_cut_submitted = true
             end
         end)
+        @test MOI.supports(model, MOI.UserCutCallback())
         MOI.optimize!(model)
         @test user_cut_submitted
     end
@@ -222,6 +226,7 @@ end
         solution_rejected = false
         MOI.set(model, MOI.HeuristicCallback(), cb_data -> begin
             x_vals = MOI.get.(model, MOI.CallbackVariablePrimal(cb_data), x)
+            @test MOI.supports(model, MOI.HeuristicSolution(cb_data))
             if MOI.submit(
                 model,
                 MOI.HeuristicSolution(cb_data),
@@ -239,6 +244,7 @@ end
                 solution_rejected = true
             end
         end)
+        @test MOI.supports(model, MOI.HeuristicCallback())
         MOI.optimize!(model)
         @test solution_accepted
         @test solution_rejected
@@ -302,6 +308,7 @@ end
                 MOI.get(model, MOI.ObjectiveBound())
             )
         end)
+        @test MOI.supports(model, Gurobi.CallbackFunction())
         MOI.optimize!(model)
     end
     @testset "LazyConstraint" begin
