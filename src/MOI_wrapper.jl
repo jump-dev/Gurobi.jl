@@ -460,6 +460,29 @@ function MOI.is_valid(model::Optimizer, v::MOI.VariableIndex)
     return haskey(model.variable_info, v)
 end
 
+function MOI.delete(model::Optimizer, indices::Vector{<:MOI.VariableIndex})
+    _update_if_necessary(model)
+    info = [_info(model, var_idx) for var_idx in indices]
+    soc_idx = findfirst(e -> e.num_soc_constraints > 0, info)
+    soc_idx !== nothing && throw(MOI.DeleteNotAllowed(indices[soc_idx]))
+    sorted_del_cols = sort!(collect(i.column for i in info))
+    del_vars!(model.inner, convert(Vector{Cint}, sorted_del_cols))
+    _require_update(model)
+    for var_idx in indices
+        delete!(model.variable_info, var_idx)
+    end
+    for other_info in values(model.variable_info)
+        other_info.column -= searchsortedlast(
+          sorted_del_cols, other_info.column
+        )
+    end
+    model.name_to_variable = nothing
+    # We throw away name_to_constraint_index so we will rebuild SingleVariable
+    # constraint names without v.
+    model.name_to_constraint_index = nothing
+    return
+end
+
 function MOI.delete(model::Optimizer, v::MOI.VariableIndex)
     _update_if_necessary(model)
     info = _info(model, v)
