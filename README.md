@@ -4,6 +4,13 @@ The [Gurobi](http://www.gurobi.com) Optimizer is a commercial optimization solve
 
 *The Gurobi wrapper for Julia is community driven and not officially supported by Gurobi. If you are a commercial customer interested in official support for Julia from Gurobi, let them know!*
 
+## Using Gurobi v0.9 and you got an error like `Q not PSD`?
+
+You need to set the NonConvex parameter:
+```julia
+model = Model(with_optimizer(Gurobi.Optimizer, NonConvex = 2))
+```
+
 ## Use with JuMP
 
 We highly recommend that you use the *Gurobi.jl* package with higher level packages such as [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl).
