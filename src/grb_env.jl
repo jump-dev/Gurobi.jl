@@ -1,27 +1,34 @@
 # Gurobi environment and other supporting facilities
 
-function _load_env()
-    a = Ref{Ptr{Cvoid}}()
-    ret = @grb_ccall(loadenv, Cint, (Ptr{Ptr{Cvoid}}, Ptr{UInt8}),
-        a, C_NULL)
-    if ret != 0
-        if ret == 10009
-            error("Invalid Gurobi license")
-        else
-            error("Failed to create environment (error $ret).")
-        end
-    end
-    return a[]
-end
-
 mutable struct Env
     ptr_env::Ptr{Cvoid}
+end
 
-    function Env(a::Ptr{Cvoid}=_load_env())
-        env = new(a)
-        # finalizer(env, free_env)  ## temporary disable: which tends to sometimes caused warnings
-        return env
+# Note: `Env()` is an outer constructor because sometimes we want to
+# make an `Env` object from a pointer returned from `GRBgetenv`, and
+# sometimes we want to create a new `Env`.
+function Env()
+    a = Ref{Ptr{Cvoid}}()
+    ret = @grb_ccall(
+        loadenv,
+        Cint,
+        (Ptr{Ptr{Cvoid}}, Ptr{UInt8}),
+        a, C_NULL
+    )
+    if ret == 10009
+        error("Invalid Gurobi license")
+    elseif ret != 0
+        error("Failed to create environment (error $ret).")
     end
+    # TODO(odow): no finalizer is set for Env, because when a model + Env
+    # falls out of scope, Julia's GC will sometimes GC the env first, and
+    # then the model. This causes an error. Thus, `Env`'s are finalized in
+    # the `Model` constructor.
+    # We should probably add a flag to differentiate between envs created
+    # manually, and envs created by `Model()`. CPLEX.jl does something
+    # similar.
+    # finalizer(env, free_env)
+    return Env(a[])
 end
 
 Base.unsafe_convert(ty::Type{Ptr{Cvoid}}, env::Env) = env.ptr_env::Ptr{Cvoid}
