@@ -1,23 +1,26 @@
 # Gurobi environment and other supporting facilities
 
+function _load_env()
+    a = Ref{Ptr{Cvoid}}()
+    ret = @grb_ccall(loadenv, Cint, (Ptr{Ptr{Cvoid}}, Ptr{UInt8}),
+        a, C_NULL)
+    if ret != 0
+        if ret == 10009
+            error("Invalid Gurobi license")
+        else
+            error("Failed to create environment (error $ret).")
+        end
+    end
+    return a[]
+end
 
 mutable struct Env
     ptr_env::Ptr{Cvoid}
 
-    function Env()
-        a = Ref{Ptr{Cvoid}}()
-        ret = @grb_ccall(loadenv, Cint, (Ptr{Ptr{Cvoid}}, Ptr{UInt8}),
-            a, C_NULL)
-        if ret != 0
-            if ret == 10009
-                error("Invalid Gurobi license")
-            else
-                error("Failed to create environment (error $ret).")
-            end
-        end
-        env = new(a[])
+    function Env(a::Ptr{Cvoid}=_load_env())
+        env = new(a)
         # finalizer(env, free_env)  ## temporary disable: which tends to sometimes caused warnings
-        env
+        return env
     end
 end
 
