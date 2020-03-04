@@ -22,6 +22,7 @@ end
 end
 
 @testset "MathOptInterface Tests" begin
-    include("MOI_wrapper.jl")
-    include("MOI_callbacks.jl")
+    @testset "$(file)" for file in readdir("MOI")
+        include(joinpath("MOI", file))
+    end
 end
