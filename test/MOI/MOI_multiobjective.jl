@@ -48,4 +48,28 @@ const MOI = Gurobi.MOI
         @test MOI.get(model, Gurobi.MultiObjectiveValue(1)) ≈ BFS[i].f1
         @test MOI.get(model, Gurobi.MultiObjectiveValue(2)) ≈ BFS[i].f2
     end
+
+    MOI.set(model, Gurobi.MultiObjectiveWeight(1), 1.0)
+    MOI.set(model, Gurobi.MultiObjectiveWeight(2), 1.0)
+    MOI.set(model, Gurobi.MultiObjectivePriority(1), 1)
+    MOI.set(model, Gurobi.MultiObjectivePriority(2), 2)
+    @test MOI.get(model, Gurobi.MultiObjectivePriority(1)) == 1
+    @test MOI.get(model, Gurobi.MultiObjectivePriority(2)) == 2
+
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.VariablePrimal(), x) ≈ BFS[1].x
+    @test MOI.get(model, MOI.VariablePrimal(), y) ≈ BFS[1].y
+    @test MOI.get(model, Gurobi.MultiObjectiveValue(1)) ≈ BFS[1].f1
+    @test MOI.get(model, Gurobi.MultiObjectiveValue(2)) ≈ BFS[1].f2
+
+    MOI.set(model, Gurobi.MultiObjectivePriority(1), 2)
+    MOI.set(model, Gurobi.MultiObjectivePriority(2), 1)
+    @test MOI.get(model, Gurobi.MultiObjectivePriority(1)) == 2
+    @test MOI.get(model, Gurobi.MultiObjectivePriority(2)) == 1
+
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.VariablePrimal(), x) ≈ BFS[3].x
+    @test MOI.get(model, MOI.VariablePrimal(), y) ≈ BFS[3].y
+    @test MOI.get(model, Gurobi.MultiObjectiveValue(1)) ≈ BFS[3].f1
+    @test MOI.get(model, Gurobi.MultiObjectiveValue(2)) ≈ BFS[3].f2
 end
