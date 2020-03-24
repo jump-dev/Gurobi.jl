@@ -78,5 +78,6 @@ include("grb_callbacks.jl")
 include("MPB_wrapper.jl")
 include("MOI_wrapper.jl")
 include("MOI_callbacks.jl")
+include("MOI_multi_objective.jl")
 
 end
