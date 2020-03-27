@@ -916,14 +916,13 @@ function MOI.add_constraints(
     return indices
 end
 
-function MOI.delete(
+function _delete_no_update(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
-    _require_update(model)
     if info.bound == LESS_AND_GREATER_THAN
         info.bound = GREATER_THAN
     else
@@ -932,6 +931,51 @@ function MOI.delete(
     info.lessthan_name = ""
     model.name_to_constraint_index = nothing
     return
+end
+
+function MOI.delete(
+    model::Optimizer,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
+)
+    _delete_no_update(model, c)
+    _require_update(model)
+    return
+end
+
+# batch version
+function MOI.delete(
+    model::Optimizer,
+    cs::Vector{MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}}
+)
+    _delete_no_update.(model, cs)
+    _require_update(model)
+    return
+end
+
+function _set_variable_lower_bound_no_update(model, info, value)
+    if info.num_soc_constraints == 0
+        # No SOC constraints, set directly.
+        @assert isnan(info.lower_bound_if_soc)
+        set_dblattrelement!(model.inner, "LB", info.column, value)
+    elseif value >= 0.0
+        # Regardless of whether there are SOC constraints, this is a valid bound
+        # for the SOC constraint and should over-ride any previous bounds.
+        info.lower_bound_if_soc = NaN
+        set_dblattrelement!(model.inner, "LB", info.column, value)
+    elseif isnan(info.lower_bound_if_soc)
+        # Previously, we had a non-negative lower bound (i.e., it was set in the
+        # case above). Now we're setting this with a negative one, but there are
+        # still some SOC constraints, so we cache `value` and set the variable
+        # lower bound to `0.0`.
+        @assert value < 0.0
+        set_dblattrelement!(model.inner, "LB", info.column, 0.0)
+        info.lower_bound_if_soc = value
+    else
+        # Previously, we had a negative lower bound. We're setting this with
+        # another negative one, but there are still some SOC constraints.
+        @assert info.lower_bound_if_soc < 0.0
+        info.lower_bound_if_soc = value
+    end
 end
 
 """
@@ -945,32 +989,8 @@ VectorOfVariables-in-SecondOrderCone constraints.
 See also `_get_variable_lower_bound`.
 """
 function _set_variable_lower_bound(model, info, value)
-    if info.num_soc_constraints == 0
-        # No SOC constraints, set directly.
-        @assert isnan(info.lower_bound_if_soc)
-        set_dblattrelement!(model.inner, "LB", info.column, value)
-        _require_update(model)
-    elseif value >= 0.0
-        # Regardless of whether there are SOC constraints, this is a valid bound
-        # for the SOC constraint and should over-ride any previous bounds.
-        info.lower_bound_if_soc = NaN
-        set_dblattrelement!(model.inner, "LB", info.column, value)
-        _require_update(model)
-    elseif isnan(info.lower_bound_if_soc)
-        # Previously, we had a non-negative lower bound (i.e., it was set in the
-        # case above). Now we're setting this with a negative one, but there are
-        # still some SOC constraints, so we cache `value` and set the variable
-        # lower bound to `0.0`.
-        @assert value < 0.0
-        set_dblattrelement!(model.inner, "LB", info.column, 0.0)
-        _require_update(model)
-        info.lower_bound_if_soc = value
-    else
-        # Previously, we had a negative lower bound. We're setting this with
-        # another negative one, but there are still some SOC constraints.
-        @assert info.lower_bound_if_soc < 0.0
-        info.lower_bound_if_soc = value
-    end
+    _set_variable_lower_bound_no_update(model, info, value)
+    _require_update(model)
 end
 
 """
@@ -991,13 +1011,13 @@ function _get_variable_lower_bound(model, info)
     return get_dblattrelement(model.inner, "LB", info.column)
 end
 
-function MOI.delete(
+function _delete_no_update(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
-    _set_variable_lower_bound(model, info, -Inf)
+    _set_variable_lower_bound_no_update(model, info, -Inf)
     if info.bound == LESS_AND_GREATER_THAN
         info.bound = LESS_THAN
     else
@@ -1010,13 +1030,31 @@ end
 
 function MOI.delete(
     model::Optimizer,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
+)
+    _delete_no_update(model, c)
+    _require_update(model)
+    return
+end
+
+# batch version
+function MOI.delete(
+    model::Optimizer,
+    cs::Vector{MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}}
+)
+    _delete_no_update.(model, cs)
+    _require_update(model)
+    return
+end
+
+function _delete_no_update(
+    model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
 )
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
-    _set_variable_lower_bound(model, info, -Inf)
+    _set_variable_lower_bound_no_update(model, info, -Inf)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
-    _require_update(model)
     info.bound = NONE
     info.greaterthan_interval_or_equalto_name = ""
     model.name_to_constraint_index = nothing
@@ -1025,16 +1063,52 @@ end
 
 function MOI.delete(
     model::Optimizer,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
+)
+    _delete_no_update(model, c)
+    _require_update(model)
+    return
+end
+
+# batch version
+function MOI.delete(
+    model::Optimizer,
+    cs::Vector{MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}}
+)
+    _delete_no_update.(model, cs)
+    _require_update(model)
+    return
+end
+
+function _delete_no_update(
+    model::Optimizer,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
 )
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
-    _set_variable_lower_bound(model, info, -Inf)
+    _set_variable_lower_bound_no_update(model, info, -Inf)
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
-    _require_update(model)
     info.bound = NONE
     info.greaterthan_interval_or_equalto_name = ""
     model.name_to_constraint_index = nothing
+end
+
+function MOI.delete(
+    model::Optimizer,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
+)
+    _delete_no_update(model, c)
+    _require_update(model)
+    return
+end
+
+# batch version
+function MOI.delete(
+    model::Optimizer,
+    cs::Vector{MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}}
+)
+    _delete_no_update.(model, cs)
+    _require_update(model)
     return
 end
 
