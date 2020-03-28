@@ -23,6 +23,44 @@ model = Model(with_optimizer(Gurobi.Optimizer, Presolve=0, OutputFlag=0))
 ```
 See the [Gurobi Documentation](https://www.gurobi.com/documentation/8.1/refman/parameters.html) for a list and description of allowable parameters.
 
+### Common Performance Pitfall with JuMP
+
+Gurobi API works differently than most solvers. Any changes to the model are not applied immediately, but instead go sit in a internal buffer (making any modifications appear to be instantaneous) waiting for a call to `update_model!` (where the work is  done). If Gurobi.jl is used directly, it is the user responsability to call `update_model!` when necessary (for example, before solving the model), as it would be if the user was using the official C interface. However, if Gurobi.jl is used with JuMP, it becomes Gurobi.jl responsibility to call `update_model!` when necessary, as a valid JuMP program should work for solvers with and without such lazy update semantics (i.e., with and without a `update_model!`-like method).
+
+This leads to a common performance pitfall that has the following message as its main symptom: `Warning: excessive time spent in model updates. Consider calling update less frequently.` This often means the JuMP program was structured in such a way that Gurobi.jl ends up calling `update_model!` each iteration of a loop. Usually, it is possible (and easy) to restructure the JuMP program in a way it stays solver-agnostic and has a close-to-ideal performance with Gurobi. To guide such restructuring it is good to keep in mind the following bits of information:
+
+1. `update_model!` is only called if changes were done since last `update_model!` (i.e., the internal buffer is not empty).
+2. `update_model!` is called when `JuMP.optimize!` is called, but this often is not the source of the problem.
+3. `update_model!` *may* be called when *ANY* model attribute is queried *even if that specific attribute was not changed*, and this often the source of the problem. 
+4. The worst-case scenario is, therefore, a loop of modify-query-modify-query, even if what is being modified and what is being queried are two completely distinct things.
+
+Finally, for an example, prefer:
+
+```julia
+# GOOD
+model = Model(Gurobi.Optimizer)
+@variable(model, x[1:100] >= 0)
+for i = 1:100  # all modifications are done before any queries
+    set_upper_bound(x[i], i)
+end
+for i = 1:100 # only the first `lower_bound` query may trigger an `update_model!` 
+    println(lower_bound(x[i]))
+end
+```
+
+to:
+
+```julia
+# BAD
+model = Model(Gurobi.Optimizer)
+@variable(model, x[1:100] >= 0)
+for i = 1:100
+    set_upper_bound(x[i], i)
+    # there is a potential `update_model!` each iteration of this loop
+    println(lower_bound(x[i]))
+end
+```
+
 ## Installation
 
 Here is the procedure to setup this package:
