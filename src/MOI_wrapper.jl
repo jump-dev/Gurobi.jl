@@ -839,6 +839,12 @@ function _throw_if_existing_lower(
     end
 end
 
+function _throw_if_existing_lower(
+    info::VariableInfo, new_set::Type{<:MOI.AbstractSet}
+)
+    _throw_if_existing_lower(info.bound, info.type, new_set, info.index)
+end
+
 function _throw_if_existing_upper(
     bound::BoundType, var_type::VariableType, new_set::Type{<:MOI.AbstractSet},
     variable::MOI.VariableIndex
@@ -861,58 +867,62 @@ function _throw_if_existing_upper(
     end
 end
 
+function _throw_if_existing_upper(
+    info::VariableInfo, new_set::Type{<:MOI.AbstractSet}
+)
+    _throw_if_existing_upper(info.bound, info.type, new_set, info.index)
+end
+
+# This method had a long body that basically replicated the batch version
+# (i.e., `add_constraints`). The batch version is needed for performance
+# reasons, so to avoid replicating code, this just wrap parameters and
+# call the batch version.
 function MOI.add_constraint(
     model::Optimizer, f::MOI.SingleVariable, s::S
 ) where {S <: SCALAR_SETS}
-    info = _info(model, f.variable)
-    if S <: MOI.LessThan{Float64}
-        _throw_if_existing_upper(info.bound, info.type, S, f.variable)
-        info.bound = info.bound == GREATER_THAN ? LESS_AND_GREATER_THAN : LESS_THAN
-    elseif S <: MOI.GreaterThan{Float64}
-        _throw_if_existing_lower(info.bound, info.type, S, f.variable)
-        info.bound = info.bound == LESS_THAN ? LESS_AND_GREATER_THAN : GREATER_THAN
-    elseif S <: MOI.EqualTo{Float64}
-        _throw_if_existing_lower(info.bound, info.type, S, f.variable)
-        _throw_if_existing_upper(info.bound, info.type, S, f.variable)
-        info.bound = EQUAL_TO
-    else
-        @assert S <: MOI.Interval{Float64}
-        _throw_if_existing_lower(info.bound, info.type, S, f.variable)
-        _throw_if_existing_upper(info.bound, info.type, S, f.variable)
-        info.bound = INTERVAL
-    end
-    index = MOI.ConstraintIndex{MOI.SingleVariable, typeof(s)}(f.variable.value)
-    MOI.set(model, MOI.ConstraintSet(), index, s)
-    return index
+    # The MOI.add_constraint definition says S should be a concrete type, but
+    # this method allows S to be a Union type.
+    @assert isconcretetype(S)
+    indexes = MOI.add_constraints(model, MOI.SingleVariable[f], S[s])
+    # `only` is not used below to keep backwards compatibility with julia 1.0.5
+    @assert isone(length(indexes))
+    return first(indexes)
 end
 
 function MOI.add_constraints(
     model::Optimizer, f::Vector{MOI.SingleVariable}, s::Vector{S}
 ) where {S <: SCALAR_SETS}
-    for fi in f
-        info = _info(model, fi.variable)
-        if S <: MOI.LessThan{Float64}
-            _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
-            info.bound = info.bound == GREATER_THAN ? LESS_AND_GREATER_THAN : LESS_THAN
-        elseif S <: MOI.GreaterThan{Float64}
-            _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
-            info.bound = info.bound == LESS_THAN ? LESS_AND_GREATER_THAN : GREATER_THAN
-        elseif S <: MOI.EqualTo{Float64}
-            _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
-            _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
-            info.bound = EQUAL_TO
-        else
-            @assert S <: MOI.Interval{Float64}
-            _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
-            _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
-            info.bound = INTERVAL
-        end
+    # The MOI.add_constraints definition says S should be a concrete type, but
+    # this method allows S to be a Union type. This method is simplified by the
+    # assumption all elements are from the same concrete type.
+    @assert isconcretetype(S)
+    infos = _info.(model, getfield.(f, :variable))
+    if S <: MOI.LessThan{Float64}
+        _throw_if_existing_upper.(infos, S)
+        setfield!.(infos, :bound, map(getfield.(infos, :bound)) do old_bound
+            old_bound == GREATER_THAN ? LESS_AND_GREATER_THAN : LESS_THAN
+        end)
+    elseif S <: MOI.GreaterThan{Float64}
+        _throw_if_existing_lower.(infos, S)
+        setfield!.(infos, :bound, map(getfield.(infos, :bound)) do old_bound
+            old_bound == LESS_THAN ? LESS_AND_GREATER_THAN : GREATER_THAN
+        end)
+    elseif S <: MOI.EqualTo{Float64}
+        _throw_if_existing_lower.(infos, S)
+        _throw_if_existing_upper.(infos, S)
+        setfield!.(infos, :bound, EQUAL_TO)
+    else
+        @assert S <: MOI.Interval{Float64}
+        _throw_if_existing_lower.(infos, S)
+        _throw_if_existing_upper.(infos, S)
+        setfield!.(infos, :bound, INTERVAL)
     end
     indices = [
-        MOI.ConstraintIndex{MOI.SingleVariable, eltype(s)}(fi.variable.value)
+        MOI.ConstraintIndex{MOI.SingleVariable, S}(fi.variable.value)
         for fi in f
     ]
-    _set_bounds(model, indices, s)
+    # Now really set the bounds inside the Gurobi model.
+    MOI.set(model, MOI.ConstraintSet(), indices, s)
     return indices
 end
 
@@ -934,8 +944,27 @@ function MOI.delete(
     return
 end
 
+function _partition_by_bits(bits, list)
+    accepted = Vector{eltype(list)}(undef, length(list))
+    rejected = Vector{eltype(list)}(undef, length(list))
+    qt_accepted = qt_rejected = 0
+    for (istrue, value) in zip(bits, list)
+        if istrue
+            qt_accepted += 1
+            accepted[qt_accepted] = value
+        else
+            qt_rejected += 1
+            rejected[qt_rejected] = value
+        end
+    end
+    resize!(accepted, qt_accepted)
+    resize!(rejected, qt_rejected)
+    return accepted, rejected
+end
+
 """
     _set_variable_lower_bound(model, info, value)
+    _set_variable_lower_bound(model, infos, values)
 
 This function is used to indirectly set the lower bound of a variable.
 
@@ -944,33 +973,86 @@ VectorOfVariables-in-SecondOrderCone constraints.
 
 See also `_get_variable_lower_bound`.
 """
-function _set_variable_lower_bound(model, info, value)
-    if info.num_soc_constraints == 0
-        # No SOC constraints, set directly.
-        @assert isnan(info.lower_bound_if_soc)
-        set_dblattrelement!(model.inner, "LB", info.column, value)
+function _set_variable_lower_bound(model, info::VariableInfo, value::Float64)
+    # Just wrap the parameters and call the list/vector/batch version.
+    _set_variable_lower_bound(model, [info], [value])
+    return
+end
+
+function _set_variable_lower_bound(model, infos, values)
+    @assert length(infos) == length(values)
+    # Deal with variables with no SOC constraints first, just set directly.
+    no_soc_bits = iszero.(getfield.(infos, :num_soc_constraints))
+    if any(no_soc_bits)
+        no_soc_infos, infos = _partition_by_bits(no_soc_bits, infos)
+        no_soc_values, values = _partition_by_bits(no_soc_bits, values)
+        @assert all(info -> isnan(info.lower_bound_if_soc), no_soc_infos)
+        set_dblattrlist!(
+            model.inner, "LB", getfield.(no_soc_infos, :column), no_soc_values
+        )
         _require_update(model)
-    elseif value >= 0.0
-        # Regardless of whether there are SOC constraints, this is a valid bound
-        # for the SOC constraint and should over-ride any previous bounds.
-        info.lower_bound_if_soc = NaN
-        set_dblattrelement!(model.inner, "LB", info.column, value)
-        _require_update(model)
-    elseif isnan(info.lower_bound_if_soc)
-        # Previously, we had a non-negative lower bound (i.e., it was set in the
-        # case above). Now we're setting this with a negative one, but there are
-        # still some SOC constraints, so we cache `value` and set the variable
-        # lower bound to `0.0`.
-        @assert value < 0.0
-        set_dblattrelement!(model.inner, "LB", info.column, 0.0)
-        _require_update(model)
-        info.lower_bound_if_soc = value
-    else
-        # Previously, we had a negative lower bound. We're setting this with
-        # another negative one, but there are still some SOC constraints.
-        @assert info.lower_bound_if_soc < 0.0
-        info.lower_bound_if_soc = value
     end
+    # From there, we can assume `infos` and `values` refer to variables with
+    # soc constraints.
+    iszero(length(infos)) && return
+
+    # Positive bounds are valid bounds for the SOC constraint and should
+    # override them.
+    overrode_bits = values .>= 0.0
+    if any(overrode_bits)
+        overrode_infos, infos = _partition_by_bits(overrode_bits, infos)
+        overrode_values, values = _partition_by_bits(overrode_bits, values)
+        setfield!.(overrode_infos, :lower_bound_if_soc, NaN)
+        set_dblattrlist!(
+            model.inner, "LB", getfield.(overrode_infos, :column),
+            overrode_values
+        )
+        _require_update(model)
+    end
+    # From there, we can assume `infos` and `values` refer to variables with
+    # SOC constraints and lower bounds being set to negative values.
+    iszero(length(infos)) && return
+
+    # Previously, we had a non-negative lower bound (i.e., it was set in
+    # the `if` above). Now we're setting this with a negative one, but
+    # there are still some SOC constraints, so we cache `value` and set the
+    # variable lower bound to `0.0`.
+    sign_change_bits = isnan.(getfield.(infos, :lower_bound_if_soc))
+    if any(sign_change_bits)
+        sign_change_infos, infos = _partition_by_bits(sign_change_bits, infos)
+        sign_change_values, values = _partition_by_bits(sign_change_bits, values)
+        @assert all(value -> value < 0.0, sign_change_values)
+        set_dblattrlist!(
+            model.inner, "LB", getfield.(sign_change_infos, :column),
+            repeat(Float64[0.0], length(sign_change_values))
+        )
+        setfield!.(sign_change_infos, :lower_bound_if_soc, sign_change_values)
+        _require_update(model)
+    end
+    iszero(length(infos)) && return
+
+    # From there, we can assume `infos` and `values` refer to variables with
+    # SOC constraints and negative lower bounds being set to another negative
+    # lower bounds.
+    # We just replace the cached value, as the bound will keep being zero,
+    # no `model_update!` needed.
+    @assert all(info -> info.lower_bound_if_soc < 0.0, infos)
+    setfield!.(infos, :lower_bound_if_soc, values)
+
+    return
+end
+
+function _set_variable_upper_bound(model, infos, values)
+    @assert length(infos) == length(values)
+    for (info, value) in zip(infos, values)
+        set_dblattrelement!(model.inner, "UB", info.column, value)
+    end
+    _require_update(model)
+end
+
+function _set_variable_upper_bound(model, info::VariableInfo, value::Float64)
+    set_dblattrelement!(model.inner, "UB", info.column, value)
+    _require_update(model)
 end
 
 """
@@ -1110,18 +1192,39 @@ end
 
 function MOI.set(
     model::Optimizer, ::MOI.ConstraintSet,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, S}, s::S
+    cs::Vector{MOI.ConstraintIndex{MOI.SingleVariable, S}}, s::Vector{S}
 ) where {S<:SCALAR_SETS}
-    MOI.throw_if_not_valid(model, c)
-    lower, upper = _bounds(s)
-    info = _info(model, c)
-    if lower !== nothing
-        _set_variable_lower_bound(model, info, lower)
-    end
-    if upper !== nothing
-        set_dblattrelement!(model.inner, "UB", info.column, upper)
+    # This method is simplified by the assumption all elements are from the
+    # same concrete type.
+    @assert isconcretetype(S)
+    @assert length(cs) == length(s)
+    MOI.throw_if_not_valid.(model, cs)
+    infos = _info.(model, cs)
+    if S <: MOI.LessThan{Float64}
+        _set_variable_upper_bound(model, infos, getfield.(s, :upper))
+    elseif S <: MOI.GreaterThan{Float64}
+        _set_variable_lower_bound(model, infos, getfield.(s, :lower))
+    elseif S <: MOI.EqualTo{Float64}
+        values = getfield.(s, :value)
+        _set_variable_upper_bound(model, infos, values)
+        _set_variable_lower_bound(model, infos, values)
+    else
+        @assert S <: MOI.Interval{Float64}
+        _set_variable_upper_bound(model, infos, getfield.(s, :upper))
+        _set_variable_lower_bound(model, infos, getfield.(s, :lower))
     end
     _require_update(model)
+    return
+end
+
+function MOI.set(
+    model::Optimizer, ::MOI.ConstraintSet,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S}, s::S
+) where {S<:SCALAR_SETS}
+    # This method is simplified by the assumption all elements are from the
+    # same concrete type.
+    @assert isconcretetype(S)
+    MOI.set(model, MOI.ConstraintSet(), [c], S[s])
     return
 end
 
