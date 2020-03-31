@@ -757,6 +757,31 @@ end
         MOI.optimize!(model)
         @test MOI.get(model, MOI.TerminationStatus()) == MOI.DUAL_INFEASIBLE
     end
+    @testset "negative post bound III" begin
+        # This test was added because add_constraint and add_constraints had
+        # different implementations and add_constraints failed where
+        # add_constraint succeeded.
+        MOI.empty!(model)
+        t = MOI.add_variable(model)
+        x = MOI.add_variables(model, 2)
+        c_soc = MOI.add_constraint(
+            model, MOI.VectorOfVariables([t; x]), MOI.SecondOrderCone(3)
+        )
+        c_lbs = MOI.add_constraints(
+            model, MOI.SingleVariable.([t; x]), MOI.GreaterThan.([-6.0, 3.0, 4.0])
+        )
+        c_lb = first(c_lbs)
+        MOI.set(model, MOI.ObjectiveFunction{MOI.SingleVariable}(), MOI.SingleVariable(t))
+        MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
+        MOI.delete(model, c_lb)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
+        MOI.delete(model, c_soc)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.TerminationStatus()) == MOI.DUAL_INFEASIBLE
+    end
     @testset "2 SOC's" begin
         MOI.empty!(model)
         t = MOI.add_variable(model)

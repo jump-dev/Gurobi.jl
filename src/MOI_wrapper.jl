@@ -1091,8 +1091,12 @@ function _set_bounds(
         lower, upper = _bounds(s)
         info = _info(model, c)
         if lower !== nothing
-            push!(lower_columns, info.column)
-            push!(lower_values, lower)
+            if info.num_soc_constraints == 0
+                push!(lower_columns, info.column)
+                push!(lower_values, lower)
+            else
+                _set_variable_lower_bound(model, info, lower)
+            end
         end
         if upper !== nothing
             push!(upper_columns, info.column)
