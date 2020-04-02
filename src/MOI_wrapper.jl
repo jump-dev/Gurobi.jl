@@ -17,6 +17,12 @@ mutable struct VariableInfo
     index::MOI.VariableIndex
     column::Int
     bound::BoundType
+    # Both fields below are cached values to avoid triggering a model_update!
+    # if the variable bounds are queried. They are non-NaN only if `bound` is
+    # different from NONE. EQUAL_TO sets both of them. See also
+    # `lower_bound_if_soc`.
+    lower_bound_if_bounded::Float64
+    upper_bound_if_bounded::Float64
     type::VariableType
     start::Union{Float64, Nothing}
     name::String
@@ -29,11 +35,15 @@ mutable struct VariableInfo
     greaterthan_interval_or_equalto_name::String
     type_constraint_name::String
     # Storage for the lower bound if the variable is the `t` variable in a
-    # second order cone.
+    # second order cone. Theoretically, if both `lower_bound_if_bounded` and
+    # `lower_bound_if_soc` are non-NaN, then they have the same value,
+    # but you can also just have SOC constraints, or just have bounds, or
+    # have a bound and have a SOC constraint that does not need to set
+    # `lower_bound_if_soc` (in all such cases just one of them is NaN).
     lower_bound_if_soc::Float64
     num_soc_constraints::Int
     function VariableInfo(index::MOI.VariableIndex, column::Int)
-        return new(index, column, NONE, CONTINUOUS, nothing, "", "", "", "", NaN, 0)
+        return new(index, column, NONE, NaN, NaN, CONTINUOUS, nothing, "", "", "", "", NaN, 0)
     end
 end
 
@@ -868,20 +878,28 @@ function MOI.add_constraint(
     if S <: MOI.LessThan{Float64}
         _throw_if_existing_upper(info.bound, info.type, S, f.variable)
         info.bound = info.bound == GREATER_THAN ? LESS_AND_GREATER_THAN : LESS_THAN
+        info.upper_bound_if_bounded = s.upper
     elseif S <: MOI.GreaterThan{Float64}
         _throw_if_existing_lower(info.bound, info.type, S, f.variable)
         info.bound = info.bound == LESS_THAN ? LESS_AND_GREATER_THAN : GREATER_THAN
+        info.lower_bound_if_bounded = s.lower
     elseif S <: MOI.EqualTo{Float64}
         _throw_if_existing_lower(info.bound, info.type, S, f.variable)
         _throw_if_existing_upper(info.bound, info.type, S, f.variable)
         info.bound = EQUAL_TO
+        info.upper_bound_if_bounded = info.lower_bound_if_bounded = s.value
     else
         @assert S <: MOI.Interval{Float64}
         _throw_if_existing_lower(info.bound, info.type, S, f.variable)
         _throw_if_existing_upper(info.bound, info.type, S, f.variable)
         info.bound = INTERVAL
+        info.upper_bound_if_bounded = s.upper
+        info.lower_bound_if_bounded = s.lower
     end
     index = MOI.ConstraintIndex{MOI.SingleVariable, typeof(s)}(f.variable.value)
+    # This sets the bounds in the inner model and set the cache in VariableInfo
+    # again (we could just set them there, but then VariableInfo is in a
+    # invalid state that trigger some asserts, i.e., has bound but no cache).
     MOI.set(model, MOI.ConstraintSet(), index, s)
     return index
 end
@@ -889,23 +907,28 @@ end
 function MOI.add_constraints(
     model::Optimizer, f::Vector{MOI.SingleVariable}, s::Vector{S}
 ) where {S <: SCALAR_SETS}
-    for fi in f
+    for (fi, si) in zip(f, s)
         info = _info(model, fi.variable)
         if S <: MOI.LessThan{Float64}
             _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
             info.bound = info.bound == GREATER_THAN ? LESS_AND_GREATER_THAN : LESS_THAN
+            info.upper_bound_if_bounded = si.upper
         elseif S <: MOI.GreaterThan{Float64}
             _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
             info.bound = info.bound == LESS_THAN ? LESS_AND_GREATER_THAN : GREATER_THAN
+            info.lower_bound_if_bounded = si.lower
         elseif S <: MOI.EqualTo{Float64}
             _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
             _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
             info.bound = EQUAL_TO
+            info.upper_bound_if_bounded = info.lower_bound_if_bounded = si.value
         else
             @assert S <: MOI.Interval{Float64}
             _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
             _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
             info.bound = INTERVAL
+            info.upper_bound_if_bounded = si.upper
+            info.lower_bound_if_bounded = si.lower
         end
     end
     indices = [
@@ -929,6 +952,7 @@ function MOI.delete(
     else
         info.bound = NONE
     end
+    info.upper_bound_if_bounded = NaN
     info.lessthan_name = ""
     model.name_to_constraint_index = nothing
     return
@@ -941,6 +965,9 @@ This function is used to indirectly set the lower bound of a variable.
 
 We need to do it this way to account for potential lower bounds of 0.0 added by
 VectorOfVariables-in-SecondOrderCone constraints.
+
+This does not look at `info.bound` and does not update
+`info.lower_bound_if_bounded`.
 
 See also `_get_variable_lower_bound`.
 """
@@ -977,7 +1004,9 @@ end
     _get_variable_lower_bound(model, info)
 
 Get the current variable lower bound, ignoring a potential bound of `0.0` set
-by a second order cone constraint.
+by a second order cone constraint, if an adequate `SingleVariable` constraint
+is set (i.e., `info.bound` is not `NONE` or `LESS_THAN`) then use a cached
+value; otherwise update the model if necessary and query the LB from it.
 
 See also `_set_variable_lower_bound`.
 """
@@ -987,8 +1016,35 @@ function _get_variable_lower_bound(model, info)
         # was < 0.
         @assert info.lower_bound_if_soc < 0.0
         return info.lower_bound_if_soc
+    elseif !isnan(info.lower_bound_if_bounded)
+        @assert info.bound in (
+            GREATER_THAN, LESS_AND_GREATER_THAN, EQUAL_TO, INTERVAL
+        )
+        return info.lower_bound_if_bounded
     end
+    _update_if_necessary(model)
     return get_dblattrelement(model.inner, "LB", info.column)
+end
+
+"""
+    _get_variable_upper_bound(model, info)
+
+Get the current variable upper bound, if an adequate `SingleVariable`
+constraint is set (i.e., `info.bound` is not `NONE` or `GREATER_THAN`) then use
+a cached value; otherwise update the model if necessary and query the UB from
+it.
+
+See also `_get_variable_lower_bound`.
+"""
+function _get_variable_upper_bound(model, info)
+    if !isnan(info.upper_bound_if_bounded)
+        @assert info.bound in (
+            LESS_THAN, LESS_AND_GREATER_THAN, EQUAL_TO, INTERVAL
+        )
+        return info.upper_bound_if_bounded
+    end
+    _update_if_necessary(model)
+    return get_dblattrelement(model.inner, "UB", info.column)
 end
 
 function MOI.delete(
@@ -1003,6 +1059,7 @@ function MOI.delete(
     else
         info.bound = NONE
     end
+    info.lower_bound_if_bounded = NaN
     info.greaterthan_interval_or_equalto_name = ""
     model.name_to_constraint_index = nothing
     return
@@ -1018,6 +1075,7 @@ function MOI.delete(
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
     info.bound = NONE
+    info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
     info.greaterthan_interval_or_equalto_name = ""
     model.name_to_constraint_index = nothing
     return
@@ -1033,6 +1091,7 @@ function MOI.delete(
     set_dblattrelement!(model.inner, "UB", info.column, Inf)
     _require_update(model)
     info.bound = NONE
+    info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
     info.greaterthan_interval_or_equalto_name = ""
     model.name_to_constraint_index = nothing
     return
@@ -1043,9 +1102,9 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
 )
     MOI.throw_if_not_valid(model, c)
-    _update_if_necessary(model)
-    lower = _get_variable_lower_bound(model, _info(model, c))
-    return MOI.GreaterThan(lower)
+    info = _info(model, c)
+    @assert !isnan(info.lower_bound_if_bounded)
+    return MOI.GreaterThan(_get_variable_lower_bound(model, info))
 end
 
 function MOI.get(
@@ -1053,9 +1112,9 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
     MOI.throw_if_not_valid(model, c)
-    _update_if_necessary(model)
-    upper = get_dblattrelement(model.inner, "UB", _info(model, c).column)
-    return MOI.LessThan(upper)
+    info = _info(model, c)
+    @assert !isnan(info.upper_bound_if_bounded)
+    return MOI.LessThan(_get_variable_upper_bound(model, info))
 end
 
 function MOI.get(
@@ -1063,9 +1122,10 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
 )
     MOI.throw_if_not_valid(model, c)
-    _update_if_necessary(model)
-    lower = _get_variable_lower_bound(model, _info(model, c))
-    return MOI.EqualTo(lower)
+    info = _info(model, c)
+    @assert !isnan(info.upper_bound_if_bounded)
+    @assert info.upper_bound_if_bounded == info.lower_bound_if_bounded
+    return MOI.EqualTo(_get_variable_lower_bound(model, info))
 end
 
 function MOI.get(
@@ -1073,11 +1133,13 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
 )
     MOI.throw_if_not_valid(model, c)
-    _update_if_necessary(model)
     info = _info(model, c)
-    lower = _get_variable_lower_bound(model, _info(model, c))
-    upper = get_dblattrelement(model.inner, "UB", info.column)
-    return MOI.Interval(lower, upper)
+    @assert !isnan(info.upper_bound_if_bounded)
+    @assert !isnan(info.lower_bound_if_bounded)
+    return MOI.Interval(
+        _get_variable_lower_bound(model, info),
+        _get_variable_upper_bound(model, info),
+    )
 end
 
 function _set_bounds(
@@ -1120,9 +1182,13 @@ function MOI.set(
     lower, upper = _bounds(s)
     info = _info(model, c)
     if lower !== nothing
+        @assert !isnan(info.lower_bound_if_bounded)
+        info.lower_bound_if_bounded = lower
         _set_variable_lower_bound(model, info, lower)
     end
     if upper !== nothing
+        @assert !isnan(info.upper_bound_if_bounded)
+        info.upper_bound_if_bounded = upper
         set_dblattrelement!(model.inner, "UB", info.column, upper)
     end
     _require_update(model)
@@ -2988,6 +3054,10 @@ function MOI.add_constraint(
     t_info = _info(model, f.variables[1])
     lb = _get_variable_lower_bound(model, t_info)
     if isnan(t_info.lower_bound_if_soc) && lb < 0.0
+        # If `t_info.lower_bound_if_bounded` is active, this just makes
+        # `t_info.lower_bound_if_soc` equal to it. If `lower_bound_if_bounded`
+        # is set after, then it will call `_set_variable_lower_bound` and
+        # update `lower_bound_if_soc` accordingly.
         t_info.lower_bound_if_soc = lb
         set_dblattrelement!(model.inner, "LB", t_info.column, 0.0)
     end
@@ -3043,6 +3113,14 @@ function MOI.delete(
     # There was a previous bound that we over-wrote, and it must have been
     # < 0 otherwise we wouldn't have needed to overwrite it.
     @assert t_info.lower_bound_if_soc < 0.0
+    # Also, if there is a cached value in `t_info.lower_bound_if_bounded`
+    # (i.e., `t_info.bound` is not `NONE` nor `LESS_THAN`), then it has
+    # followed any changes `t_info.lower_bound_if_soc` has gone through
+    # and has the same value. So when LB is set to the old value of
+    # `lower_bound_if_soc` below, then `lower_bound_if_bounded` will stay
+    # correct.
+    @assert isnan(t_info.lower_bound_if_bounded) ||
+        t_info.lower_bound_if_bounded == t_info.lower_bound_if_soc
     tmp_lower_bound = t_info.lower_bound_if_soc
     t_info.lower_bound_if_soc = NaN
     set_dblattrelement!(model.inner, "LB", t_info.column, tmp_lower_bound)
