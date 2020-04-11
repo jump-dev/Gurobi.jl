@@ -2578,15 +2578,7 @@ conflict is not purged, and any calls to the above attributes will return values
 for the original conflict without a warning.
 """
 function compute_conflict(model::Optimizer)
-    try
-        computeIIS(model.inner)
-    catch exc
-        if isa(exc, GurobiError) && exc.code == 10015
-            model.inner.conflict = Gurobi.GRB_INFEASIBLE
-        else
-            rethrow(exc)
-        end
-    end
+    computeIIS(model.inner)
     return
 end
 
