@@ -403,11 +403,12 @@ end
         @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.OPTIMIZE_NOT_CALLED
         @test_throws ErrorException MOI.get(model, Gurobi.ConstraintConflictStatus(), c1)
 
-        # Once it's called, no problem.
-        Gurobi.compute_conflict(model)
-        @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.INFEASIBLE
-        @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == false
-        @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == false
+        @test_throws Gurobi.GurobiError Gurobi.compute_conflict(model)
+        # TODO(odow): bypass Gurobi's IIS checker when underlying model is
+        # feasible.
+        # @test MOI.get(model, Gurobi.ConflictStatus()) == MOI.INFEASIBLE
+        # @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c1) == false
+        # @test MOI.get(model, Gurobi.ConstraintConflictStatus(), c2) == false
     end
 end
 
