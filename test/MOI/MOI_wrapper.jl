@@ -5,7 +5,8 @@ const GUROBI_ENV = Gurobi.Env()
 const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
     # Note: we set `DualReductions = 0` so that we never return
     # `INFEASIBLE_OR_UNBOUNDED`.
-    Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, DualReductions=0), Float64
+    Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, DualReductions=0, QCPDual = 1),
+    Float64
 )
 
 const CONFIG = MOIT.TestConfig()
@@ -420,8 +421,8 @@ end
 end
 
 @testset "QCPDuals without needing to pass QCPDual=1" begin
-    @testset "QCPDual default" begin
-        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+    @testset "QCPDual=1" begin
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, QCPDual=1)
         MOI.Utilities.loadfromstring!(model, """
         variables: x, y, z
         minobjective: 1.0 * x + 1.0 * y + 1.0 * z
@@ -443,8 +444,8 @@ end
         @test MOI.get(model, MOI.ConstraintDual(), c2) ≈ 0.0 atol=1e-6
         @test MOI.get(model, MOI.ConstraintDual(), c3) ≈ 0.0 atol=1e-6
     end
-    @testset "QCPDual=0" begin
-        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, QCPDual=0)
+    @testset "QCPDual default" begin
+        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
         MOI.Utilities.loadfromstring!(model, """
         variables: x, y, z
         minobjective: 1.0 * x + 1.0 * y + 1.0 * z
