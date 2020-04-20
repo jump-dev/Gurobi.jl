@@ -1478,6 +1478,10 @@ function MOI.delete(
     del_constrs!(model.inner, rows_to_delete)
     _require_update(model)
     for (_, info) in model.affine_constraint_info
+        # The trick here is: searchsortedlast returns, in O(log n), the
+        # last index with a row smaller than info.row, over rows_to_delete
+        # this is the same as the number of rows deleted before it, and
+        # how much its value need to be shifted.
         info.row -= searchsortedlast(rows_to_delete, info.row)
     end
     cs_values = sort!(getfield.(cs, :value))

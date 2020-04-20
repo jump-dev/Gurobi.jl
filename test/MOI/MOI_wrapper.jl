@@ -468,10 +468,10 @@ end
     end
 end
 
-@testset "Add constraints" begin
+@testset "Add and delete constraints" begin
     model = Gurobi.Optimizer(GUROBI_ENV)
     x = MOI.add_variables(model, 2)
-    MOI.add_constraints(
+    cs = MOI.add_constraints(
         model,
         [MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, x[i])], 0.0) for i in 1:2],
         MOI.EqualTo.([0.0, 0.0])
@@ -479,6 +479,10 @@ end
     @test MOI.get(model, MOI.NumberOfConstraints{
         MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64}
     }()) == 2
+    MOI.delete(model, cs)
+    @test iszero(MOI.get(model, MOI.NumberOfConstraints{
+        MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64}
+    }()))
 end
 
 @testset "Extra name tests" begin
