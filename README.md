@@ -81,7 +81,7 @@ By default, `build`ing *Gurobi.jl* will fail if the Gurobi library is not found.
 
 - Make sure that you have downloaded and installed Gurobi from [gurobi.com](https://gurobi.com). Also, make sure that you validate the license.
 
-- Check that you have a Gurobi version between 7.0 and 8.1.
+- Check that your Gurobi version is at least 7.0
 
 - Make sure that the `GUROBI_HOME` environment variable is set correctly. You can see the current value as follows
 ```julia
