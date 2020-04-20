@@ -1469,6 +1469,29 @@ end
 
 function MOI.delete(
     model::Optimizer,
+    cs::Vector{<:MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}}
+)
+    # The `sort!`s called are necessary for improving the efficiency of the
+    # updates (i.e., without them we cannot use `searchsorted*` methods).
+    _update_if_necessary(model)
+    rows_to_delete = sort!(getfield.(_info.(model, cs), :row))
+    del_constrs!(model.inner, rows_to_delete)
+    _require_update(model)
+    for (_, info) in model.affine_constraint_info
+        info.row -= searchsortedlast(rows_to_delete, info.row)
+    end
+    cs_values = sort!(getfield.(cs, :value))
+    # If the key of an model.affine_constraint_info entry is in cs_values,
+    # then that entry is deleted.
+    filter!(model.affine_constraint_info) do pair
+        isempty(searchsorted(cs_values, pair.first))
+    end
+    model.name_to_constraint_index = nothing
+    return
+end
+
+function MOI.delete(
+    model::Optimizer,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any}
 )
     row = _info(model, c).row
