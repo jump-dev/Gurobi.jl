@@ -128,12 +128,6 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     You can share Gurobi `Env`s between models by passing an instance of `Env`
     as the first argument. By default, a new environment is created for every
     model.
-
-    Note that we set the parameter `InfUnbdInfo` to `1` rather than the default
-    of `0` so that we can query infeasibility certificates. Users are, however,
-    free to over-ride this as follows `Optimizer(InfUndbInfo=0)`. In addition,
-    we also set `QCPDual` to `1` to enable duals in QCPs. Users can override
-    this by passing `Optimizer(QCPDual=0)`.
     """
     function Optimizer(env::Union{Nothing, Env} = nothing; kwargs...)
         model = new()
@@ -149,12 +143,6 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         for (name, value) in kwargs
             model.params[string(name)] = value
             setparam!(model.inner, string(name), value)
-        end
-        if !haskey(model.params, "InfUnbdInfo")
-            MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
-        end
-        if !haskey(model.params, "QCPDual")
-            MOI.set(model, MOI.RawParameter("QCPDual"), 1)
         end
         return model
     end
