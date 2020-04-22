@@ -5,7 +5,13 @@ const GUROBI_ENV = Gurobi.Env()
 const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
     # Note: we set `DualReductions = 0` so that we never return
     # `INFEASIBLE_OR_UNBOUNDED`.
-    Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, DualReductions=0, QCPDual = 1),
+    Gurobi.Optimizer(
+        GUROBI_ENV,
+        OutputFlag = 0,
+        DualReductions = 0,
+        QCPDual = 1,
+        InfUnbdInfo = 1,
+    ),
     Float64
 )
 
