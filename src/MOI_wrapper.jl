@@ -2737,8 +2737,8 @@ function MOI.get(
     model::Optimizer, ::ConstraintConflictStatus,
     index::MOI.ConstraintIndex{
         MOI.ScalarAffineFunction{Float64},
-				# This union does not specify the type parameters of MOI.*
-				# not sure if SUPPORTED_SCALAR_SETS should be used here.
+        # This union does not specify the type parameters of MOI.*
+        # not sure if SUPPORTED_SCALAR_SETS should be used here.
         <:Union{MOI.LessThan, MOI.GreaterThan, MOI.EqualTo}
     }
 )
