@@ -454,9 +454,8 @@ function _info(model::Optimizer, key::MOI.VariableIndex)
 end
 
 function _get_next_column(model::Optimizer)
-    old_value = deepcopy(model.next_column)
     model.next_column += 1
-    return old_value
+    return model.next_column - 1
 end
 
 function MOI.add_variable(model::Optimizer)
