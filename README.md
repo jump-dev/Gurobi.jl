@@ -19,9 +19,11 @@ This can be done using the ``Gurobi.Optimizer`` object. Here is how to create a 
 ```julia
 using JuMP, Gurobi
 
-model = Model(with_optimizer(Gurobi.Optimizer, Presolve=0, OutputFlag=0))
+model = Model(Gurobi.Optimizer)
+set_optimizer_attribute(model,"TimeLimit",100)
+set_optimizer_attribute(model,"Presolve",0)
 ```
-See the [Gurobi Documentation](https://www.gurobi.com/documentation/8.1/refman/parameters.html) for a list and description of allowable parameters.
+See the [Gurobi Documentation](https://www.gurobi.com/documentation/current/refman/parameters.html) for a list and description of allowable parameters.
 
 ### Common Performance Pitfall with JuMP
 
@@ -86,7 +88,7 @@ By default, `build`ing *Gurobi.jl* will fail if the Gurobi library is not found.
 - Make sure that the `GUROBI_HOME` environment variable is set correctly. You can see the current value as follows
 ```julia
 julia> ENV["GUROBI_HOME"]
-"C:\\gurobi801\\win64"
+"C:\\gurobi902\\win64"
 ```
 If it is not set correctly (e.g., you get an error `Key "GUROBI_HOME" not found`), you can set it as follows
 ```julia
@@ -94,7 +96,7 @@ julia> ENV["GUROBI_HOME"] = "/replace/this/with/the/path/to/gurobi"
 
 julia> import Pkg; Pkg.build("Gurobi")
 ```
-The Gurobi library (`gurobiXXX.dll` on Windows, `gurobiXXX.so` on Unix, and `gurobiXXX.dylib` in OSX where `XXX` is a version) will be searched for in ``GUROBI_HOME/lib`` on unix platforms and ``GUROBI_HOME\bin`` on Windows.
+The Gurobi library (`gurobiXX.dll` on Windows, `gurobiXX.so` on Unix, and `gurobiXX.dylib` in OSX where `XX` is a version) will be searched for in ``GUROBI_HOME/lib`` on unix platforms and ``GUROBI_HOME\bin`` on Windows.
 
 ## Reusing the same Gurobi environment for multiple solves
 
@@ -513,7 +515,7 @@ Note that you can use ``add_ivars!`` and ``add_bvars!`` to add multiple integer 
 ```julia
 using JuMP, Gurobi
 
-model = Model(with_optimizer(Gurobi.Optimizer))
+model = Model(Gurobi.Optimizer)
 
 @variables(model, begin
     0 <= x <= 5
