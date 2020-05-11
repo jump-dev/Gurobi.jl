@@ -20,7 +20,9 @@ function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
         f(cb_data, cb_where)
         model.callback_state = CB_NONE
     end)
-    update_model!(model.inner)
+    # mark the update as necessary and immediately call for the update
+    _require_update(model)
+    _update_if_necessary(model)
     return
 end
 MOI.supports(::Optimizer, ::CallbackFunction) = true

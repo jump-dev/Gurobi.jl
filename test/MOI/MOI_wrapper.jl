@@ -492,6 +492,43 @@ end
     }()))
 end
 
+@testset "Buffered deletion test" begin
+    # Check if the VarHintVal of variables (could be any attribute that is not
+    # cached, the most common as: the bounds, name, and the start, are all
+    # cached) are right if we remove some variables and add new ones without
+    # updating the model (and that they stay correct after updating the model,
+    # here done by `MOI.optimize!`, as the update needs to be done inside MOI
+    # code, that is aware of the lazy updates).
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    vars = MOI.add_variables(model, 3)
+    vars_obj = [7.0, 42.0, -0.5]
+    obj_attr = Gurobi.VariableAttribute("Obj")
+    MOI.set.(model, obj_attr, vars, vars_obj)
+    @test all(MOI.is_valid.(model, vars))
+    @test MOI.get.(model, obj_attr, vars) == vars_obj
+    MOI.delete(model, vars[[1, 3]])
+    @test !MOI.is_valid(model, vars[1])
+    @test !MOI.is_valid(model, vars[3])
+    fourth_var = MOI.add_variable(model)
+    fourth_var_obj = -77.0
+    MOI.set(model, obj_attr, fourth_var, fourth_var_obj)
+    # Check before updating the model and after the delete+insert.
+    @test !MOI.is_valid(model, vars[1])
+    @test !MOI.is_valid(model, vars[3])
+    @test MOI.is_valid(model, vars[2])
+    @test vars_obj[2] == MOI.get(model, obj_attr, vars[2])
+    @test MOI.is_valid(model, fourth_var)
+    @test fourth_var_obj == MOI.get(model, obj_attr, fourth_var)
+    # Then optimize to force an update.
+    MOI.optimize!(model)
+    # And check again.
+    @test MOI.is_valid(model, vars[2])
+    @test vars_obj[2] == MOI.get(model, obj_attr, vars[2])
+    @test MOI.is_valid(model, fourth_var)
+    @test fourth_var_obj == MOI.get(model, obj_attr, fourth_var)
+end
+
+
 @testset "Extra name tests" begin
     model = Gurobi.Optimizer(GUROBI_ENV)
     @testset "Variables" begin
