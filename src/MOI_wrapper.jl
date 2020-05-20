@@ -2636,19 +2636,7 @@ function MOI.get(
     end
 end
 
-"""
-    compute_conflict(model::Optimizer)
-
-Compute a minimal subset of the constraints and variables that keep the model
-infeasible.
-
-See also `Gurobi.ConflictStatus` and `Gurobi.ConstraintConflictStatus`.
-
-Note that if `model` is modified after a call to `compute_conflict`, the
-conflict is not purged, and any calls to the above attributes will return
-values for the original conflict without a warning.
-"""
-function compute_conflict(model::Optimizer)
+function MOI.compute_conflict!(model::Optimizer)
     computeIIS(model.inner)
     return
 end
@@ -2665,25 +2653,14 @@ function _is_feasible(model::Optimizer)
     return model.inner.conflict == Gurobi.GRB_INFEASIBLE
 end
 
-"""
-    ConflictStatus()
-
-Return an `MOI.TerminationStatusCode` indicating the status of the last
-computed conflict. If a minimal conflict is found, it will return
-`MOI.OPTIMAL`. If the problem is feasible, it will return `MOI.INFEASIBLE`. If
-`compute_conflict` has not been called yet, it will return
-`MOI.OPTIMIZE_NOT_CALLED`.
-"""
-struct ConflictStatus <: MOI.AbstractModelAttribute end
-
-MOI.is_set_by_optimize(::ConflictStatus) = true
-
-function MOI.get(model::Optimizer, ::ConflictStatus)
+function MOI.get(model::Optimizer, ::MOI.ConflictStatus)
     if model.inner.conflict == -1
-        return MOI.OPTIMIZE_NOT_CALLED
+        return MOI.COMPUTE_CONFLICT_NOT_CALLED
     elseif model.inner.conflict == 0
-        return MOI.OPTIMAL
-    elseif model.inner.conflict == Gurobi.GRB_LOADED
+        return MOI.CONFLICT_FOUND
+    elseif model.inner.conflict == Gurobi.IIS_NOT_INFEASIBLE
+        return MOI.NO_CONFLICT_EXISTS
+    elseif model.inner.conflict == Gurobi.GRB_LOADED # TODO: these codes do not exist in MOI.
         return MOI.OTHER_ERROR
     elseif model.inner.conflict == Gurobi.GRB_OPTIMAL
         return MOI.OPTIMAL
@@ -2714,69 +2691,70 @@ function MOI.get(model::Optimizer, ::ConflictStatus)
     end
 end
 
-"""
-    ConstraintConflictStatus()
-
-A Boolean constraint attribute indicating whether the constraint participates
-in the last computed conflict.
-"""
-struct ConstraintConflictStatus <: MOI.AbstractConstraintAttribute end
-
-MOI.is_set_by_optimize(::ConstraintConflictStatus) = true
-
 function MOI.get(
-    model::Optimizer, ::ConstraintConflictStatus,
+    model::Optimizer, ::MOI.ConstraintConflictStatus,
     index::MOI.ConstraintIndex{MOI.SingleVariable, <:MOI.LessThan}
 )
     _ensure_conflict_computed(model)
     if _is_feasible(model)
-        return false
+        return MOI.NOT_IN_CONFLICT
+    elseif get_intattrelement(model.inner, "IISUB", _info(model, index).column) > 0
+        return MOI.IN_CONFLICT
+    else
+        return MOI.NOT_IN_CONFLICT
     end
-    return get_intattrelement(model.inner, "IISUB", _info(model, index).column) > 0
 end
 
 function MOI.get(
-    model::Optimizer, ::ConstraintConflictStatus,
+    model::Optimizer, ::MOI.ConstraintConflictStatus,
     index::MOI.ConstraintIndex{MOI.SingleVariable, <:MOI.GreaterThan}
 )
     _ensure_conflict_computed(model)
     if _is_feasible(model)
-        return false
+        return MOI.NOT_IN_CONFLICT
+    elseif get_intattrelement(model.inner, "IISLB", _info(model, index).column) > 0
+        return MOI.IN_CONFLICT
+    else
+        return MOI.NOT_IN_CONFLICT
     end
-    return get_intattrelement(model.inner, "IISLB", _info(model, index).column) > 0
 end
 
 function MOI.get(
-    model::Optimizer, ::ConstraintConflictStatus,
+    model::Optimizer, ::MOI.ConstraintConflictStatus,
     index::MOI.ConstraintIndex{
         MOI.SingleVariable, <:Union{MOI.EqualTo, MOI.Interval}
     }
 )
     _ensure_conflict_computed(model)
     if _is_feasible(model)
-        return false
+        return MOI.NOT_IN_CONFLICT
+    elseif get_intattrelement(model.inner, "IISLB", _info(model, index).column) > 0
+        return MOI.IN_CONFLICT
+    elseif get_intattrelement(model.inner, "IISUB", _info(model, index).column) > 0
+        return MOI.IN_CONFLICT
+    else
+        return MOI.NOT_IN_CONFLICT
     end
-    if get_intattrelement(model.inner, "IISLB", _info(model, index).column) > 0
-        return true
-    end
-    return get_intattrelement(model.inner, "IISUB", _info(model, index).column) > 0
 end
 
 function MOI.get(
-    model::Optimizer, ::ConstraintConflictStatus,
+    model::Optimizer, ::MOI.ConstraintConflictStatus,
     index::MOI.ConstraintIndex{
         MOI.ScalarAffineFunction{Float64}, <:SUPPORTED_SCALAR_SETS
     }
 )
     _ensure_conflict_computed(model)
     if _is_feasible(model)
-        return false
+        return MOI.NOT_IN_CONFLICT
+    elseif get_intattrelement(model.inner, "IISConstr", _info(model, index).row) > 0
+        return MOI.IN_CONFLICT
+    else
+        return MOI.NOT_IN_CONFLICT
     end
-    return get_intattrelement(model.inner, "IISConstr", _info(model, index).row) > 0
 end
 
 function MOI.get(
-    model::Optimizer, ::ConstraintConflictStatus,
+    model::Optimizer, ::MOI.ConstraintConflictStatus,
     index::MOI.ConstraintIndex{
         MOI.ScalarQuadraticFunction{Float64},
         <:Union{MOI.LessThan, MOI.GreaterThan}
@@ -2784,9 +2762,12 @@ function MOI.get(
 )
     _ensure_conflict_computed(model)
     if _is_feasible(model)
-        return false
+        return MOI.NOT_IN_CONFLICT
+    elseif get_intattrelement(model.inner, "IISQConstr", _info(model, index).row) > 0
+        return MOI.IN_CONFLICT
+    else
+        return MOI.NOT_IN_CONFLICT
     end
-    return get_intattrelement(model.inner, "IISQConstr", _info(model, index).row) > 0
 end
 
 ###
