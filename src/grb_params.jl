@@ -96,7 +96,14 @@ const GRB_INT_PARAMS =[
     "PoolSolutions",
     "PoolSearchMode",
     "NonConvex",
-]
+    "BQPCuts",
+    "FuncPieces",
+    "IgnoreNames",
+    "PartitionPlace",
+    "RelaxLiftCuts",
+    "RLTCuts",
+    "StartNodeLimit",
+    "StartNumber"]
 
 # This list was obtained through AWK (with Gurobi 5.6)
 # command:
@@ -130,7 +137,12 @@ const GRB_DBL_PARAMS = [
     "PreSOS1BigM",
     "PreSOS2BigM",
     "TuneTimeLimit",
-    "PoolGap"]
+    "PoolGap",
+    "FuncMaxVal",
+    "FuncPieceError",
+    "FuncPieceLength",
+    "FuncPieceRatio",
+    ]
 
 # This list was obtained through AWK (with Gurobi 5.6)
 # command:
@@ -144,7 +156,10 @@ const GRB_STR_PARAMS = [
     "LogFile",
     "WorkerPool",
     "ResultFile",
-    "Dummy"]
+    "Dummy",
+    "InputFile",
+    "LogFile",
+    ]
 
 
 #################################################
