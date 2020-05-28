@@ -2660,34 +2660,8 @@ function MOI.get(model::Optimizer, ::MOI.ConflictStatus)
         return MOI.CONFLICT_FOUND
     elseif model.inner.conflict == Gurobi.IIS_NOT_INFEASIBLE
         return MOI.NO_CONFLICT_EXISTS
-    elseif model.inner.conflict == Gurobi.GRB_LOADED # TODO: these codes do not exist in MOI.
-        return MOI.OTHER_ERROR
-    elseif model.inner.conflict == Gurobi.GRB_OPTIMAL
-        return MOI.OPTIMAL
-    elseif model.inner.conflict == Gurobi.GRB_INFEASIBLE
-        return MOI.INFEASIBLE
-    elseif model.inner.conflict == Gurobi.GRB_INF_OR_UNBD
-        return MOI.INFEASIBLE_OR_UNBOUNDED
-    elseif model.inner.conflict == Gurobi.GRB_USER_OBJ_LIMIT
-        return MOI.OBJECTIVE_LIMIT
-    elseif model.inner.conflict == Gurobi.GRB_ITERATION_LIMIT
-        return MOI.ITERATION_LIMIT
-    elseif model.inner.conflict == Gurobi.GRB_NODE_LIMIT
-        return MOI.NODE_LIMIT
-    elseif model.inner.conflict == Gurobi.GRB_TIME_LIMIT
-        return MOI.TIME_LIMIT
-    elseif model.inner.conflict == Gurobi.GRB_SOLUTION_LIMIT
-        return MOI.SOLUTION_LIMIT
-    elseif model.inner.conflict == Gurobi.GRB_INTERRUPTED
-        return MOI.INTERRUPTED
-    elseif model.inner.conflict == Gurobi.GRB_NUMERIC
-        return MOI.NUMERICAL_ERROR
-    elseif model.inner.conflict == Gurobi.GRB_SUBOPTIMAL
-        return MOI.OTHER_LIMIT
-    elseif model.inner.conflict == Gurobi.GRB_INPROGRESS
-        return MOI.OTHER_ERROR
     else
-        return MOI.OTHER_ERROR
+        return MOI.NO_CONFLICT_FOUND
     end
 end
 
