@@ -282,11 +282,13 @@ end
         c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(1.0))
 
         # Getting the results before the conflict refiner has been called must return an error.
+        @test MOI.get(model, Gurobi.ConflictStatus()) == -1
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.COMPUTE_CONFLICT_NOT_CALLED
         @test_throws ErrorException MOI.get(model, MOI.ConstraintConflictStatus(), c1)
 
         # Once it's called, no problem.
         MOI.compute_conflict!(model)
+        @test MOI.get(model, Gurobi.ConflictStatus()) == 0
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
         @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.IN_CONFLICT
         @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) == MOI.IN_CONFLICT
@@ -299,11 +301,13 @@ end
         c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.LessThan(1.0))
 
         # Getting the results before the conflict refiner has been called must return an error.
+        @test MOI.get(model, Gurobi.ConflictStatus()) == -1
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.COMPUTE_CONFLICT_NOT_CALLED
         @test_throws ErrorException MOI.get(model, MOI.ConstraintConflictStatus(), c1)
 
         # Once it's called, no problem.
         MOI.compute_conflict!(model)
+        @test MOI.get(model, Gurobi.ConflictStatus()) == 0
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
         @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.IN_CONFLICT
         @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) == MOI.IN_CONFLICT
@@ -316,11 +320,13 @@ end
             model, MOI.SingleVariable(x), MOI.Interval(1.0, 0.0)
         )
         # Getting the results before the conflict refiner has been called must return an error.
+        @test MOI.get(model, Gurobi.ConflictStatus()) == -1
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.COMPUTE_CONFLICT_NOT_CALLED
         @test_throws ErrorException MOI.get(model, MOI.ConstraintConflictStatus(), c1)
 
         # Once it's called, no problem.
         MOI.compute_conflict!(model)
+        @test MOI.get(model, Gurobi.ConflictStatus()) == 0
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
         @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.IN_CONFLICT
     end
@@ -337,11 +343,13 @@ end
         c2 = MOI.add_constraint(model, cf2, MOI.GreaterThan(1.0))
 
         # Getting the results before the conflict refiner has been called must return an error.
+        @test MOI.get(model, Gurobi.ConflictStatus()) == -1
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.COMPUTE_CONFLICT_NOT_CALLED
         @test_throws ErrorException MOI.get(model, MOI.ConstraintConflictStatus(), c1)
 
         # Once it's called, no problem.
         MOI.compute_conflict!(model)
+        @test MOI.get(model, Gurobi.ConflictStatus()) == 0
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
         @test MOI.get(model, MOI.ConstraintConflictStatus(), b1) == MOI.IN_CONFLICT
         @test MOI.get(model, MOI.ConstraintConflictStatus(), b2) == MOI.IN_CONFLICT
@@ -361,11 +369,13 @@ end
         c2 = MOI.add_constraint(model, cf2, MOI.GreaterThan(1.0))
 
         # Getting the results before the conflict refiner has been called must return an error.
+        @test MOI.get(model, Gurobi.ConflictStatus()) == -1
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.COMPUTE_CONFLICT_NOT_CALLED
         @test_throws ErrorException MOI.get(model, MOI.ConstraintConflictStatus(), c1)
 
         # Once it's called, no problem.
         MOI.compute_conflict!(model)
+        @test MOI.get(model, Gurobi.ConflictStatus()) == 0
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
         @test MOI.get(model, MOI.ConstraintConflictStatus(), b1) == MOI.IN_CONFLICT
         @test MOI.get(model, MOI.ConstraintConflictStatus(), b2) == MOI.IN_CONFLICT
@@ -387,11 +397,13 @@ end
         c2 = MOI.add_constraint(model, cf2, MOI.GreaterThan(1.0))
 
         # Getting the results before the conflict refiner has been called must return an error.
+        @test MOI.get(model, Gurobi.ConflictStatus()) == -1
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.COMPUTE_CONFLICT_NOT_CALLED
         @test_throws ErrorException MOI.get(model, MOI.ConstraintConflictStatus(), c1)
 
         # Once it's called, no problem.
         MOI.compute_conflict!(model)
+        @test MOI.get(model, Gurobi.ConflictStatus()) == 0
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
         @test MOI.get(model, MOI.ConstraintConflictStatus(), b1) == MOI.IN_CONFLICT
         @test MOI.get(model, MOI.ConstraintConflictStatus(), b2) == MOI.IN_CONFLICT
@@ -407,12 +419,14 @@ end
         c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.LessThan(2.0))
 
         # Getting the results before the conflict refiner has been called must return an error.
+        @test MOI.get(model, Gurobi.ConflictStatus()) == -1
         @test MOI.get(model, MOI.ConflictStatus()) == MOI.COMPUTE_CONFLICT_NOT_CALLED
         @test_throws ErrorException MOI.get(model, MOI.ConstraintConflictStatus(), c1)
 
         # TODO(odow): bypass Gurobi's IIS checker when underlying model is
         # feasible.
         # @test_throws Gurobi.GurobiError MOI.compute_conflict!(model)
+        # @test MOI.get(model, Gurobi.ConflictStatus()) == Gurobi.IIS_NOT_INFEASIBLE
         # @test MOI.get(model, MOI.ConflictStatus()) == MOI.NO_CONFLICT_EXISTS
         # @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.NOT_IN_CONFLICT
         # @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) == MOI.NOT_IN_CONFLICT

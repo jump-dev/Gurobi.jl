@@ -2655,12 +2655,29 @@ function _is_feasible(model::Optimizer)
     return model.inner.conflict == Gurobi.GRB_INFEASIBLE
 end
 
+"""
+    ConflictStatus()
+
+Return the raw status from Gurobi indicating the status of the last
+computed conflict. It returns an integer:
+
+* `-1` if `compute_conflict!` has not yet been called
+* `0` if it found a conflict
+* other values are defined in [Gurobi's documentation](https://www.gurobi.com/documentation/9.0/refman/error_codes.html)
+"""
+struct ConflictStatus <: MOI.AbstractModelAttribute end
+
+function MOI.get(model::Optimizer, ::ConflictStatus)
+    return model.inner.conflict
+end
+
 function MOI.get(model::Optimizer, ::MOI.ConflictStatus)
-    if model.inner.conflict == -1
+    status = MOI.get(model, ConflictStatus())
+    if status == -1
         return MOI.COMPUTE_CONFLICT_NOT_CALLED
-    elseif model.inner.conflict == 0
+    elseif status == 0
         return MOI.CONFLICT_FOUND
-    elseif model.inner.conflict == Gurobi.IIS_NOT_INFEASIBLE
+    elseif status == Gurobi.IIS_NOT_INFEASIBLE
         return MOI.NO_CONFLICT_EXISTS
     else
         return MOI.NO_CONFLICT_FOUND
