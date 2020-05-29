@@ -2636,6 +2636,8 @@ function MOI.get(
     end
 end
 
+@deprecate compute_conflict MOI.compute_conflict!
+
 function MOI.compute_conflict!(model::Optimizer)
     computeIIS(model.inner)
     return
