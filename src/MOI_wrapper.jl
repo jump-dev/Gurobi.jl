@@ -2663,7 +2663,7 @@ computed conflict. It returns an integer:
 
 * `-1` if `compute_conflict!` has not yet been called
 * `0` if it found a conflict
-* other values are defined in [Gurobi's documentation](https://www.gurobi.com/documentation/9.0/refman/error_codes.html)
+* other values are defined in [Gurobi's documentation](https://www.gurobi.com/documentation/current/refman/error_codes.html)
 """
 struct ConflictStatus <: MOI.AbstractModelAttribute end
 
