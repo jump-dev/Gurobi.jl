@@ -153,7 +153,7 @@ if !found && !haskey(ENV, "GUROBI_JL_SKIP_LIB_CHECK")
     diagnose_gurobi_install()
     error("""
     Unable to locate Gurobi installation. If the advice above did not help,
-    open an issue at https://github.com/JuliaOpt/Gurobi.jl and post the full
+    open an issue at https://github.com/jump-dev/Gurobi.jl and post the full
     print-out of this diagnostic attempt.
     """)
 end

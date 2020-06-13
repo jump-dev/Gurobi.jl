@@ -14,7 +14,7 @@ set_optimizer_attribute(model, "NonConvex", 2)
 
 ## Use with JuMP
 
-We highly recommend that you use the *Gurobi.jl* package with higher level packages such as [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl).
+We highly recommend that you use the *Gurobi.jl* package with higher level packages such as [JuMP.jl](https://github.com/jump-dev/JuMP.jl).
 
 This can be done using the ``Gurobi.Optimizer`` object. Here is how to create a *JuMP* model that uses Gurobi as the solver. 
 ```julia
@@ -28,7 +28,7 @@ See the [Gurobi Documentation](https://www.gurobi.com/documentation/current/refm
 
 ## Reusing the same Gurobi environment for multiple solves
 
-When using this package via other packages such as [JuMP.jl](https://github.com/JuliaOpt/JuMP.jl), the default behavior is to obtain a new Gurobi license token every time a model is created and solved. If you are using Gurobi in a setting where the number of concurrent Gurobi uses is limited (e.g. ["Single-Use" or "Floating-Use" licenses](http://www.gurobi.com/products/licensing-pricing/licensing-overview)), you might instead prefer to obtain a single license token that is shared by all models that your program solves. You can do this by passing a Gurobi Environment object as the first parameter to `Gurobi.Optimizer`. For example, the follow code snippet solves multiple problems with JuMP using the same license token:
+When using this package via other packages such as [JuMP.jl](https://github.com/jump-dev/JuMP.jl), the default behavior is to obtain a new Gurobi license token every time a model is created and solved. If you are using Gurobi in a setting where the number of concurrent Gurobi uses is limited (e.g. ["Single-Use" or "Floating-Use" licenses](http://www.gurobi.com/products/licensing-pricing/licensing-overview)), you might instead prefer to obtain a single license token that is shared by all models that your program solves. You can do this by passing a Gurobi Environment object as the first parameter to `Gurobi.Optimizer`. For example, the follow code snippet solves multiple problems with JuMP using the same license token:
 
 ```julia
 using JuMP, Gurobi
@@ -133,7 +133,7 @@ MOI.get(model, Gurobi.VariableAttribute("LB"), x)  # Returns 0.0
 
 MOI.get(model, Gurobi.ModelAttribute("NumConstrs")) # Returns 1
 ```
-Note that we are using [JuMP in direct-mode](https://www.juliaopt.org/JuMP.jl/v0.20.0/solvers/#Direct-mode-1). 
+Note that we are using [JuMP in direct-mode](https://jump.dev/JuMP.jl/v0.20.0/solvers/#Direct-mode-1).
 A complete list of supported Gurobi attributes can be found in [their online documentation](https://www.gurobi.com/documentation/8.1/refman/attributes.html).
 
 *Most users should not need to use the low-level API detailed in the following sections.*
@@ -393,7 +393,7 @@ solution = linprog(f, A, '<', b, lb, Inf, GurobiSolver(Presolve=0))
 
 ##### Example 1.4: Linear programming with JuMP (Algebraic model)
 
-Using [JuMP](https://github.com/JuliaOpt/JuMP.jl), we can specify linear programming problems using a more
+Using [JuMP](https://github.com/jump-dev/JuMP.jl), we can specify linear programming problems using a more
 natural algebraic approach.
 
 ```julia

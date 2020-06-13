@@ -6,7 +6,7 @@ if isfile(_DEPS_FILE)
 else
     error("""
         Gurobi not properly installed. Please run Pkg.build(\"Gurobi\"). For
-        more information go to https://github.com/JuliaOpt/Gurobi.jl
+        more information go to https://github.com/jump-dev/Gurobi.jl
     """)
 end
 
