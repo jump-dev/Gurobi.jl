@@ -4,7 +4,7 @@ The [Gurobi](http://www.gurobi.com) Optimizer is a commercial optimization solve
 
 *The Gurobi wrapper for Julia is community driven and not officially supported by Gurobi. If you are a commercial customer interested in official support for Julia from Gurobi, let them know!*
 
-## Using Gurobi v0.9 and you got an error like `Q not PSD`?
+## Using Gurobi v9.0 and you got an error like `Q not PSD`?
 
 You need to set the NonConvex parameter:
 ```julia
