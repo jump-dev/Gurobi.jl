@@ -311,10 +311,11 @@ setparam!(env, "Presolve", 0)
  # construct the model
 model = gurobi_model(env;
     name = "lp_01",
+    sense = :maximize,
     f = ones(2),
     A = [50. 24.; 30. 33.],
     b = [2400., 2100.],
-    lb = [5., 45.])
+    lb = [45., 5.])
 
  # run optimization
 optimize(model)
@@ -382,10 +383,10 @@ Julia code:
 ```julia
 using MathProgBase, Gurobi
 
-f = [1., 1.]
+f = -[1., 1.]
 A = [50. 24.; 30. 33.]
 b = [2400., 2100.]
-lb = [5., 45.]
+lb = [45., 5.]
 
 # pass params as keyword arguments to GurobiSolver
 solution = linprog(f, A, '<', b, lb, Inf, GurobiSolver(Presolve=0))
@@ -400,12 +401,12 @@ natural algebraic approach.
 using JuMP, Gurobi
 
 # pass params as keyword arguments to GurobiSolver
-model = Model(with_optimizer(Gurobi.Optimizer, Presolve=0))
+model = Model(optimizer_with_attributes(Gurobi.Optimizer, "Presolve" => 0))
 
-@variable(model, x >= 5)
-@variable(model, y >= 45)
+@variable(model, x >= 45)
+@variable(model, y >=  5)
 
-@objective(model, Min, x + y)
+@objective(model, Max, x + y)
 @constraint(model, 50x + 24y <= 2400)
 @constraint(model, 30x + 33y <= 2100)
 
