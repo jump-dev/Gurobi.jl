@@ -94,11 +94,28 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     # variable type, and the names of SingleVariable-in-Set constraints.
     variable_info::CleverDicts.CleverDict{MOI.VariableIndex, VariableInfo}
 
-    # An index that is incremented for each new constraint (regardless of
-    # type). We can check if a constraint is valid by checking if it is in the
-    # correct xxx_constraint_info. We should _not_ reset this to zero, since
-    # then new constraints cannot be distinguished from previously created
-    # ones.
+    # If you add variables to a model that had variables deleted AND has
+    # not called `update_model!` since the deletion, then the newly created
+    # variables may have attributes set, but their column index before the
+    # call to `update_model!` is different than after the `update_model!`.
+    # Before the `update_model!` their column is the same as if no variables
+    # were deleted, after the `update_model!` the columns indexes are
+    # shifted (by being being subtracted by the number of variables deleted
+    # with column indexes smaller than them). To control this the two
+    # fields below are used:
+    # `next_column`: The column index of the next variable/column added. It is
+    # updated when variables are added, and when the `_update_if_necessary!` is
+    # called AND `columns_deleted_since_last_update` is not empty.
+    # `columns_deleted_since_last_update`: Stores the column indexes of all
+    # columns that were deleted since the last call to `_update_if_necessary!`,
+    # after such call the vector is emptied.
+    next_column::Int
+    columns_deleted_since_last_update::Vector{Int}
+
+    # An index that is incremented for each new constraint (regardless of type).
+    # We can check if a constraint is valid by checking if it is in the correct
+    # xxx_constraint_info. We should _not_ reset this to zero, since then new
+    # constraints cannot be distinguished from previously created ones.
     last_constraint_index::Int
     # ScalarAffineFunction{Float64}-in-Set storage.
     affine_constraint_info::Dict{Int, ConstraintInfo}
@@ -145,6 +162,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         model.silent = false
         model.params = Dict{String, Any}()
         model.variable_info = CleverDicts.CleverDict{MOI.VariableIndex, VariableInfo}()
+        model.next_column = 1
+        model.columns_deleted_since_last_update = Int[]
         model.affine_constraint_info = Dict{Int, ConstraintInfo}()
         model.quadratic_constraint_info = Dict{Int, ConstraintInfo}()
         model.sos_constraint_info = Dict{Int, ConstraintInfo}()
@@ -179,6 +198,8 @@ function MOI.empty!(model::Optimizer)
     model.objective_type = SCALAR_AFFINE
     model.is_feasibility = true
     empty!(model.variable_info)
+    model.next_column = 1
+    empty!(model.columns_deleted_since_last_update)
     empty!(model.affine_constraint_info)
     empty!(model.quadratic_constraint_info)
     empty!(model.sos_constraint_info)
@@ -200,14 +221,16 @@ function MOI.is_empty(model::Optimizer)
     model.objective_type != SCALAR_AFFINE && return false
     model.is_feasibility == false && return false
     !isempty(model.variable_info) && return false
-    length(model.affine_constraint_info) != 0 && return false
-    length(model.quadratic_constraint_info) != 0 && return false
-    length(model.sos_constraint_info) != 0 && return false
+    !isone(model.next_column) && return false
+    !isempty(model.columns_deleted_since_last_update) && return false
+    !isempty(model.affine_constraint_info) && return false
+    !isempty(model.quadratic_constraint_info) && return false
+    !isempty(model.sos_constraint_info) && return false
     model.name_to_variable !== nothing && return false
     model.name_to_constraint_index !== nothing && return false
     model.has_unbounded_ray && return false
     model.has_infeasibility_cert && return false
-    length(model.callback_variable_primal) != 0 && return false
+    !isempty(model.callback_variable_primal) && return false
     model.callback_state != CB_NONE && return false
     model.has_generic_callback && return false
     model.lazy_callback !== nothing && return false
@@ -233,8 +256,18 @@ Calls `update_model!`, but only if the `model.needs_update` flag is set.
 """
 function _update_if_necessary(model::Optimizer)
     if model.needs_update
+        sort!(model.columns_deleted_since_last_update)
+        for var_info in values(model.variable_info)
+            var_info.column -= searchsortedlast(
+                 model.columns_deleted_since_last_update, var_info.column
+            )
+        end
+        model.next_column -= length(model.columns_deleted_since_last_update)
+        empty!(model.columns_deleted_since_last_update)
         update_model!(model.inner)
         model.needs_update = false
+    else
+        @assert isempty(model.columns_deleted_since_last_update)
     end
     return
 end
@@ -429,6 +462,11 @@ function _info(model::Optimizer, key::MOI.VariableIndex)
     throw(MOI.InvalidIndex(key))
 end
 
+function _get_next_column(model::Optimizer)
+    model.next_column += 1
+    return model.next_column - 1
+end
+
 function MOI.add_variable(model::Optimizer)
     # Initialize `VariableInfo` with a dummy `VariableIndex` and a column,
     # because we need `add_item` to tell us what the `VariableIndex` is.
@@ -438,7 +476,7 @@ function MOI.add_variable(model::Optimizer)
     info = _info(model, index)
     # Now, set `.index` and `.column`.
     info.index = index
-    info.column = length(model.variable_info)
+    info.column = _get_next_column(model)
     add_cvar!(model.inner, 0.0)
     _require_update(model)
     return index
@@ -446,9 +484,7 @@ end
 
 function MOI.add_variables(model::Optimizer, N::Int)
     add_cvars!(model.inner, zeros(N))
-    _require_update(model)
     indices = Vector{MOI.VariableIndex}(undef, N)
-    num_variables = length(model.variable_info)
     for i in 1:N
         # Initialize `VariableInfo` with a dummy `VariableIndex` and a column,
         # because we need `add_item` to tell us what the `VariableIndex` is.
@@ -458,9 +494,10 @@ function MOI.add_variables(model::Optimizer, N::Int)
         info = _info(model, index)
         # Now, set `.index` and `.column`.
         info.index = index
-        info.column = num_variables + i
+        info.column = _get_next_column(model)
         indices[i] = index
     end
+    _require_update(model)
     return indices
 end
 
@@ -469,50 +506,40 @@ function MOI.is_valid(model::Optimizer, v::MOI.VariableIndex)
 end
 
 function MOI.delete(model::Optimizer, indices::Vector{<:MOI.VariableIndex})
-    _update_if_necessary(model)
+    #_update_if_necessary(model)
     info = [_info(model, var_idx) for var_idx in indices]
     soc_idx = findfirst(e -> e.num_soc_constraints > 0, info)
     soc_idx !== nothing && throw(MOI.DeleteNotAllowed(indices[soc_idx]))
-    sorted_del_cols = sort!(collect(i.column for i in info))
-    del_vars!(model.inner, convert(Vector{Cint}, sorted_del_cols))
-    _require_update(model)
+    del_cols = collect(i.column for i in info)
+    del_vars!(model.inner, convert(Vector{Cint}, del_cols))
     for var_idx in indices
         delete!(model.variable_info, var_idx)
     end
-    for other_info in values(model.variable_info)
-        # The trick here is: `searchsortedlast` returns, in O(log n), the
-        # last index with a row smaller than `info.row`, over `rows_to_delete`
-        # this is the same as the number of rows deleted before it, and how
-        # much its value need to be shifted.
-        other_info.column -= searchsortedlast(
-          sorted_del_cols, other_info.column
-        )
-    end
+
+    append!(model.columns_deleted_since_last_update, del_cols)
+
     model.name_to_variable = nothing
     # We throw away name_to_constraint_index so we will rebuild SingleVariable
     # constraint names without v.
     model.name_to_constraint_index = nothing
+    _require_update(model)
     return
 end
 
 function MOI.delete(model::Optimizer, v::MOI.VariableIndex)
-    _update_if_necessary(model)
+    #_update_if_necessary(model)
     info = _info(model, v)
     if info.num_soc_constraints > 0
         throw(MOI.DeleteNotAllowed(v))
     end
+    push!(model.columns_deleted_since_last_update, info.column)
     del_vars!(model.inner, Cint[info.column])
-    _require_update(model)
     delete!(model.variable_info, v)
-    for other_info in values(model.variable_info)
-        if other_info.column > info.column
-            other_info.column -= 1
-        end
-    end
     model.name_to_variable = nothing
     # We throw away name_to_constraint_index so we will rebuild SingleVariable
     # constraint names without v.
     model.name_to_constraint_index = nothing
+    _require_update(model)
     return
 end
 
@@ -636,6 +663,8 @@ function MOI.set(
         column = _info(model, term.variable_index).column
         obj[column] += term.coefficient
     end
+    # NOTE: variables added may be referred before a `_update_if_necessary`
+    # what is the problem we try to prevent below?
     # This update is needed because we might have added some variables.
     _update_if_necessary(model)
     set_dblattrarray!(model.inner, "Obj", 1, num_vars, obj)
