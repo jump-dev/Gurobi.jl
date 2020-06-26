@@ -13,14 +13,18 @@ const SCALAR_SETS = Union{
     MOI.EqualTo{Float64}, MOI.Interval{Float64}
 }
 
+# Union used by many methods because interval constraints are not supported.
+const SUPPORTED_SCALAR_SETS = Union{
+    MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.EqualTo{Float64}
+}
+
 mutable struct VariableInfo
     index::MOI.VariableIndex
     column::Int
     bound::BoundType
     # Both fields below are cached values to avoid triggering a model_update!
-    # if the variable bounds are queried. They are non-NaN only if `bound` is
-    # different from NONE. EQUAL_TO sets both of them. See also
-    # `lower_bound_if_soc`.
+    # if the variable bounds are queried. They are NaN only if `bound` is
+    # NONE. EQUAL_TO sets both of them. See also `lower_bound_if_soc`.
     lower_bound_if_bounded::Float64
     upper_bound_if_bounded::Float64
     type::VariableType
@@ -37,21 +41,24 @@ mutable struct VariableInfo
     # Storage for the lower bound if the variable is the `t` variable in a
     # second order cone. Theoretically, if both `lower_bound_if_bounded` and
     # `lower_bound_if_soc` are non-NaN, then they have the same value,
-    # but you can also just have SOC constraints, or just have bounds, or
-    # have a bound and have a SOC constraint that does not need to set
+    # but you can also: (1) just have SOC constraints; (2) just have bounds;
+    # (3) have a bound and a SOC constraint that does not need to set
     # `lower_bound_if_soc` (in all such cases just one of them is NaN).
     lower_bound_if_soc::Float64
     num_soc_constraints::Int
     function VariableInfo(index::MOI.VariableIndex, column::Int)
-        return new(index, column, NONE, NaN, NaN, CONTINUOUS, nothing, "", "", "", "", NaN, 0)
+        return new(
+            index, column, NONE, NaN, NaN, CONTINUOUS, nothing,
+            "", "", "", "", NaN, 0
+        )
     end
 end
 
 mutable struct ConstraintInfo
     row::Int
     set::MOI.AbstractSet
-    # Storage for constraint names. Where possible, these are also stored in the
-    # Gurobi model.
+    # Storage for constraint names. Where possible, these are also stored in
+    # the Gurobi model.
     name::String
     ConstraintInfo(row::Int, set) = new(row, set, "")
 end
@@ -66,8 +73,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     params::Dict{String, Any}
 
     # The next field is used to cleverly manage calls to `update_model!`.
-    # `needs_update` is used to record whether an update should be called before
-    # accessing a model attribute (such as the value of a RHS term).
+    # `needs_update` is used to record whether an update should be called
+    # before accessing a model attribute (such as the value of a RHS term).
     needs_update::Bool
 
     # A flag to keep track of MOI.Silent, which over-rides the OutputFlag
@@ -122,8 +129,10 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
 
     # Mappings from variable and constraint names to their indices. These are
     # lazily built on-demand, so most of the time, they are `nothing`.
-    name_to_variable::Union{Nothing, Dict{String, Union{Nothing, MOI.VariableIndex}}}
-    name_to_constraint_index::Union{Nothing, Dict{String, Union{Nothing, MOI.ConstraintIndex}}}
+    name_to_variable::Union{Nothing,
+        Dict{String, Union{Nothing, MOI.VariableIndex}}}
+    name_to_constraint_index::Union{Nothing,
+        Dict{String, Union{Nothing, MOI.ConstraintIndex}}}
 
     # These two flags allow us to distinguish between FEASIBLE_POINT and
     # INFEASIBILITY_CERTIFICATE when querying VariablePrimal and ConstraintDual.
@@ -506,7 +515,9 @@ function MOI.delete(model::Optimizer, indices::Vector{<:MOI.VariableIndex})
     for var_idx in indices
         delete!(model.variable_info, var_idx)
     end
+
     append!(model.columns_deleted_since_last_update, del_cols)
+
     model.name_to_variable = nothing
     # We throw away name_to_constraint_index so we will rebuild SingleVariable
     # constraint names without v.
@@ -666,7 +677,8 @@ function MOI.get(
     model::Optimizer, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}
 )
     if model.objective_type == SCALAR_QUADRATIC
-        error("Unable to get objective function. Currently: $(model.objective_type).")
+        error("Unable to get objective function. Currently: " *
+            "$(model.objective_type).")
     end
     _update_if_necessary(model)
     dest = zeros(length(model.variable_info))
@@ -998,22 +1010,22 @@ function _set_variable_lower_bound(model, info, value)
         set_dblattrelement!(model.inner, "LB", info.column, value)
         _require_update(model)
     elseif value >= 0.0
-        # Regardless of whether there are SOC constraints, this is a valid bound
-        # for the SOC constraint and should over-ride any previous bounds.
+        # Regardless of whether there are SOC constraints, this is a valid
+        # bound for the SOC constraint and should override any previous bounds.
         info.lower_bound_if_soc = NaN
         set_dblattrelement!(model.inner, "LB", info.column, value)
         _require_update(model)
     elseif isnan(info.lower_bound_if_soc)
-        # Previously, we had a non-negative lower bound (i.e., it was set in the
-        # case above). Now we're setting this with a negative one, but there are
-        # still some SOC constraints, so we cache `value` and set the variable
-        # lower bound to `0.0`.
+        # Previously, we had a non-negative lower bound (i.e., it was set in
+        # the case above). Now we are setting this with a negative one, but
+        # there are still some SOC constraints, so we cache `value` and set the
+        # variable lower bound to `0.0`.
         @assert value < 0.0
         set_dblattrelement!(model.inner, "LB", info.column, 0.0)
         _require_update(model)
         info.lower_bound_if_soc = value
     else
-        # Previously, we had a negative lower bound. We're setting this with
+        # Previously, we had a negative lower bound. We are setting this with
         # another negative one, but there are still some SOC constraints.
         @assert info.lower_bound_if_soc < 0.0
         info.lower_bound_if_soc = value
@@ -1032,8 +1044,8 @@ See also `_set_variable_lower_bound`.
 """
 function _get_variable_lower_bound(model, info)
     if !isnan(info.lower_bound_if_soc)
-        # There is a value stored. That means that we must have set a value that
-        # was < 0.
+        # There is a value stored. That means that we must have set a value
+        # that was < 0.
         @assert info.lower_bound_if_soc < 0.0
         return info.lower_bound_if_soc
     elseif !isnan(info.lower_bound_if_bounded)
@@ -1372,7 +1384,8 @@ function MOI.get(
     elseif S <: Union{MOI.GreaterThan, MOI.Interval, MOI.EqualTo}
         return info.greaterthan_interval_or_equalto_name
     else
-        @assert S <: Union{MOI.ZeroOne, MOI.Integer, MOI.Semiinteger, MOI.Semicontinuous}
+        @assert S <: Union{MOI.ZeroOne, MOI.Integer, MOI.Semiinteger,
+            MOI.Semicontinuous}
         return info.type_constraint_name
     end
 end
@@ -1391,7 +1404,8 @@ function MOI.set(
         old_name = info.greaterthan_interval_or_equalto_name
         info.greaterthan_interval_or_equalto_name = name
     else
-        @assert S <: Union{MOI.ZeroOne, MOI.Integer, MOI.Semiinteger, MOI.Semicontinuous}
+        @assert S <: Union{MOI.ZeroOne, MOI.Integer, MOI.Semiinteger,
+            MOI.Semicontinuous}
         info.type_constraint_name
         info.type_constraint_name = name
     end
@@ -1427,7 +1441,7 @@ end
 
 function MOI.add_constraint(
     model::Optimizer, f::MOI.ScalarAffineFunction{Float64},
-    s::Union{MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.EqualTo{Float64}}
+    s::SUPPORTED_SCALAR_SETS
 )
     if !iszero(f.constant)
         throw(MOI.ScalarFunctionConstantNotZero{Float64, typeof(f), typeof(s)}(f.constant))
@@ -1445,7 +1459,7 @@ end
 
 function MOI.add_constraints(
     model::Optimizer, f::Vector{MOI.ScalarAffineFunction{Float64}},
-    s::Vector{<:Union{MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.EqualTo{Float64}}}
+    s::Vector{<:SUPPORTED_SCALAR_SETS}
 )
     if length(f) != length(s)
         error("Number of functions does not equal number of sets.")
@@ -1901,7 +1915,8 @@ function check_moi_callback_validity(model::Optimizer)
         model.user_cut_callback !== nothing ||
         model.heuristic_callback !== nothing
     if has_moi_callback && model.has_generic_callback
-        error("Cannot use Gurobi.CallbackFunction as well as MOI.AbstractCallbackFunction")
+        error("Cannot use Gurobi.CallbackFunction as well as " *
+            "MOI.AbstractCallbackFunction")
     end
     return has_moi_callback
 end
@@ -1936,7 +1951,8 @@ function _throw_if_optimize_in_progress(model, attr)
 end
 
 # These strings are taken directly from the following page of the online Gurobi
-# documentation: https://www.com/documentation/8.1/refman/optimization_status_codes.html#sec:StatusCodes
+# documentation:
+# https://www.com/documentation/8.1/refman/optimization_status_codes.html#sec:StatusCodes
 const RAW_STATUS_STRINGS = [
     (MOI.OPTIMIZE_NOT_CALLED, "Model is loaded, but no solution information is available."),
     (MOI.OPTIMAL, "Model was solved to optimality (subject to tolerances), and an optimal solution is available."),
@@ -2110,9 +2126,9 @@ function MOI.get(
         # tolerances).
         return reduced_cost
     elseif sense == MOI.MAX_SENSE && reduced_cost > 0
-        # If minimizing, the reduced cost must be positive (ignoring
-        # tolerances). However, because of the MOI dual convention, we return a
-        # negative value.
+        # If maximizing, the reduced cost must be positive (ignoring
+        # tolerances). However, because of the MOI dual convention,
+        # we return a negative value.
         return -reduced_cost
     else
         # The reduced cost, if non-zero, must related to the lower bound.
@@ -2132,13 +2148,13 @@ function MOI.get(
     # applies to the lower or upper bound. It can be wrong by at most
     # `FeasibilityTol`.
     if sense == MOI.MIN_SENSE && reduced_cost > 0
-        # If minimizing, the reduced cost must be negative (ignoring
+        # If minimizing, the reduced cost must be positive (ignoring
         # tolerances).
         return reduced_cost
     elseif sense == MOI.MAX_SENSE && reduced_cost < 0
-        # If minimizing, the reduced cost must be positive (ignoring
-        # tolerances). However, because of the MOI dual convention, we return a
-        # negative value.
+        # If maximizing, the reduced cost must be negative (ignoring
+        # tolerances). However, because of the MOI dual convention,
+        # we return a positive value.
         return -reduced_cost
     else
         # The reduced cost, if non-zero, must related to the lower bound.
@@ -2152,7 +2168,8 @@ function MOI.get(
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", _info(model, c).column)
+    return _dual_multiplier(model) * get_dblattrelement(
+        model.inner, "RC", _info(model, c).column)
 end
 
 function MOI.get(
@@ -2161,7 +2178,8 @@ function MOI.get(
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    return _dual_multiplier(model) * get_dblattrelement(model.inner, "RC", _info(model, c).column)
+    return _dual_multiplier(model) * get_dblattrelement(
+        model.inner, "RC", _info(model, c).column)
 end
 
 function MOI.get(
@@ -2171,9 +2189,11 @@ function MOI.get(
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
-        return -_dual_multiplier(model) * get_dblattrelement(model.inner, "FarkasDual", _info(model, c).row)
+        return -_dual_multiplier(model) * get_dblattrelement(
+            model.inner, "FarkasDual", _info(model, c).row)
     end
-    return _dual_multiplier(model) * get_dblattrelement(model.inner, "Pi", _info(model, c).row)
+    return _dual_multiplier(model) * get_dblattrelement(
+        model.inner, "Pi", _info(model, c).row)
 end
 
 function MOI.get(
@@ -2182,7 +2202,8 @@ function MOI.get(
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    return _dual_multiplier(model) * get_dblattrelement(model.inner, "QCPi", _info(model, c).row)
+    return _dual_multiplier(model) * get_dblattrelement(
+        model.inner, "QCPi", _info(model, c).row)
 end
 
 function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
@@ -2323,7 +2344,8 @@ function MOI.get(
     indices = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}[]
     for (key, info) in model.affine_constraint_info
         if typeof(info.set) == S
-            push!(indices, MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}(key))
+            push!(indices,
+                MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}(key))
         end
     end
     return sort!(indices, by = x -> x.value)
@@ -2336,7 +2358,8 @@ function MOI.get(
     indices = MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, S}[]
     for (key, info) in model.quadratic_constraint_info
         if typeof(info.set) == S
-            push!(indices, MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, S}(key))
+            push!(indices,
+                MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, S}(key))
         end
     end
     return sort!(indices, by = x -> x.value)
@@ -2400,7 +2423,8 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraints)
         if typeof(info.set) == MOI.SecondOrderCone
             push!(constraints, (MOI.VectorOfVariables, MOI.SecondOrderCone))
         else
-            push!(constraints, (MOI.ScalarQuadraticFunction{Float64}, typeof(info.set)))
+            push!(constraints,
+                (MOI.ScalarQuadraticFunction{Float64}, typeof(info.set)))
         end
     end
     for info in values(model.sos_constraint_info)
@@ -2621,8 +2645,8 @@ infeasible.
 See also `Gurobi.ConflictStatus` and `Gurobi.ConstraintConflictStatus`.
 
 Note that if `model` is modified after a call to `compute_conflict`, the
-conflict is not purged, and any calls to the above attributes will return values
-for the original conflict without a warning.
+conflict is not purged, and any calls to the above attributes will return
+values for the original conflict without a warning.
 """
 function compute_conflict(model::Optimizer)
     computeIIS(model.inner)
@@ -2631,8 +2655,9 @@ end
 
 function _ensure_conflict_computed(model::Optimizer)
     if model.inner.conflict == -1
-        error("Cannot access conflict status. Call `Gurobi.compute_conflict(model)` first. " *
-              "In case the model is modified, the computed conflict will not be purged.")
+        error("Cannot access conflict status. Call " *
+            "`Gurobi.compute_conflict(model)` first. In case the model " *
+            "is modified, the computed conflict will not be purged.")
     end
 end
 
@@ -2740,8 +2765,7 @@ end
 function MOI.get(
     model::Optimizer, ::ConstraintConflictStatus,
     index::MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},
-        <:Union{MOI.LessThan, MOI.GreaterThan, MOI.EqualTo}
+        MOI.ScalarAffineFunction{Float64}, <:SUPPORTED_SCALAR_SETS
     }
 )
     _ensure_conflict_computed(model)
@@ -2926,7 +2950,8 @@ function MOI.set(
         throw(MOI.UnsupportedAttribute(attr))
     if !(T <: VAR_ATTR_TYPE[attr.name])
         throw(ArgumentError(
-            "Attribute $(attr.name) is $(VAR_ATTR_TYPE[attr.name]) but $T provided."
+            "Attribute $(attr.name) is $(VAR_ATTR_TYPE[attr.name]) but " *
+            "$T provided."
         ))
     end
     setter! = SETTER_FOR_ELEM_ATTR_TYPE[VAR_ATTR_TYPE[attr.name]]
@@ -3047,7 +3072,8 @@ function MOI.set(model::Optimizer, attr::ModelAttribute, value::T) where T
     MOI.supports(model, attr) || throw(MOI.UnsupportedAttribute(attr))
     if !(T <: MODEL_ATTR_TYPE[attr.name])
         throw(ArgumentError(
-            "Attribute $(attr.name) is $(MODEL_ATTR_TYPE[attr.name]) but $T provided."
+            "Attribute $(attr.name) is $(MODEL_ATTR_TYPE[attr.name]) but " *
+            "$T provided."
         ))
     end
     setter! = SETTER_FOR_MODEL_ATTR_TYPE[MODEL_ATTR_TYPE[attr.name]]
@@ -3112,7 +3138,9 @@ function MOI.add_constraint(
     model.last_constraint_index += 1
     model.quadratic_constraint_info[model.last_constraint_index] =
         ConstraintInfo(length(model.quadratic_constraint_info) + 1, s)
-    return MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.SecondOrderCone}(model.last_constraint_index)
+    return MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.SecondOrderCone}(
+        model.last_constraint_index
+    )
 end
 
 function MOI.is_valid(
