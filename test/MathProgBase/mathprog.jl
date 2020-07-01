@@ -28,7 +28,7 @@ include(mathprogbase_file("conicinterface.jl"))
 coniclineartest(GurobiSolver(OutputFlag=0))
 # The following tests are not passing on Gurobi 8.0.0 due to known bug
 # on infeasibility check of SOC models.
-# https://github.com/JuliaOpt/Gurobi.jl/pull/123
+# https://github.com/jump-dev/Gurobi.jl/pull/123
 if Gurobi.version < v"8.0.0"
     conicSOCtest(GurobiSolver(OutputFlag=0))
     conicSOCRotatedtest(GurobiSolver(OutputFlag=0))

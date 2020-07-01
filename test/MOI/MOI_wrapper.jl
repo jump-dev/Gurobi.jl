@@ -180,7 +180,7 @@ end
 end
 
 @testset "LQOI Issue #38" begin
-    # https://github.com/JuliaOpt/LinQuadOptInterface.jl/issues/38#issuecomment-407625187
+    # https://github.com/jump-dev/LinQuadOptInterface.jl/issues/38#issuecomment-407625187
     _getinner(opt::Gurobi.Optimizer) = opt.inner
     @inferred _getinner(Gurobi.Optimizer(GUROBI_ENV))
 end
