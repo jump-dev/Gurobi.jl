@@ -60,12 +60,19 @@ function _print_GUROBI_HOME_help()
     correct location if needed):
     ```
     # On Windows, this might be
-    ENV["GUROBI_HOME"] = `C:\\Program Files\\gurobi902\\win64\\"
-    # On OSX, this might be
-    ENV["GUROBI_HOME"] = `/Library/gurobi902/mac64/"
-    # On Unix, this might be
-    ENV["GUROBI_HOME"] = `/opt/gurobi902/linux64/"
+    ENV["GUROBI_HOME"] = "C:\\Program Files\\gurobi902\\win64\\"
+    import Pkg
+    Pkg.add("Gurobi")
+    Pkg.build("Gurobi")
 
+    # On OSX, this might be
+    ENV["GUROBI_HOME"] = "/Library/gurobi902/mac64/"
+    import Pkg
+    Pkg.add("Gurobi")
+    Pkg.build("Gurobi")
+
+    # On Unix, this might be
+    ENV["GUROBI_HOME"] = "/opt/gurobi902/linux64/"
     import Pkg
     Pkg.add("Gurobi")
     Pkg.build("Gurobi")
@@ -132,7 +139,9 @@ function diagnose_gurobi_install()
             found this version of Gurobi on your path.
 
             $(read(io, String))
-            Is this version one of the supported versions listed above? If not,
+            Is this version one of the supported versions listed above? If so,
+            we found the executable, but not the libraries we need. Follow the
+            advice below to set the `GUROBI_HOME` environment variable. If not,
             you should edit your `PATH` to point to the correct version, or set
             the `GUROBI_HOME` environment variable.\n\n""")
             _print_GUROBI_HOME_help()
