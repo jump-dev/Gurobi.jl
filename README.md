@@ -1,11 +1,14 @@
 # Gurobi.jl
 
-The [Gurobi](http://www.gurobi.com) Optimizer is a commercial optimization
-solver for a variety of mathematical programming problems, including linear
-programming (LP), quadratic programming (QP), quadratically constrained
-programming (QCP), mixed integer linear programming (MILP), mixed-integer
-quadratic programming (MIQP), and mixed-integer quadratically constrained
-programming (MIQCP).
+Gurobi.jl is a wrapper for the [Gurobi Optimizer](https://www.gurobi.com).
+
+It has two components:
+ - a thin wrapper around the complete C API
+ - an interface to [MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl)
+
+The C API can be accessed via `Gurobi.GRBxx` functions, where the names and
+arguments are identical to the C API. See the [Gurobi documentation](https://www.gurobi.com/documentation/9.0/refman/c_api_details.html)
+for details.
 
 *The Gurobi wrapper for Julia is community driven and not officially supported
 by Gurobi. If you are a commercial customer interested in official support for
@@ -14,11 +17,8 @@ Julia from Gurobi, let them know!*
 ## Installation
 
 First, obtain a license of Gurobi and install Gurobi solver, following the
-instructions on [Gurobi's website](http://www.gurobi.com).
-
-   **The minimum version supported by *Gurobi.jl* is Gurobi v9.0.**
-
-Then, run the following:
+instructions on [Gurobi's website](http://www.gurobi.com). Then, run the
+following:
 
 ```julia
 import Pkg
@@ -44,7 +44,7 @@ make *Gurobi.jl* installable (but not usable).
 
 ## Use with JuMP
 
-We highly recommend that you use the *Gurobi.jl* package with higher level
+We highly recommend that you use the *urobi.jl package with higher level
 packages such as [JuMP.jl](https://github.com/jump-dev/JuMP.jl).
 
 This can be done using the ``Gurobi.Optimizer`` object. Here is how to create a
