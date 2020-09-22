@@ -44,7 +44,7 @@ make *Gurobi.jl* installable (but not usable).
 
 ## Use with JuMP
 
-We highly recommend that you use the *urobi.jl package with higher level
+We highly recommend that you use the *Gurobi.jl* package with higher level
 packages such as [JuMP.jl](https://github.com/jump-dev/JuMP.jl).
 
 This can be done using the ``Gurobi.Optimizer`` object. Here is how to create a
