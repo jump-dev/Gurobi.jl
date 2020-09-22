@@ -3,12 +3,14 @@
 # ==============================================================================
 
 mutable struct CallbackData
+    model::Optimizer
     ptr::Ptr{Cvoid}
 end
 Base.cconvert(::Type{Ptr{Cvoid}}, x::CallbackData) = x
 Base.unsafe_convert(::Type{Ptr{Cvoid}}, x::CallbackData) = x.ptr::Ptr{Cvoid}
 
 mutable struct _CallbackUserData
+    model::Optimizer
     callback::Function
 end
 Base.cconvert(::Type{Ptr{Cvoid}}, x::_CallbackUserData) = x
@@ -23,7 +25,7 @@ function gurobi_callback_wrapper(
     p_user_data::Ptr{Cvoid}
 )
     user_data = unsafe_pointer_to_objref(p_user_data)::_CallbackUserData
-    user_data.callback(CallbackData(cb_data), cb_where)
+    user_data.callback(CallbackData(user_data.model, cb_data), cb_where)
     return Cint(0)
 end
 
@@ -36,9 +38,8 @@ Callback function should be of the form
 
     callback(cb_data::CallbackData, cb_where::Cint)
 
-Note: before accessing `MOI.CallbackVariablePrimal`, you must call either
-`Gurobi.cbget_mipsol_sol(model, cb_data, cb_where)` or
-`Gurobi.cbget_mipsol_rel(model, cb_data, cb_where)`.
+Note: before accessing `MOI.CallbackVariablePrimal`, you must call
+`Gurobi.load_callback_variable_primal(cb_data, cb_where)`.
 """
 struct CallbackFunction <: MOI.AbstractCallback end
 
@@ -49,6 +50,7 @@ function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
         (Ptr{Cvoid}, Ptr{Cvoid}, Cint, Ptr{Cvoid})
     )
     user_data = _CallbackUserData(
+        model,
         (cb_data, cb_where) -> begin
             model.callback_state = CB_GENERIC
             f(cb_data, cb_where)
@@ -70,32 +72,38 @@ end
 MOI.supports(::Optimizer, ::CallbackFunction) = true
 
 """
-    cbget_mipsol_sol(model::Optimizer, cb_data, cb_where)
+    load_callback_variable_primal(cb_data, cb_where)
 
-Load the solution at a `GRB_CB_MIPSOL` node so that it can be accessed using
+Load the solution during a callback so that it can be accessed using
 `MOI.CallbackVariablePrimal`.
 """
-function cbget_mipsol_sol(model::Optimizer, cb_data, cb_where)
-    resize!(model.callback_variable_primal, length(model.variable_info))
-    ret = GRBcbget(
-        cb_data, cb_where, GRB_CB_MIPSOL_SOL, model.callback_variable_primal
+function load_callback_variable_primal(cb_data::CallbackData, cb_where::Cint)
+    resize!(
+        cb_data.model.callback_variable_primal,
+        length(cb_data.model.variable_info),
     )
-    _check_ret(model, ret)
-    return
-end
-
-"""
-    cbget_mipsol_rel(model::Optimizer, cb_data, cb_where)
-
-Load the solution at a `GRB_CB_MIPNODE` node so that it can be accessed using
-`MOI.CallbackVariablePrimal`.
-"""
-function cbget_mipsol_rel(model::Optimizer, cb_data, cb_where)
-    resize!(model.callback_variable_primal, length(model.variable_info))
-    ret = GRBcbget(
-        cb_data, cb_where, GRB_CB_MIPNODE_REL, model.callback_variable_primal
-    )
-    _check_ret(model, ret)
+    if cb_where == GRB_CB_MIPNODE
+        ret = GRBcbget(
+            cb_data,
+            cb_where,
+            GRB_CB_MIPNODE_REL,
+            cb_data.model.callback_variable_primal,
+        )
+        _check_ret(cb_data.model, ret)
+    elseif cb_where == GRB_CB_MIPSOL
+        ret = GRBcbget(
+            cb_data,
+            cb_where,
+            GRB_CB_MIPSOL_SOL,
+            cb_data.model.callback_variable_primal,
+        )
+        _check_ret(cb_data.model, ret)
+    else
+        error(
+            "`load_callback_variable_primal` can only be called at " *
+            "GRB_CB_MIPNODE or GRB_CB_MIPSOL."
+        )
+    end
     return
 end
 
@@ -106,7 +114,7 @@ end
 function default_moi_callback(model::Optimizer)
     return (cb_data, cb_where) -> begin
         if cb_where == GRB_CB_MIPSOL
-            cbget_mipsol_sol(model, cb_data, cb_where)
+            load_callback_variable_primal(cb_data, cb_where)
             if model.lazy_callback !== nothing
                 model.callback_state = CB_LAZY
                 model.lazy_callback(cb_data)
@@ -114,14 +122,10 @@ function default_moi_callback(model::Optimizer)
         elseif cb_where == GRB_CB_MIPNODE
             resultP = Ref{Cint}()
             GRBcbget(cb_data, cb_where, GRB_CB_MIPNODE_STATUS, resultP)
-            if resultP[] != 2
+            if resultP[] != GRB_OPTIMAL
                 return  # Solution is something other than optimal.
             end
-            cbget_mipsol_rel(model, cb_data, cb_where)
-            if model.lazy_callback !== nothing
-                model.callback_state = CB_LAZY
-                model.lazy_callback(cb_data)
-            end
+            load_callback_variable_primal(cb_data, cb_where)
             if model.user_cut_callback !== nothing
                 model.callback_state = CB_USER_CUT
                 model.user_cut_callback(cb_data)

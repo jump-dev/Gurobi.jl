@@ -316,7 +316,7 @@ function test_CallbackFunction_callback_LazyConstraint()
     function callback_function(cb_data::Gurobi.CallbackData, cb_where::Cint)
         push!(cb_calls, cb_where)
         if cb_where == Gurobi.GRB_CB_MIPSOL
-            Gurobi.cbget_mipsol_sol(model, cb_data, cb_where)
+            Gurobi.load_callback_variable_primal(cb_data, cb_where)
             x_val = MOI.get(model, MOI.CallbackVariablePrimal(cb_data), x)
             y_val = MOI.get(model, MOI.CallbackVariablePrimal(cb_data), y)
             if y_val - x_val > 1 + 1e-6
@@ -363,7 +363,7 @@ function test_CallbackFunction_callback_UserCut()
         if status[] != 2
             return  # Not optimal.
         end
-        Gurobi.cbget_mipsol_rel(model, cb_data, cb_where)
+        Gurobi.load_callback_variable_primal(cb_data, cb_where)
         terms = MOI.ScalarAffineTerm{Float64}[]
         accumulated = 0.0
         for (i, xi) in enumerate(x)
@@ -402,7 +402,7 @@ function test_CallbackFunction_callback_HeuristicSolution()
         if status[] != 2
             return  # Not optimal.
         end
-        Gurobi.cbget_mipsol_rel(model, cb_data, cb_where)
+        Gurobi.load_callback_variable_primal(cb_data, cb_where)
         x_vals = MOI.get.(model, MOI.CallbackVariablePrimal(cb_data), x)
         if MOI.submit(
             model,
