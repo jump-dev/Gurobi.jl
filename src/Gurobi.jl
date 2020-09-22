@@ -16,11 +16,6 @@ include("gen/ctypes.jl")
 include("gen/libgrb_common.jl")
 include("gen/libgrb_api.jl")
 
-
-const GRB_VERSION_MAJOR = 9
-const GRB_VERSION_MINOR = 0
-const GRB_VERSION_TECHNICAL = 1
-
 const _GUROBI_VERSION = VersionNumber(
     "$GRB_VERSION_MAJOR.$GRB_VERSION_MINOR.$(GRB_VERSION_TECHNICAL)"
 )
