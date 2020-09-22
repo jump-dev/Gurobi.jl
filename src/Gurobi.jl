@@ -1,6 +1,6 @@
 module Gurobi
 
-const _DEPS_FILE = joinpath(dirname(@__FILE__),"..","deps","deps.jl")
+const _DEPS_FILE = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
 if isfile(_DEPS_FILE)
     include(_DEPS_FILE)
 else
@@ -10,74 +10,42 @@ else
     """)
 end
 
-import SparseArrays, LinearAlgebra
+using CEnum
 
-### imports
+include("gen/ctypes.jl")
+include("gen/libgrb_common.jl")
+include("gen/libgrb_api.jl")
 
-import Base.show, Base.copy, Base.read
 
-### exports
-export
+const GRB_VERSION_MAJOR = 9
+const GRB_VERSION_MINOR = 0
+const GRB_VERSION_TECHNICAL = 1
 
-# grb_env
-free_env,
+const _GUROBI_VERSION = VersionNumber(
+    "$GRB_VERSION_MAJOR.$GRB_VERSION_MINOR.$(GRB_VERSION_TECHNICAL)"
+)
 
-# grb_params
-getparam, setparam!, setparams!,
+if !(v"9.0.0" <= _GUROBI_VERSION < v"9.1")
+    error(
+        "You have installed version $_GUROBI_VERSION of Gurobi, which is not " *
+        "supported by Gurobi.jl. If the version change was breaking, changes " *
+        "may need to be made to the Julia code. Please open an issue at " *
+        "https://github.com/jump-dev/Gurobi.jl."
+    )
+end
 
-# grb_model
-set_sense!, update_model!, reset_model!, get_tune_result!,
-read_model, write_model, tune_model, presolve_model, fixed_model,
-copy, read,
-
-# grb_attrs
-model_name, model_sense, model_type,
-num_vars, num_constrs, num_sos, num_qconstrs,
-num_cnzs, num_qnzs, num_qcnzs,
-is_qp, is_qcp, is_mip,
-
-lowerbounds, upperbounds, objcoeffs, set_objcoeffs!,
-
-# grb_vars
-GRB_CONTINUOUS, GRB_BINARY, GRB_INTEGER,
-add_var!, add_vars!, add_cvar!, add_cvars!,
-add_bvar!, add_bvars!, add_ivar!, add_ivars!,
-del_vars!,
-
-# grb_constrs
-add_constr!, add_constrs!, add_constrs_t!,
-add_rangeconstr!, add_rangeconstrs!, add_rangeconstrs_t!,
-get_constrmatrix, add_sos!, del_constrs!, chg_coeffs!,
-
-# grb_quad
-add_qpterms!, add_qconstr!,
-
-# higher level
-gurobi_model,
-
-# grb_solve
-optimize, computeIIS, get_solution,
-get_status, OptimInfo, get_optiminfo, get_objval
-
-### include source files
-
-include("grb_common.jl")
-include("grb_env.jl")
-
-include("grb_model.jl")
-include("grb_params.jl")
-include("grb_vars.jl")
-include("grb_attrs.jl")
-include("grb_constrs.jl")
-include("grb_quad.jl")
-include("grb_highlevel.jl")
-
-include("grb_solve.jl")
-include("grb_callbacks.jl")
-
-include("MPB_wrapper.jl")
 include("MOI_wrapper.jl")
 include("MOI_callbacks.jl")
 include("MOI_multi_objective.jl")
+
+# Gurobi exports all `GRBXXX` symbols. If you don't want all of these symbols in
+# your environment, then use `import Gurobi` instead of `using Gurobi`.
+
+for sym in names(@__MODULE__, all=true)
+    sym_string = string(sym)
+    if startswith(sym_string, "GRB")
+        @eval export $sym
+    end
+end
 
 end

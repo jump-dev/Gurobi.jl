@@ -2,22 +2,23 @@ const MOI  = Gurobi.MOI
 const MOIT = MOI.Test
 
 const GUROBI_ENV = Gurobi.Env()
+
 const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
-    # Note: we set `DualReductions = 0` so that we never return
-    # `INFEASIBLE_OR_UNBOUNDED`.
-    Gurobi.Optimizer(
-        GUROBI_ENV,
-        OutputFlag = 0,
-        DualReductions = 0,
-        QCPDual = 1,
-        InfUnbdInfo = 1,
-    ),
+    begin
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        MOI.set(model, MOI.Silent(), true)
+        # We set `DualReductions = 0` so that we never return
+        # `INFEASIBLE_OR_UNBOUNDED`.
+        MOI.set(model, MOI.RawParameter("DualReductions"), 0)
+        MOI.set(model, MOI.RawParameter("QCPDual"), 1)
+        MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
+        model
+    end,
     Float64
 )
-
 const CONFIG = MOIT.TestConfig()
 
-@testset "Unit Tests" begin
+@testset "basic constraint tests" begin
     MOIT.basic_constraint_tests(OPTIMIZER, CONFIG; exclude = [
         (MOI.VectorOfVariables, MOI.SecondOrderCone),
         (MOI.VectorOfVariables, MOI.RotatedSecondOrderCone),
@@ -47,6 +48,9 @@ const CONFIG = MOIT.TestConfig()
         ],
         delete = false
     )
+end
+
+@testset "unittest" begin
     MOIT.unittest(OPTIMIZER, MOIT.TestConfig(atol=1e-6), [
         # TODO(odow): bug! We can't delete a vector of variables if one is in
         # a second order cone.
@@ -54,6 +58,9 @@ const CONFIG = MOIT.TestConfig()
         # TODO(odow): implement number of threads.
         "number_threads",
     ])
+end
+
+@testset "modificationtest" begin
     MOIT.modificationtest(OPTIMIZER, CONFIG)
 end
 
@@ -129,23 +136,23 @@ end
     end
 
     @testset "start_values_test" begin
-        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag = 0)
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        MOI.set(model, MOI.Silent(), true)
         x = MOI.add_variables(model, 2)
         @test MOI.supports(model, MOI.VariablePrimalStart(), MOI.VariableIndex)
         @test MOI.get(model, MOI.VariablePrimalStart(), x[1]) === nothing
         @test MOI.get(model, MOI.VariablePrimalStart(), x[2]) === nothing
         Gurobi._update_if_necessary(model)
-        @test Gurobi.get_dblattrelement(
-            model.inner, "Start", Gurobi._info(model, x[1]).column
-        ) == Gurobi.GRB_UNDEFINED
+        p = Ref{Cdouble}()
+        Gurobi.GRBgetdblattrelement(model.inner, "Start", Cint(0), p)
+        @test p[] == Gurobi.GRB_UNDEFINED
         MOI.set(model, MOI.VariablePrimalStart(), x[1], 1.0)
         MOI.set(model, MOI.VariablePrimalStart(), x[2], nothing)
         @test MOI.get(model, MOI.VariablePrimalStart(), x[1]) == 1.0
         @test MOI.get(model, MOI.VariablePrimalStart(), x[2]) === nothing
         Gurobi._update_if_necessary(model)
-        @test Gurobi.get_dblattrelement(
-            model.inner, "Start", Gurobi._info(model, x[2]).column
-        ) == Gurobi.GRB_UNDEFINED
+        Gurobi.GRBgetdblattrelement(model.inner, "Start", Cint(1), p)
+        @test p[] == Gurobi.GRB_UNDEFINED
         MOI.optimize!(model)
         @test MOI.get(model, MOI.ObjectiveValue()) == 0.0
         # We don't support ConstraintDualStart or ConstraintPrimalStart yet.
@@ -194,8 +201,11 @@ end
     # forces the solver to return after its first feasible MIP solution,
     # which tests the right part of the code without relying on potentially
     # flaky or system-dependent time limits.
-    m = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, SolutionLimit=1,
-                         Heuristics=0.0, Presolve=0)
+    m = Gurobi.Optimizer(GUROBI_ENV)
+    MOI.set(m, MOI.Silent(), true)
+    MOI.set(m, MOI.RawParameter("SolutionLimit"), 1)
+    MOI.set(m, MOI.RawParameter("Heuristics"), 0)
+    MOI.set(m, MOI.RawParameter("Presolve"), 0)
     N = 100
     x = MOI.add_variables(m, N)
     for xi in x
@@ -228,55 +238,59 @@ end
     MOI.set(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 2.0))
     @test MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()).constant == 2.0
-    @test Gurobi.get_dblattr(m.inner, "ObjCon") == 2.0
+    p = Ref{Cdouble}()
+    Gurobi.GRBgetdblattr(m, "ObjCon", p)
+    @test p[] == 2.0
 
     MOI.modify(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), MOI.ScalarConstantChange(3.0))
     @test MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()).constant == 3.0
-    @test Gurobi.get_dblattr(m.inner, "ObjCon") == 3.0
+    Gurobi.GRBgetdblattr(m.inner, "ObjCon", p)
+    @test p[] == 3.0
 end
 
 @testset "Env" begin
     @testset "User-provided" begin
         env = Gurobi.Env()
         model_1 = Gurobi.Optimizer(env)
-        @test model_1.inner.env === env
+        @test model_1.env === env
         model_2 = Gurobi.Optimizer(env)
-        @test model_2.inner.env === env
+        @test model_2.env === env
         # Check that finalizer doesn't touch env when manually provided.
-        finalize(model_1.inner)
-        @test Gurobi.is_valid(env)
+        finalize(model_1)
+        @test env.ptr_env != C_NULL
     end
     @testset "Automatic" begin
         model_1 = Gurobi.Optimizer()
         model_2 = Gurobi.Optimizer()
-        @test model_1.inner.env !== model_2.inner.env
+        @test model_1.env !== model_2.env
         # Check that env is finalized with model when not supplied manually.
-        finalize(model_1.inner)
-        @test !Gurobi.is_valid(model_1.inner.env)
+        finalize(model_1)
+        @test model_1.env.ptr_env == C_NULL
     end
     @testset "Env when emptied" begin
         @testset "User-provided" begin
             env = Gurobi.Env()
             model = Gurobi.Optimizer(env)
-            @test model.inner.env === env
-            @test Gurobi.is_valid(env)
+            @test model.env === env
+            @test env.ptr_env != C_NULL
             MOI.empty!(model)
-            @test model.inner.env === env
-            @test Gurobi.is_valid(env)
+            @test model.env === env
+            @test env.ptr_env != C_NULL
         end
         @testset "Automatic" begin
             model = Gurobi.Optimizer()
-            env = model.inner.env
+            env = model.env
             MOI.empty!(model)
-            @test model.inner.env !== env
-            @test Gurobi.is_valid(model.inner.env)
+            @test model.env === env
+            @test env.ptr_env != C_NULL
         end
     end
 end
 
 @testset "Conflict refiner" begin
     @testset "Variable bounds (SingleVariable and LessThan/GreaterThan)" begin
-        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        MOI.set(model, MOI.Silent(), true)
         x = MOI.add_variable(model)
         c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(2.0))
         c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(1.0))
@@ -295,7 +309,8 @@ end
     end
 
     @testset "Variable bounds (ScalarAffine)" begin
-        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        MOI.set(model, MOI.Silent(), true)
         x = MOI.add_variable(model)
         c1 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.GreaterThan(2.0))
         c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.LessThan(1.0))
@@ -314,7 +329,8 @@ end
     end
 
     @testset "Variable bounds (Invalid Interval)" begin
-        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        MOI.set(model, MOI.Silent(), true)
         x = MOI.add_variable(model)
         c1 = MOI.add_constraint(
             model, MOI.SingleVariable(x), MOI.Interval(1.0, 0.0)
@@ -332,7 +348,8 @@ end
     end
 
     @testset "Two conflicting constraints (GreaterThan, LessThan)" begin
-        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        MOI.set(model, MOI.Silent(), true)
         x = MOI.add_variable(model)
         y = MOI.add_variable(model)
         b1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(0.0))
@@ -358,7 +375,8 @@ end
     end
 
     @testset "Two conflicting constraints (EqualTo)" begin
-        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        MOI.set(model, MOI.Silent(), true)
         x = MOI.add_variable(model)
         y = MOI.add_variable(model)
         b1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(0.0))
@@ -384,7 +402,8 @@ end
     end
 
     @testset "Variables outside conflict" begin
-        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        MOI.set(model, MOI.Silent(), true)
         x = MOI.add_variable(model)
         y = MOI.add_variable(model)
         z = MOI.add_variable(model)
@@ -413,7 +432,8 @@ end
     end
 
     @testset "No conflict" begin
-        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        MOI.set(model, MOI.Silent(), true)
         x = MOI.add_variable(model)
         c1 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.GreaterThan(1.0))
         c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.LessThan(2.0))
@@ -442,7 +462,9 @@ end
 
 @testset "QCPDuals without needing to pass QCPDual=1" begin
     @testset "QCPDual=1" begin
-        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0, QCPDual=1)
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        MOI.set(model, MOI.Silent(), true)
+        MOI.set(model, MOI.RawParameter("QCPDual"), 1)
         MOI.Utilities.loadfromstring!(model, """
         variables: x, y, z
         minobjective: 1.0 * x + 1.0 * y + 1.0 * z
@@ -465,7 +487,8 @@ end
         @test MOI.get(model, MOI.ConstraintDual(), c3) ≈ 0.0 atol=1e-6
     end
     @testset "QCPDual default" begin
-        model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+        model = Gurobi.Optimizer(GUROBI_ENV)
+        MOI.set(model, MOI.Silent(), true)
         MOI.Utilities.loadfromstring!(model, """
         variables: x, y, z
         minobjective: 1.0 * x + 1.0 * y + 1.0 * z
@@ -483,9 +506,9 @@ end
         c1 = MOI.get(model, MOI.ConstraintIndex, "c1")
         c2 = MOI.get(model, MOI.ConstraintIndex, "c2")
         c3 = MOI.get(model, MOI.ConstraintIndex, "c3")
-        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ConstraintDual(), c1)
-        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ConstraintDual(), c2)
-        @test_throws Gurobi.GurobiError MOI.get(model, MOI.ConstraintDual(), c3)
+        @test_throws ErrorException MOI.get(model, MOI.ConstraintDual(), c1)
+        @test_throws ErrorException MOI.get(model, MOI.ConstraintDual(), c2)
+        @test_throws ErrorException MOI.get(model, MOI.ConstraintDual(), c3)
     end
 end
 
@@ -514,6 +537,7 @@ end
     # here done by `MOI.optimize!`, as the update needs to be done inside MOI
     # code, that is aware of the lazy updates).
     model = Gurobi.Optimizer(GUROBI_ENV)
+    MOI.set(model, MOI.Silent(), true)
     vars = MOI.add_variables(model, 3)
     vars_obj = [7.0, 42.0, -0.5]
     obj_attr = Gurobi.VariableAttribute("Obj")
@@ -627,12 +651,13 @@ c3: x in Integer()
     )
     # Getting/setting a non-existing attribute.
     attr = Gurobi.ConstraintAttribute("Non-existing")
-    @test_throws MOI.UnsupportedAttribute(attr) MOI.set(model, attr, c2, 1)
-    @test_throws MOI.UnsupportedAttribute(attr) MOI.get(model, attr, c2)
+    err = ErrorException("Gurobi Error 10004: Unknown attribute 'Non-existing'")
+    @test_throws err MOI.set(model, attr, c2, 1)
+    @test_throws err MOI.get(model, attr, c2)
     # Setting an attribute to a value of the wrong type.
     @test_throws(
-        ArgumentError("Attribute Lazy is Integer but Float64 provided."),
-        MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c2, 1.0)
+        ArgumentError("Attribute Lazy requires Int64 arguments. Provided argument was of type Float64."),
+        MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c2, 1.5)
     )
 end
 
@@ -662,12 +687,13 @@ c3: x in Integer()
     # Things that should fail follow.
     # Getting/setting a non-existing attribute.
     attr = Gurobi.VariableAttribute("Non-existing")
-    @test_throws MOI.UnsupportedAttribute(attr) MOI.set(model, attr, x, 1)
-    @test_throws MOI.UnsupportedAttribute(attr) MOI.get(model, attr, x)
+    err = ErrorException("Gurobi Error 10004: Unknown attribute 'Non-existing'")
+    @test_throws err MOI.set(model, attr, x, 1)
+    @test_throws err MOI.get(model, attr, x)
     # Setting an attribute to a value of the wrong type.
     @test_throws(
-        ArgumentError("Attribute BranchPriority is Integer but Float64 provided."),
-        MOI.set(model, Gurobi.VariableAttribute("BranchPriority"), x, 1.0)
+        ArgumentError("Attribute BranchPriority requires Int64 arguments. Provided argument was of type Float64."),
+        MOI.set(model, Gurobi.VariableAttribute("BranchPriority"), x, 1.5)
     )
 end
 
@@ -693,17 +719,19 @@ c3: x in Integer()
     # Things that should fail follow.
     # Getting/setting a non-existing attribute.
     attr = Gurobi.ModelAttribute("Non-existing")
-    @test_throws MOI.UnsupportedAttribute(attr) MOI.set(model, attr, 1)
-    @test_throws MOI.UnsupportedAttribute(attr) MOI.get(model, attr)
+    err = ErrorException("Gurobi Error 10004: Unknown attribute 'Non-existing'")
+    @test_throws err MOI.set(model, attr, 1)
+    @test_throws err MOI.get(model, attr)
     # Setting an attribute to a value of the wrong type.
     @test_throws(
-        ArgumentError("Attribute NumStart is Integer but Float64 provided."),
+        ArgumentError("Attribute NumStart requires $(Int) arguments. Provided argument was of type Float64."),
         MOI.set(model, Gurobi.ModelAttribute("NumStart"), 4.0)
     )
 end
 
 @testset "SOC hide lower bound constraint" begin
-    model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    MOI.set(model, MOI.Silent(), true)
     @testset "No initial bound" begin
         MOI.empty!(model)
         t = MOI.add_variable(model)
@@ -934,7 +962,8 @@ end
 end
 
 @testset "Duals with equal bounds #250" begin
-    model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variable(model)
     xl = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(1.0))
     xu = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(1.0))
@@ -959,7 +988,8 @@ end
 end
 
 @testset "FEASIBILITY_SENSE zeros objective" begin
-    model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag=0)
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variable(model)
     MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(1.0))
     MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
@@ -972,7 +1002,8 @@ end
 end
 
 @testset "Attributes" begin
-    model = Gurobi.Optimizer(GUROBI_ENV, OutputFlag = 0)
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    MOI.set(model, MOI.Silent(), true)
     MOI.optimize!(model)
     @test MOI.get(model, MOI.NodeCount()) == 0
     @test MOI.get(model, MOI.BarrierIterations()) == 0

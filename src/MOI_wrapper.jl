@@ -63,9 +63,36 @@ mutable struct ConstraintInfo
     ConstraintInfo(row::Int, set) = new(row, set, "")
 end
 
+mutable struct Env
+    ptr_env::Ptr{Cvoid}
+end
+
+# Note: `Env()` is an outer constructor because sometimes we want to
+# make an `Env` object from a pointer returned from `GRBgetenv`, and
+# sometimes we want to create a new `Env`.
+function Env()
+    a = Ref{Ptr{Cvoid}}()
+    ret = GRBloadenv(a, C_NULL)
+    if ret == 10009
+        error("Gurobi Error 10009: invalid Gurobi license")
+    elseif ret != 0
+        error("Gurobi Error $(ret): failed to create environment")
+    end
+    # TODO(odow): no finalizer is set for Env, because when a model + Env
+    # falls out of scope, Julia's GC will sometimes GC the env first, and
+    # then the model. This causes an error. Thus, `Env`'s are finalized in
+    # the `Model` constructor.
+    # We should probably add a flag to differentiate between envs created
+    # manually, and envs created by `Model()`. CPLEX.jl does something
+    # similar.
+    return Env(a[])
+end
+Base.cconvert(::Type{Ptr{Cvoid}}, x::Env) = x
+Base.unsafe_convert(::Type{Ptr{Cvoid}}, env::Env) = env.ptr_env::Ptr{Cvoid}
+
 mutable struct Optimizer <: MOI.AbstractOptimizer
     # The low-level Gurobi model.
-    inner::Model
+    inner::Ptr{Cvoid}
     # The Gurobi environment. If `nothing`, a new environment will be created
     # on `MOI.empty!`.
     env::Union{Nothing, Env}
@@ -146,6 +173,9 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     lazy_callback::Union{Nothing, Function}
     user_cut_callback::Union{Nothing, Function}
     heuristic_callback::Union{Nothing, Function}
+    generic_callback::Any
+
+    conflict::Cint
 
     """
         Optimizer(env = nothing; kwargs...)
@@ -158,41 +188,90 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     """
     function Optimizer(env::Union{Nothing, Env} = nothing; kwargs...)
         model = new()
-        model.env = env
-        model.silent = false
+        model.inner = C_NULL
+        model.env = env === nothing ? Env() : env
         model.params = Dict{String, Any}()
+        for (name, value) in kwargs
+            @info "TODO(odow): Deprecate"
+            model.params[string(name)] = value
+        end
+        model.silent = false
         model.variable_info = CleverDicts.CleverDict{MOI.VariableIndex, VariableInfo}()
         model.next_column = 1
+        model.last_constraint_index = 1
         model.columns_deleted_since_last_update = Int[]
         model.affine_constraint_info = Dict{Int, ConstraintInfo}()
         model.quadratic_constraint_info = Dict{Int, ConstraintInfo}()
         model.sos_constraint_info = Dict{Int, ConstraintInfo}()
         model.callback_variable_primal = Float64[]
-        MOI.empty!(model)  # MOI.empty!(model) re-sets the `.inner` field.
-        for (name, value) in kwargs
-            model.params[string(name)] = value
-            setparam!(model.inner, string(name), value)
+        MOI.empty!(model)
+        finalizer(model) do m
+            ret = GRBfreemodel(m.inner)
+            _check_ret(m, ret)
+            if env === nothing
+                GRBfreeenv(m.env.ptr_env)
+                m.env.ptr_env = C_NULL
+            end
         end
         return model
     end
 end
+Base.cconvert(::Type{Ptr{Cvoid}}, x::Optimizer) = x
+Base.unsafe_convert(::Type{Ptr{Cvoid}}, model::Optimizer) = model.inner::Ptr{Cvoid}
 
-Base.show(io::IO, model::Optimizer) = show(io, model.inner)
+function _check_ret(model::Optimizer, ret::Cint)
+    if ret != 0
+        msg = unsafe_string(GRBgetmerrormsg(model))
+        throw(ErrorException("Gurobi Error $(ret): $(msg)"))
+    end
+    return
+end
+
+function _check_ret(env, ret::Cint)
+    if ret != 0
+        msg = unsafe_string(GRBgeterrormsg(env))
+        throw(ErrorException("Gurobi Error $(ret): $(msg)"))
+    end
+    return
+end
+
+function Base.show(io::IO, model::Optimizer)
+    if model.inner == C_NULL
+        println(io, "Gurobi Model: NULL")
+        return
+    end
+    p = Ref{Cint}()
+    GRBgetintattr(model, "ModelSense", p)
+    println(io, "    sense  : $(p[] > 0 ? :minimize : :maximize)")
+    GRBgetintattr(model, "NumVars", p)
+    println(io, "    number of variables             = $(p[])")
+    GRBgetintattr(model, "NumConstrs", p)
+    println(io, "    number of linear constraints    = $(p[])")
+    GRBgetintattr(model, "NumQConstrs", p)
+    println(io, "    number of quadratic constraints = $(p[])")
+    GRBgetintattr(model, "NumSOS", p)
+    println(io, "    number of sos constraints       = $(p[])")
+    GRBgetintattr(model, "NumNZs", p)
+    println(io, "    number of non-zero coeffs       = $(p[])")
+    GRBgetintattr(model, "NumQNZs", p)
+    println(io, "    number of non-zero qp objective terms  = $(p[])")
+    GRBgetintattr(model, "NumQCNZs", p)
+    println(io, "    number of non-zero qp constraint terms = $(p[])")
+    return
+end
 
 function MOI.empty!(model::Optimizer)
-    if model.env === nothing
-        model.inner = Model(Env(), "", finalize_env = true)
-    else
-        model.inner = Model(model.env, "", finalize_env = false)
-    end
+    a = Ref{Ptr{Cvoid}}()
+    ret = GRBnewmodel(
+        model.env, a, "", 0, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL
+    )
+    model.inner = a[]
+    _check_ret(model, ret)
     for (name, value) in model.params
-        setparam!(model.inner, name, value)
+        MOI.set(model, MOI.RawParameter(name), value)
     end
     if model.silent
-        # Set the parameter on the internal model, but don't modify the entry in
-        # model.params so that if Silent() is set to `true`, the user-provided
-        # value will be restored.
-        setparam!(model.inner, "OutputFlag", 0)
+        MOI.set(model, MOI.Silent(), true)
     end
     model.needs_update = false
     model.objective_type = SCALAR_AFFINE
@@ -213,6 +292,8 @@ function MOI.empty!(model::Optimizer)
     model.lazy_callback = nothing
     model.user_cut_callback = nothing
     model.heuristic_callback = nothing
+    model.generic_callback = nothing
+    model.conflict = Cint(-1)
     return
 end
 
@@ -264,7 +345,8 @@ function _update_if_necessary(model::Optimizer)
         end
         model.next_column -= length(model.columns_deleted_since_last_update)
         empty!(model.columns_deleted_since_last_update)
-        update_model!(model.inner)
+        ret = GRBupdatemodel(model)
+        _check_ret(model, ret)
         model.needs_update = false
     else
         @assert isempty(model.columns_deleted_since_last_update)
@@ -332,14 +414,47 @@ MOI.supports(::Optimizer, ::MOI.RawParameter) = true
 MOI.supports(::Optimizer, ::MOI.ConstraintPrimalStart) = false
 MOI.supports(::Optimizer, ::MOI.ConstraintDualStart) = false
 
-function MOI.set(model::Optimizer, param::MOI.RawParameter, value)
-    model.params[param.name] = value
-    setparam!(model.inner, param.name, value)
-    return
+function MOI.set(model::Optimizer, raw::MOI.RawParameter, value)
+    env = GRBgetenv(model)
+    param = raw.name
+    model.params[param] = value
+    param_type = GRBgetparamtype(env, param)
+    ret = if param_type == -1
+        throw(MOI.UnsupportedAttribute(MOI.RawParameter(param)))
+    elseif param_type == 1
+        GRBsetintparam(env, param, value)
+    elseif param_type == 2
+        GRBsetdblparam(env, param, value)
+    else
+        @assert param_type == 3
+        GRBsetstrparam(env, param, value)
+    end
+    return _check_ret(env, ret)
 end
 
-function MOI.get(model::Optimizer, param::MOI.RawParameter)
-    return getparam(model.inner, param.name)
+function MOI.get(model::Optimizer, raw::MOI.RawParameter)
+    env = GRBgetenv(model)
+    param = raw.name
+    param_type = GRBgetparamtype(env, param)
+    if param_type == -1
+        throw(MOI.UnsupportedAttribute(MOI.RawParameter(param)))
+    elseif param_type == 1
+        a = Ref{Cint}()
+        ret = GRBgetintparam(env, param, a)
+        _check_ret(env, ret)
+        return a[]
+    elseif param_type == 2
+        a = Ref{Cdouble}()
+        ret = GRBgetdblparam(env, param, a)
+        _check_ret(env, ret)
+        return a[]
+    else
+        @assert param_type == 3
+        valueP = Ref{Ptr{Cchar}}()
+        ret = GRBgetstrparam(env, param, valueP)
+        _check_ret(env, ret)
+        return unsafe_string(valueP[])
+    end
 end
 
 function MOI.set(model::Optimizer, ::MOI.TimeLimitSec, limit::Real)
@@ -378,12 +493,14 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraintAttributesSet)
 end
 
 function _indices_and_coefficients(
-    indices::AbstractVector{Int}, coefficients::AbstractVector{Float64},
-    model::Optimizer, f::MOI.ScalarAffineFunction{Float64}
+    indices::AbstractVector{Cint},
+    coefficients::AbstractVector{Float64},
+    model::Optimizer,
+    f::MOI.ScalarAffineFunction{Float64},
 )
     i = 1
     for term in f.terms
-        indices[i] = _info(model, term.variable_index).column
+        indices[i] = Cint(_info(model, term.variable_index).column - 1)
         coefficients[i] = term.coefficient
         i += 1
     end
@@ -393,22 +510,30 @@ end
 function _indices_and_coefficients(
     model::Optimizer, f::MOI.ScalarAffineFunction{Float64}
 )
-    f_canon = MOI.Utilities.canonical(f)
+    f_canon = if MOI.Utilities.is_canonical(f)
+        f
+    else
+        MOI.Utilities.canonical(f)
+    end
     nnz = length(f_canon.terms)
-    indices = Vector{Int}(undef, nnz)
+    indices = Vector{Cint}(undef, nnz)
     coefficients = Vector{Float64}(undef, nnz)
     _indices_and_coefficients(indices, coefficients, model, f_canon)
     return indices, coefficients
 end
 
 function _indices_and_coefficients(
-    I::AbstractVector{Int}, J::AbstractVector{Int}, V::AbstractVector{Float64},
-    indices::AbstractVector{Int}, coefficients::AbstractVector{Float64},
-    model::Optimizer, f::MOI.ScalarQuadraticFunction
+    I::AbstractVector{Cint},
+    J::AbstractVector{Cint},
+    V::AbstractVector{Float64},
+    indices::AbstractVector{Cint},
+    coefficients::AbstractVector{Float64},
+    model::Optimizer,
+    f::MOI.ScalarQuadraticFunction
 )
     for (i, term) in enumerate(f.quadratic_terms)
-        I[i] = _info(model, term.variable_index_1).column
-        J[i] = _info(model, term.variable_index_2).column
+        I[i] = Cint(_info(model, term.variable_index_1).column - 1)
+        J[i] = Cint(_info(model, term.variable_index_2).column - 1)
         V[i] =  term.coefficient
         # Gurobi returns a list of terms. MOI requires 0.5 x' Q x. So, to get
         # from
@@ -425,7 +550,7 @@ function _indices_and_coefficients(
         end
     end
     for (i, term) in enumerate(f.affine_terms)
-        indices[i] = _info(model, term.variable_index).column
+        indices[i] = Cint(_info(model, term.variable_index).column - 1)
         coefficients[i] = term.coefficient
     end
     return
@@ -434,13 +559,17 @@ end
 function _indices_and_coefficients(
     model::Optimizer, f::MOI.ScalarQuadraticFunction
 )
-    f_canon = MOI.Utilities.canonical(f)
+    f_canon = if MOI.Utilities.is_canonical(f)
+        f
+    else
+        MOI.Utilities.canonical(f)
+    end
     nnz_quadratic = length(f_canon.quadratic_terms)
     nnz_affine = length(f_canon.affine_terms)
-    I = Vector{Int}(undef, nnz_quadratic)
-    J = Vector{Int}(undef, nnz_quadratic)
+    I = Vector{Cint}(undef, nnz_quadratic)
+    J = Vector{Cint}(undef, nnz_quadratic)
     V = Vector{Float64}(undef, nnz_quadratic)
-    indices = Vector{Int}(undef, nnz_affine)
+    indices = Vector{Cint}(undef, nnz_affine)
     coefficients = Vector{Float64}(undef, nnz_affine)
     _indices_and_coefficients(I, J, V, indices, coefficients, model, f_canon)
     return indices, coefficients, I, J, V
@@ -477,13 +606,27 @@ function MOI.add_variable(model::Optimizer)
     # Now, set `.index` and `.column`.
     info.index = index
     info.column = _get_next_column(model)
-    add_cvar!(model.inner, 0.0)
+    ret = GRBaddvar(model, 0, C_NULL, C_NULL, 0.0, -Inf, Inf, GRB_CONTINUOUS, "")
+    _check_ret(model, ret)
     _require_update(model)
     return index
 end
 
 function MOI.add_variables(model::Optimizer, N::Int)
-    add_cvars!(model.inner, zeros(N))
+    ret = GRBaddvars(
+        model,
+        N,
+        0,
+        C_NULL,
+        C_NULL,
+        C_NULL,
+        C_NULL,
+        fill(-Inf, N),
+        C_NULL,
+        C_NULL,
+        C_NULL,
+    )
+    _check_ret(model, ret)
     indices = Vector{MOI.VariableIndex}(undef, N)
     for i in 1:N
         # Initialize `VariableInfo` with a dummy `VariableIndex` and a column,
@@ -510,14 +653,13 @@ function MOI.delete(model::Optimizer, indices::Vector{<:MOI.VariableIndex})
     info = [_info(model, var_idx) for var_idx in indices]
     soc_idx = findfirst(e -> e.num_soc_constraints > 0, info)
     soc_idx !== nothing && throw(MOI.DeleteNotAllowed(indices[soc_idx]))
-    del_cols = collect(i.column for i in info)
-    del_vars!(model.inner, convert(Vector{Cint}, del_cols))
+    del_cols = collect(Cint(i.column - 1) for i in info)
+    ret = GRBdelvars(model, length(del_cols), del_cols)
+    _check_ret(model, ret)
     for var_idx in indices
         delete!(model.variable_info, var_idx)
     end
-
-    append!(model.columns_deleted_since_last_update, del_cols)
-
+    append!(model.columns_deleted_since_last_update, del_cols .+ 1)
     model.name_to_variable = nothing
     # We throw away name_to_constraint_index so we will rebuild SingleVariable
     # constraint names without v.
@@ -533,7 +675,8 @@ function MOI.delete(model::Optimizer, v::MOI.VariableIndex)
         throw(MOI.DeleteNotAllowed(v))
     end
     push!(model.columns_deleted_since_last_update, info.column)
-    del_vars!(model.inner, Cint[info.column])
+    ret = GRBdelvars(model, 1, Ref{Cint}(info.column - 1))
+    _check_ret(model, ret)
     delete!(model.variable_info, v)
     model.name_to_variable = nothing
     # We throw away name_to_constraint_index so we will rebuild SingleVariable
@@ -560,7 +703,7 @@ end
 function _rebuild_name_to_variable(model::Optimizer)
     model.name_to_variable = Dict{String, Union{Nothing, MOI.VariableIndex}}()
     for (index, info) in model.variable_info
-        if info.name == ""
+        if isempty(info.name)
             continue
         end
         if haskey(model.name_to_variable, info.name)
@@ -581,7 +724,8 @@ function MOI.set(
 )
     info = _info(model, v)
     info.name = name
-    set_strattrelement!(model.inner, "VarName", info.column, name)
+    ret = GRBsetstrattrelement(model, "VarName", Cint(info.column) - 1, name)
+    _check_ret(model, ret)
     _require_update(model)
     model.name_to_variable = nothing
     return
@@ -595,9 +739,12 @@ function _zero_objective(model::Optimizer)
     num_vars = length(model.variable_info)
     obj = zeros(Float64, num_vars)
     _update_if_necessary(model)
-    delq!(model.inner)
-    set_dblattrarray!(model.inner, "Obj", 1, num_vars, obj)
-    set_dblattr!(model.inner, "ObjCon", 0.0)
+    ret = GRBdelq(model)
+    _check_ret(model, ret)
+    ret = GRBsetdblattrarray(model, "Obj", 0, num_vars, obj)
+    _check_ret(model, ret)
+    ret = GRBsetdblattr(model, "ObjCon", 0.0)
+    _check_ret(model, ret)
     _require_update(model)
 end
 
@@ -605,17 +752,19 @@ function MOI.set(
     model::Optimizer, ::MOI.ObjectiveSense, sense::MOI.OptimizationSense
 )
     if sense == MOI.MIN_SENSE
-        set_sense!(model.inner, :minimize)
+        ret = GRBsetintattr(model, "ModelSense", 1)
+        _check_ret(model, ret)
         model.is_feasibility = false
     elseif sense == MOI.MAX_SENSE
-        set_sense!(model.inner, :maximize)
+        ret = GRBsetintattr(model, "ModelSense", -1)
+        _check_ret(model, ret)
         model.is_feasibility = false
-    elseif sense == MOI.FEASIBILITY_SENSE
-        _zero_objective(model)
-        set_sense!(model.inner, :minimize)
-        model.is_feasibility = true
     else
-        error("Invalid objective sense: $(sense)")
+        @assert sense == MOI.FEASIBILITY_SENSE
+        _zero_objective(model)
+        ret = GRBsetintattr(model, "ModelSense", 1)
+        _check_ret(model, ret)
+        model.is_feasibility = true
     end
     _require_update(model)
     return
@@ -623,15 +772,17 @@ end
 
 function MOI.get(model::Optimizer, ::MOI.ObjectiveSense)
     _update_if_necessary(model)
-    sense = model_sense(model.inner)
+    sense = Ref{Cint}()
+    ret = GRBgetintattr(model, "ModelSense", sense)
+    _check_ret(model, ret)
     if model.is_feasibility
         return MOI.FEASIBILITY_SENSE
-    elseif sense == :maximize
+    elseif sense[] == -1
         return MOI.MAX_SENSE
-    elseif sense == :minimize
+    else
+        @assert sense[] == 1
         return MOI.MIN_SENSE
     end
-    error("Invalid objective sense: $(sense)")
 end
 
 function MOI.set(
@@ -655,7 +806,8 @@ function MOI.set(
 ) where {F <: MOI.ScalarAffineFunction{Float64}}
     if model.objective_type == SCALAR_QUADRATIC
         # We need to zero out the existing quadratic objective.
-        delq!(model.inner)
+        ret = GRBdelq(model)
+        _check_ret(model, ret)
     end
     num_vars = length(model.variable_info)
     obj = zeros(Float64, num_vars)
@@ -667,8 +819,10 @@ function MOI.set(
     # what is the problem we try to prevent below?
     # This update is needed because we might have added some variables.
     _update_if_necessary(model)
-    set_dblattrarray!(model.inner, "Obj", 1, num_vars, obj)
-    set_dblattr!(model.inner, "ObjCon", f.constant)
+    ret = GRBsetdblattrarray(model, "Obj", 0, num_vars, obj)
+    _check_ret(model, ret)
+    ret = GRBsetdblattr(model, "ObjCon", f.constant)
+    _check_ret(model, ret)
     _require_update(model)
     model.objective_type = SCALAR_AFFINE
 end
@@ -682,15 +836,18 @@ function MOI.get(
     end
     _update_if_necessary(model)
     dest = zeros(length(model.variable_info))
-    get_dblattrarray!(dest, model.inner, "Obj", 1)
+    ret = GRBgetdblattrarray(model, "Obj", 0, length(dest), dest)
+    _check_ret(model, ret)
     terms = MOI.ScalarAffineTerm{Float64}[]
     for (index, info) in model.variable_info
         coefficient = dest[info.column]
         iszero(coefficient) && continue
         push!(terms, MOI.ScalarAffineTerm(coefficient, index))
     end
-    constant = get_dblattr(model.inner, "ObjCon")
-    return MOI.ScalarAffineFunction(terms, constant)
+    constant = Ref{Cdouble}()
+    ret = GRBgetdblattr(model, "ObjCon", constant)
+    _check_ret(model, ret)
+    return MOI.ScalarAffineFunction(terms, constant[])
 end
 
 function MOI.set(
@@ -701,13 +858,17 @@ function MOI.set(
     # We need to zero out any existing linear objective.
     obj = zeros(length(model.variable_info))
     for (i, c) in zip(affine_indices, affine_coefficients)
-        obj[i] = c
+        obj[i + 1] = c
     end
-    set_dblattrarray!(model.inner, "Obj", 1, length(obj), obj)
-    set_dblattr!(model.inner, "ObjCon", f.constant)
+    ret = GRBsetdblattrarray(model, "Obj", 0, length(obj), obj)
+    _check_ret(model, ret)
+    ret = GRBsetdblattr(model, "ObjCon", f.constant)
+    _check_ret(model, ret)
     # We need to zero out the existing quadratic objective.
-    delq!(model.inner)
-    add_qpterms!(model.inner, I, J, V)
+    ret = GRBdelq(model)
+    _check_ret(model, ret)
+    ret = GRBaddqpterms(model, length(I), I, J, V)
+    _check_ret(model, ret)
     _require_update(model)
     model.objective_type = SCALAR_QUADRATIC
     return
@@ -719,18 +880,32 @@ function MOI.get(
 )
     _update_if_necessary(model)
     dest = zeros(length(model.variable_info))
-    get_dblattrarray!(dest, model.inner, "Obj", 1)
+    ret = GRBgetdblattrarray(model, "Obj", 0, length(dest), dest)
+    _check_ret(model, ret)
     terms = MOI.ScalarAffineTerm{Float64}[]
     for (index, info) in model.variable_info
         coefficient = dest[info.column]
         iszero(coefficient) && continue
         push!(terms, MOI.ScalarAffineTerm(coefficient, index))
     end
-    constant = get_dblattr(model.inner, "ObjCon")
+    constant = Ref{Cdouble}()
+    ret = GRBgetdblattr(model, "ObjCon", constant)
+    _check_ret(model, ret)
     q_terms = MOI.ScalarQuadraticTerm{Float64}[]
-    I, J, V = getq(model.inner)
-    for (i, j, v) in zip(I, J, V)
-        iszero(v) && continue
+
+    numqnzP = Ref{Cint}()
+    ret = GRBgetintattr(model, "NumQNZs", numqnzP)
+    _check_ret(model, ret)
+    qrow = Array{Cint}(undef, numqnzP[])
+    qcol = Array{Cint}(undef, numqnzP[])
+    qval = Array{Float64}(undef, numqnzP[])
+    nzout = Ref{Cint}()
+    ret = GRBgetq(model, numqnzP, qrow, qcol, qval)
+    _check_ret(model, ret)
+    for (i, j, v) in zip(qrow, qcol, qval)
+        if iszero(v)
+            continue
+        end
         # See note in `_indices_and_coefficients`.
         new_v = i == j ? 2v : v
         push!(
@@ -742,7 +917,7 @@ function MOI.get(
             )
         )
     end
-    return MOI.ScalarQuadraticFunction(terms, q_terms, constant)
+    return MOI.ScalarQuadraticFunction(terms, q_terms, constant[])
 end
 
 function MOI.modify(
@@ -750,7 +925,8 @@ function MOI.modify(
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
     chg::MOI.ScalarConstantChange{Float64}
 )
-    set_dblattr!(model.inner, "ObjCon", chg.new_constant)
+    ret = GRBsetdblattr(model, "ObjCon", chg.new_constant)
+    _check_ret(model, ret)
     _require_update(model)
     return
 end
@@ -848,8 +1024,10 @@ function MOI.get(
 end
 
 function MOI.set(
-    model::Optimizer, ::MOI.ConstraintFunction,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any}, ::MOI.SingleVariable
+    model::Optimizer,
+    ::MOI.ConstraintFunction,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any},
+    ::MOI.SingleVariable
 )
     return throw(MOI.SettingSingleVariableFunctionNotAllowed())
 end
@@ -977,7 +1155,8 @@ function MOI.delete(
 )
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
-    set_dblattrelement!(model.inner, "UB", info.column, Inf)
+    ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
+    _check_ret(model, ret)
     _require_update(model)
     if info.bound == LESS_AND_GREATER_THAN
         info.bound = GREATER_THAN
@@ -1007,13 +1186,13 @@ function _set_variable_lower_bound(model, info, value)
     if info.num_soc_constraints == 0
         # No SOC constraints, set directly.
         @assert isnan(info.lower_bound_if_soc)
-        set_dblattrelement!(model.inner, "LB", info.column, value)
+        GRBsetdblattrelement(model, "LB", Cint(info.column - 1), value)
         _require_update(model)
     elseif value >= 0.0
         # Regardless of whether there are SOC constraints, this is a valid
         # bound for the SOC constraint and should override any previous bounds.
         info.lower_bound_if_soc = NaN
-        set_dblattrelement!(model.inner, "LB", info.column, value)
+        GRBsetdblattrelement(model, "LB", Cint(info.column - 1), value)
         _require_update(model)
     elseif isnan(info.lower_bound_if_soc)
         # Previously, we had a non-negative lower bound (i.e., it was set in
@@ -1021,7 +1200,7 @@ function _set_variable_lower_bound(model, info, value)
         # there are still some SOC constraints, so we cache `value` and set the
         # variable lower bound to `0.0`.
         @assert value < 0.0
-        set_dblattrelement!(model.inner, "LB", info.column, 0.0)
+        GRBsetdblattrelement(model, "LB", Cint(info.column - 1), 0.0)
         _require_update(model)
         info.lower_bound_if_soc = value
     else
@@ -1030,6 +1209,7 @@ function _set_variable_lower_bound(model, info, value)
         @assert info.lower_bound_if_soc < 0.0
         info.lower_bound_if_soc = value
     end
+    return
 end
 
 """
@@ -1055,7 +1235,10 @@ function _get_variable_lower_bound(model, info)
         return info.lower_bound_if_bounded
     end
     _update_if_necessary(model)
-    return get_dblattrelement(model.inner, "LB", info.column)
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "LB", Cint(info.column - 1), valueP)
+    _check_ret(model, ret)
+    return valueP[]
 end
 
 """
@@ -1076,7 +1259,10 @@ function _get_variable_upper_bound(model, info)
         return info.upper_bound_if_bounded
     end
     _update_if_necessary(model)
-    return get_dblattrelement(model.inner, "UB", info.column)
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "UB", Cint(info.column - 1), valueP)
+    _check_ret(model, ret)
+    return valueP[]
 end
 
 function MOI.delete(
@@ -1104,7 +1290,8 @@ function MOI.delete(
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     _set_variable_lower_bound(model, info, -Inf)
-    set_dblattrelement!(model.inner, "UB", info.column, Inf)
+    ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
+    _check_ret(model, ret)
     _require_update(model)
     info.bound = NONE
     info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
@@ -1120,7 +1307,8 @@ function MOI.delete(
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     _set_variable_lower_bound(model, info, -Inf)
-    set_dblattrelement!(model.inner, "UB", info.column, Inf)
+    ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
+    _check_ret(model, ret)
     _require_update(model)
     info.bound = NONE
     info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
@@ -1179,29 +1367,35 @@ function _set_bounds(
     indices::Vector{MOI.ConstraintIndex{MOI.SingleVariable, S}},
     sets::Vector{S}
 ) where {S}
-    lower_columns, lower_values = Int[], Float64[]
-    upper_columns, upper_values = Int[], Float64[]
+    lower_columns, lower_values = Cint[], Float64[]
+    upper_columns, upper_values = Cint[], Float64[]
     for (c, s) in zip(indices, sets)
         lower, upper = _bounds(s)
         info = _info(model, c)
         if lower !== nothing
             if info.num_soc_constraints == 0
-                push!(lower_columns, info.column)
+                push!(lower_columns, Cint(info.column - 1))
                 push!(lower_values, lower)
             else
                 _set_variable_lower_bound(model, info, lower)
             end
         end
         if upper !== nothing
-            push!(upper_columns, info.column)
+            push!(upper_columns, Cint(info.column - 1))
             push!(upper_values, upper)
         end
     end
     if length(lower_columns) > 0
-        set_dblattrlist!(model.inner, "LB", lower_columns, lower_values)
+        ret = GRBsetdblattrlist(
+            model, "LB", length(lower_columns), lower_columns, lower_values
+        )
+        _check_ret(model, ret)
     end
     if length(upper_columns) > 0
-        set_dblattrlist!(model.inner, "UB", upper_columns, upper_values)
+        ret = GRBsetdblattrlist(
+            model, "UB", length(upper_columns), upper_columns, upper_values
+        )
+        _check_ret(model, ret)
     end
     _require_update(model)
 end
@@ -1221,7 +1415,8 @@ function MOI.set(
     if upper !== nothing
         @assert !isnan(info.upper_bound_if_bounded)
         info.upper_bound_if_bounded = upper
-        set_dblattrelement!(model.inner, "UB", info.column, upper)
+        ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), upper)
+        _check_ret(model, ret)
     end
     _require_update(model)
     return
@@ -1231,7 +1426,8 @@ function MOI.add_constraint(
     model::Optimizer, f::MOI.SingleVariable, ::MOI.ZeroOne
 )
     info = _info(model, f.variable)
-    set_charattrelement!(model.inner, "VType", info.column, Char('B'))
+    ret = GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('B'))
+    _check_ret(model, ret)
     _require_update(model)
     info.type = BINARY
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne}(f.variable.value)
@@ -1242,7 +1438,8 @@ function MOI.delete(
 )
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
-    set_charattrelement!(model.inner, "VType", info.column, Char('C'))
+    ret = GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('C'))
+    _check_ret(model, ret)
     _require_update(model)
     info.type = CONTINUOUS
     info.type_constraint_name = ""
@@ -1262,7 +1459,8 @@ function MOI.add_constraint(
     model::Optimizer, f::MOI.SingleVariable, ::MOI.Integer
 )
     info = _info(model, f.variable)
-    set_charattrelement!(model.inner, "VType", info.column, Char('I'))
+    ret = GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('I'))
+    _check_ret(model, ret)
     _require_update(model)
     info.type = INTEGER
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.Integer}(f.variable.value)
@@ -1273,7 +1471,8 @@ function MOI.delete(
 )
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
-    set_charattrelement!(model.inner, "VType", info.column, Char('C'))
+    ret = GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('C'))
+    _check_ret(model, ret)
     _require_update(model)
     info.type = CONTINUOUS
     info.type_constraint_name = ""
@@ -1295,9 +1494,11 @@ function MOI.add_constraint(
     info = _info(model, f.variable)
     _throw_if_existing_lower(info.bound, info.type, typeof(s), f.variable)
     _throw_if_existing_upper(info.bound, info.type, typeof(s), f.variable)
-    set_charattrelement!(model.inner, "VType", info.column, Char('S'))
+    ret = GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('S'))
+    _check_ret(model, ret)
     _set_variable_lower_bound(model, info, s.lower)
-    set_dblattrelement!(model.inner, "UB", info.column, s.upper)
+    ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), s.upper)
+    _check_ret(model, ret)
     _require_update(model)
     info.type = SEMICONTINUOUS
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semicontinuous{Float64}}(f.variable.value)
@@ -1309,9 +1510,11 @@ function MOI.delete(
 )
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
-    set_charattrelement!(model.inner, "VType", info.column, Char('C'))
+    ret = GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('C'))
+    _check_ret(model, ret)
     _set_variable_lower_bound(model, info, -Inf)
-    set_dblattrelement!(model.inner, "UB", info.column, Inf)
+    ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
+    _check_ret(model, ret)
     _require_update(model)
     info.type = CONTINUOUS
     info.type_constraint_name = ""
@@ -1327,8 +1530,9 @@ function MOI.get(
     info = _info(model, c)
     _update_if_necessary(model)
     lower = _get_variable_lower_bound(model, info)
-    upper = get_dblattrelement(model.inner, "UB", info.column)
-    return MOI.Semicontinuous(lower, upper)
+    upper = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "UB", Cint(info.column - 1), upper)
+    return MOI.Semicontinuous(lower, upper[])
 end
 
 function MOI.add_constraint(
@@ -1337,9 +1541,11 @@ function MOI.add_constraint(
     info = _info(model, f.variable)
     _throw_if_existing_lower(info.bound, info.type, typeof(s), f.variable)
     _throw_if_existing_upper(info.bound, info.type, typeof(s), f.variable)
-    set_charattrelement!(model.inner, "VType", info.column, Char('N'))
+    ret = GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('N'))
+    _check_ret(model, ret)
     _set_variable_lower_bound(model, info, s.lower)
-    set_dblattrelement!(model.inner, "UB", info.column, s.upper)
+    ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), s.upper)
+    _check_ret(model, ret)
     _require_update(model)
     info.type = SEMIINTEGER
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semiinteger{Float64}}(f.variable.value)
@@ -1351,9 +1557,11 @@ function MOI.delete(
 )
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
-    set_charattrelement!(model.inner, "VType", info.column, Char('C'))
+    ret = GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('C'))
+    _check_ret(model, ret)
     _set_variable_lower_bound(model, info, -Inf)
-    set_dblattrelement!(model.inner, "UB", info.column, Inf)
+    ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
+    _check_ret(model, ret)
     _require_update(model)
     info.type = CONTINUOUS
     info.type_constraint_name = ""
@@ -1369,8 +1577,9 @@ function MOI.get(
     info = _info(model, c)
     _update_if_necessary(model)
     lower = _get_variable_lower_bound(model, info)
-    upper = get_dblattrelement(model.inner, "UB", info.column)
-    return MOI.Semiinteger(lower, upper)
+    upper = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "UB", Cint(info.column - 1), upper)
+    return MOI.Semiinteger(lower, upper[])
 end
 
 function MOI.get(
@@ -1452,7 +1661,10 @@ function MOI.add_constraint(
 
     indices, coefficients = _indices_and_coefficients(model, f)
     sense, rhs = _sense_and_rhs(s)
-    add_constr!(model.inner, indices, coefficients, sense, rhs)
+    ret = GRBaddconstr(
+        model, length(indices), indices, coefficients, sense, rhs, ""
+    )
+    _check_ret(model, ret)
     _require_update(model)
     return MOI.ConstraintIndex{typeof(f), typeof(s)}(model.last_constraint_index)
 end
@@ -1475,9 +1687,9 @@ function MOI.add_constraints(
     end
     # Initialize storage
     indices = Vector{MOI.ConstraintIndex{eltype(f), eltype(s)}}(undef, length(f))
-    row_starts = Vector{Int}(undef, length(f) + 1)
-    row_starts[1] = 1
-    columns = Vector{Int}(undef, nnz)
+    row_starts = Vector{Cint}(undef, length(f) + 1)
+    row_starts[1] = 0
+    columns = Vector{Cint}(undef, nnz)
     coefficients = Vector{Float64}(undef, nnz)
     senses = Vector{Cchar}(undef, length(f))
     rhss = Vector{Float64}(undef, length(f))
@@ -1486,9 +1698,10 @@ function MOI.add_constraints(
         senses[i], rhss[i] = _sense_and_rhs(si)
         row_starts[i + 1] = row_starts[i] + length(fi.terms)
         _indices_and_coefficients(
-            view(columns, row_starts[i]:row_starts[i + 1] - 1),
-            view(coefficients, row_starts[i]:row_starts[i + 1] - 1),
-            model, fi
+            view(columns, (1 + row_starts[i]):row_starts[i + 1]),
+            view(coefficients, (1 + row_starts[i]):row_starts[i + 1]),
+            model,
+            fi,
         )
         model.last_constraint_index += 1
         indices[i] = MOI.ConstraintIndex{eltype(f), eltype(s)}(model.last_constraint_index)
@@ -1496,7 +1709,18 @@ function MOI.add_constraints(
             ConstraintInfo(length(model.affine_constraint_info) + 1, si)
     end
     pop!(row_starts)  # Gurobi doesn't need the final row start.
-    add_constrs!(model.inner, row_starts, columns, coefficients, senses, rhss)
+    p = pointer(senses)
+    ret = GC.@preserve GRBaddconstrs(
+        model,
+        length(f),
+        length(coefficients),
+        row_starts,
+        columns,
+        coefficients,
+        p, # TODO(odow): change Clang to not convert Ptr{Cchar} to Cstring here?
+        rhss,
+        C_NULL,
+    )
     _require_update(model)
     return indices
 end
@@ -1508,15 +1732,15 @@ function MOI.delete(
     # The `sort!`s called are necessary for improving the efficiency of the
     # updates (i.e., without them we cannot use `searchsorted*` methods).
     _update_if_necessary(model)
-    rows_to_delete = sort!(getfield.(_info.(model, cs), :row))
-    del_constrs!(model.inner, rows_to_delete)
+    rows_to_delete = sort!([Cint(_info(model, x).row - 1) for x in cs])
+    ret = GRBdelconstrs(model, length(rows_to_delete), rows_to_delete)
     _require_update(model)
     for (_, info) in model.affine_constraint_info
         # The trick here is: searchsortedlast returns, in O(log n), the
         # last index with a row smaller than info.row, over rows_to_delete
         # this is the same as the number of rows deleted before it, and
         # how much its value need to be shifted.
-        info.row -= searchsortedlast(rows_to_delete, info.row)
+        info.row -= searchsortedlast(rows_to_delete, info.row - 1)
     end
     cs_values = sort!(getfield.(cs, :value))
     # If the key of an model.affine_constraint_info entry is in cs_values,
@@ -1534,7 +1758,8 @@ function MOI.delete(
 )
     row = _info(model, c).row
     _update_if_necessary(model)
-    del_constrs!(model.inner, row)
+    ret = GRBdelconstrs(model, 1, Ref{Cint}(row - 1))
+    _check_ret(model, ret)
     _require_update(model)
     for (key, info) in model.affine_constraint_info
         if info.row > row
@@ -1551,34 +1776,44 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}
 ) where {S}
     _update_if_necessary(model)
-    rhs = get_dblattrelement(model.inner, "RHS", _info(model, c).row)
-    return S(rhs)
+    rhs = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "RHS", Cint(_info(model, c).row - 1), rhs)
+    _check_ret(model, ret)
+    return S(rhs[])
 end
 
 function MOI.set(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}, s::S
 ) where {S}
-    set_dblattrelement!(model.inner, "RHS", _info(model, c).row, MOI.constant(s))
+    ret = GRBsetdblattrelement(
+        model, "RHS", Cint(_info(model, c).row - 1), MOI.constant(s)
+    )
+    _check_ret(model, ret)
     _require_update(model)
     return
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintFunction,
+    model::Optimizer,
+    ::MOI.ConstraintFunction,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}
 ) where {S}
     _update_if_necessary(model)
-    sparse_a = SparseArrays.sparse(get_constrs(model.inner, _info(model, c).row, 1)')
-    terms = MOI.ScalarAffineTerm{Float64}[]
-    for (col, val) in zip(sparse_a.rowval, sparse_a.nzval)
-        iszero(val) && continue
-        push!(
-            terms,
-            MOI.ScalarAffineTerm(
-                val,
-                model.variable_info[CleverDicts.LinearIndex(col)].index
-            )
+    numnzP = Ref{Cint}()
+    row = Cint(_info(model, c).row - 1)
+    ret = GRBgetconstrs(model, numnzP, C_NULL, C_NULL, C_NULL, row, 1)
+    _check_ret(model, ret)
+    cbeg = Array{Cint}(undef, 2)
+    cind = Array{Cint}(undef, numnzP[])
+    cval = Array{Cdouble}(undef, numnzP[])
+    ret = GRBgetconstrs(model, numnzP, cbeg, cind, cval, row, 1)
+    _check_ret(model, ret)
+    terms = Vector{MOI.ScalarAffineTerm{Float64}}(undef, length(cind))
+    for i = 1:length(terms)
+        terms[i] = MOI.ScalarAffineTerm(
+            cval[i],
+            model.variable_info[CleverDicts.LinearIndex(cind[i] + 1)].index
         )
     end
     return MOI.ScalarAffineFunction(terms, 0.0)
@@ -1599,7 +1834,8 @@ function MOI.set(
     info = _info(model, c)
     info.name = name
     if !isempty(name)
-        set_strattrelement!(model.inner, "ConstrName", info.row, name)
+        ret = GRBsetstrattrelement(model, "ConstrName", Cint(info.row - 1), name)
+        _check_ret(model, ret)
         _require_update(model)
     end
     model.name_to_constraint_index = nothing
@@ -1709,7 +1945,13 @@ function MOI.add_constraint(
     end
     indices, coefficients, I, J, V = _indices_and_coefficients(model, f)
     sense, rhs = _sense_and_rhs(s)
-    add_qconstr!(model.inner, indices, coefficients, I, J, V, sense, rhs)
+    ret = GRBaddqconstr(
+        model,
+        length(indices), indices, coefficients,
+        length(I), I, J, V,
+        sense, rhs, ""
+    )
+    _check_ret(model, ret)
     _require_update(model)
     model.last_constraint_index += 1
     model.quadratic_constraint_info[model.last_constraint_index] =
@@ -1731,7 +1973,8 @@ function MOI.delete(
 ) where {S}
     _update_if_necessary(model)
     info = _info(model, c)
-    delqconstrs!(model.inner, [info.row])
+    ret = GRBdelqconstrs(model, 1, Ref{Cint}(info.row - 1))
+    _check_ret(model, ret)
     _require_update(model)
     for (key, info_2) in model.quadratic_constraint_info
         if info_2.row > info.row
@@ -1748,37 +1991,53 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, S}
 ) where {S}
     _update_if_necessary(model)
-    rhs = get_dblattrelement(model.inner, "QCRHS", _info(model, c).row)
-    return S(rhs)
+    rhs = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(
+        model, "QCRHS", Cint(_info(model, c).row - 1), rhs
+    )
+    _check_ret(model, ret)
+    return S(rhs[])
+end
+
+function _getqconstr(model::Optimizer, row::Cint)
+    numlnzP = Ref{Cint}()
+    numqnzP = Ref{Cint}()
+    ret = GRBgetqconstr(
+        model, row, numlnzP, C_NULL, C_NULL, numqnzP, C_NULL, C_NULL, C_NULL
+    )
+    _check_ret(model, ret)
+    lind = Array{Cint}(undef, numlnzP[])
+    lval = Array{Cdouble}(undef, numlnzP[])
+    qrow = Array{Cint}(undef, numqnzP[])
+    qcol = Array{Cint}(undef, numqnzP[])
+    qval = Array{Cdouble}(undef, numqnzP[])
+    ret = GRBgetqconstr(
+        model, row, numlnzP, lind, lval, numqnzP, qrow, qcol, qval
+    )
+    _check_ret(model, ret)
+    return lind, lval, qrow, qcol, qval
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintFunction,
+    model::Optimizer,
+    ::MOI.ConstraintFunction,
     c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, S}
 ) where {S}
     _update_if_necessary(model)
-    affine_cols, affine_coefficients, I, J, V = getqconstr(model.inner, _info(model, c).row)
-    affine_terms = MOI.ScalarAffineTerm{Float64}[]
-    for (col, coef) in zip(affine_cols, affine_coefficients)
-        iszero(coef) && continue
-        push!(
-            affine_terms,
-            MOI.ScalarAffineTerm(
-                coef,
-                model.variable_info[CleverDicts.LinearIndex(col + 1)].index
-                )
+    li, lv, I, J, V = _getqconstr(model, Cint(_info(model, c).row - 1))
+    affine_terms = Vector{MOI.ScalarAffineTerm{Float64}}(undef, length(li))
+    for i = 1:length(li)
+        affine_terms[i] = MOI.ScalarAffineTerm(
+            lv[i], model.variable_info[CleverDicts.LinearIndex(li[i] + 1)].index
         )
     end
-    quadratic_terms = MOI.ScalarQuadraticTerm{Float64}[]
-    for (i, j, coef) in zip(I, J, V)
-        new_coef = i == j ? 2coef : coef
-        push!(
-            quadratic_terms,
-            MOI.ScalarQuadraticTerm(
-                new_coef,
-                model.variable_info[CleverDicts.LinearIndex(i + 1)].index,
-                model.variable_info[CleverDicts.LinearIndex(j + 1)].index
-            )
+    quadratic_terms = Vector{MOI.ScalarQuadraticTerm{Float64}}(undef, length(I))
+    for i = 1:length(I)
+        v = I[i] == J[i] ? 2V[i] : V[i]
+        quadratic_terms[i] = MOI.ScalarQuadraticTerm(
+            v,
+            model.variable_info[CleverDicts.LinearIndex(I[i] + 1)].index,
+            model.variable_info[CleverDicts.LinearIndex(J[i] + 1)].index,
         )
     end
     return MOI.ScalarQuadraticFunction(affine_terms, quadratic_terms, 0.0)
@@ -1799,7 +2058,8 @@ function MOI.set(
     info = _info(model, c)
     info.name = name
     _update_if_necessary(model)
-    set_strattrelement!(model.inner, "QCName", info.row, name)
+    ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
+    _check_ret(model, ret)
     _require_update(model)
     model.name_to_constraint_index = nothing
     return
@@ -1821,8 +2081,8 @@ function _info(
     throw(MOI.InvalidIndex(key))
 end
 
-_sos_type(::MOI.SOS1) = :SOS1
-_sos_type(::MOI.SOS2) = :SOS2
+_sos_type(::MOI.SOS1) = GRB_SOS_TYPE1
+_sos_type(::MOI.SOS2) = GRB_SOS_TYPE2
 
 function MOI.is_valid(
     model::Optimizer,
@@ -1839,8 +2099,17 @@ end
 function MOI.add_constraint(
     model::Optimizer, f::MOI.VectorOfVariables, s::SOS
 )
-    columns = Int[_info(model, v).column for v in f.variables]
-    add_sos!(model.inner, _sos_type(s), columns, s.weights)
+    columns = Cint[_info(model, v).column - 1 for v in f.variables]
+    ret = GRBaddsos(
+        model,
+        1,
+        length(columns),
+        Ref{Cint}(_sos_type(s)),
+        Ref{Cint}(0),
+        columns,
+        s.weights,
+    )
+    _check_ret(model, ret)
     model.last_constraint_index += 1
     index = MOI.ConstraintIndex{MOI.VectorOfVariables, typeof(s)}(model.last_constraint_index)
     model.sos_constraint_info[index.value] = ConstraintInfo(
@@ -1855,7 +2124,9 @@ function MOI.delete(
 )
     row = _info(model, c).row
     _update_if_necessary(model)
-    del_sos!(model.inner, [Cint(row)])
+    rows = Ref{Cint}(row - 1)
+    ret = GRBdelsos(model, 1, rows)
+    _check_ret(model, ret)
     _require_update(model)
     for (key, info) in model.sos_constraint_info
         if info.row > row
@@ -1885,23 +2156,46 @@ function MOI.set(
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintSet,
+    model::Optimizer,
+    ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.VectorOfVariables, S}
 ) where {S <: SOS}
     _update_if_necessary(model)
-    sparse_a, _ = get_sos(model.inner, _info(model, c).row, 1)
-    return S(sparse_a.nzval)
+    nummembersP = Ref{Cint}()
+    start = Cint(_info(model, c).row - 1)
+    sostype = Ref{Cint}()
+    rbeg = Vector{Cint}(undef, 2)
+    ret = GRBgetsos(
+        model, nummembersP, sostype, rbeg, C_NULL, C_NULL, start, 1
+    )
+    _check_ret(model, ret)
+    ind = Array{Cint}(undef, nummembersP[])
+    weight = Array{Cdouble}(undef, nummembersP[])
+    ret = GRBgetsos(model, nummembersP, sostype, rbeg, ind, weight, start, 1)
+    _check_ret(model, ret)
+    return S(weight)
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintFunction,
+    model::Optimizer,
+    ::MOI.ConstraintFunction,
     c::MOI.ConstraintIndex{MOI.VectorOfVariables, S}
 ) where {S <: SOS}
     _update_if_necessary(model)
-    sparse_a, _ = get_sos(model.inner, _info(model, c).row, 1)
-    indices = SparseArrays.nonzeroinds(sparse_a[1, :])
+    nummembersP = Ref{Cint}()
+    start = Cint(_info(model, c).row - 1)
+    sostype = Ref{Cint}()
+    rbeg = Vector{Cint}(undef, 2)
+    ret = GRBgetsos(
+        model, nummembersP, sostype, rbeg, C_NULL, C_NULL, start, 1
+    )
+    _check_ret(model, ret)
+    ind = Array{Cint}(undef, nummembersP[])
+    weight = Array{Cdouble}(undef, nummembersP[])
+    ret = GRBgetsos(model, nummembersP, sostype, rbeg, ind, weight, start, 1)
+    _check_ret(model, ret)
     return MOI.VectorOfVariables(
-        [model.variable_info[CleverDicts.LinearIndex(i)].index for i in indices]
+        [model.variable_info[CleverDicts.LinearIndex(i + 1)].index for i in ind]
     )
 end
 
@@ -1909,14 +2203,16 @@ end
 ### Optimize methods.
 ###
 
-function check_moi_callback_validity(model::Optimizer)
+function _check_moi_callback_validity(model::Optimizer)
     has_moi_callback =
         model.lazy_callback !== nothing ||
         model.user_cut_callback !== nothing ||
         model.heuristic_callback !== nothing
     if has_moi_callback && model.has_generic_callback
-        error("Cannot use Gurobi.CallbackFunction as well as " *
-            "MOI.AbstractCallbackFunction")
+        error(
+            "Cannot use Gurobi.CallbackFunction as well as " *
+            "MOI.AbstractCallbackFunction"
+        )
     end
     return has_moi_callback
 end
@@ -1927,12 +2223,13 @@ function MOI.optimize!(model::Optimizer)
     _update_if_necessary(model)
 
     # Initialize callbacks if necessary.
-    if check_moi_callback_validity(model)
+    if _check_moi_callback_validity(model)
         MOI.set(model, CallbackFunction(), default_moi_callback(model))
         model.has_generic_callback = false
     end
 
-    optimize(model.inner)
+    ret = GRBoptimize(model)
+    _check_ret(model, ret)
 
     # Post-optimize caching to speed up the checks in VariablePrimal and
     # ConstraintDual.
@@ -1954,39 +2251,47 @@ end
 # documentation:
 # https://www.com/documentation/8.1/refman/optimization_status_codes.html#sec:StatusCodes
 const RAW_STATUS_STRINGS = [
-    (MOI.OPTIMIZE_NOT_CALLED, "Model is loaded, but no solution information is available."),
-    (MOI.OPTIMAL, "Model was solved to optimality (subject to tolerances), and an optimal solution is available."),
-    (MOI.INFEASIBLE, "Model was proven to be infeasible."),
-    (MOI.INFEASIBLE_OR_UNBOUNDED, "Model was proven to be either infeasible or unbounded. To obtain a more definitive conclusion, set the DualReductions parameter to 0 and reoptimize."),
-    (MOI.DUAL_INFEASIBLE, "Model was proven to be unbounded. Important note: an unbounded status indicates the presence of an unbounded ray that allows the objective to improve without limit. It says nothing about whether the model has a feasible solution. If you require information on feasibility, you should set the objective to zero and reoptimize."),
-    (MOI.OBJECTIVE_LIMIT, "Optimal objective for model was proven to be worse than the value specified in the Cutoff parameter. No solution information is available."),
-    (MOI.ITERATION_LIMIT, "Optimization terminated because the total number of simplex iterations performed exceeded the value specified in the IterationLimit parameter, or because the total number of barrier iterations exceeded the value specified in the BarIterLimit parameter."),
-    (MOI.NODE_LIMIT, "Optimization terminated because the total number of branch-and-cut nodes explored exceeded the value specified in the NodeLimit parameter."),
-    (MOI.TIME_LIMIT, "Optimization terminated because the time expended exceeded the value specified in the TimeLimit parameter."),
-    (MOI.SOLUTION_LIMIT, "Optimization terminated because the number of solutions found reached the value specified in the SolutionLimit parameter."),
-    (MOI.INTERRUPTED, "Optimization was terminated by the user."),
-    (MOI.NUMERICAL_ERROR, "Optimization was terminated due to unrecoverable numerical difficulties."),
-    (MOI.OTHER_LIMIT, "Unable to satisfy optimality tolerances; a sub-optimal solution is available."),
-    (MOI.OTHER_ERROR, "An asynchronous optimization call was made, but the associated optimization run is not yet complete."),
-    (MOI.OBJECTIVE_LIMIT, "User specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached.")
+    # Gurobi Code, TerminationStatus, PrimalStatus, RawStatusString
+    (1,  MOI.OPTIMIZE_NOT_CALLED,     MOI.NO_SOLUTION, "Model is loaded, but no solution information is available."),
+    (2,  MOI.OPTIMAL,                 MOI.FEASIBLE_POINT, "Model was solved to optimality (subject to tolerances), and an optimal solution is available."),
+    (3,  MOI.INFEASIBLE,              MOI.NO_SOLUTION, "Model was proven to be infeasible."),
+    (4,  MOI.INFEASIBLE_OR_UNBOUNDED, MOI.NO_SOLUTION, "Model was proven to be either infeasible or unbounded. To obtain a more definitive conclusion, set the DualReductions parameter to 0 and reoptimize."),
+    (5,  MOI.DUAL_INFEASIBLE,         MOI.NO_SOLUTION, "Model was proven to be unbounded. Important note: an unbounded status indicates the presence of an unbounded ray that allows the objective to improve without limit. It says nothing about whether the model has a feasible solution. If you require information on feasibility, you should set the objective to zero and reoptimize."),
+    (6,  MOI.OBJECTIVE_LIMIT,         MOI.NO_SOLUTION, "Optimal objective for model was proven to be worse than the value specified in the Cutoff parameter. No solution information is available."),
+    (7,  MOI.ITERATION_LIMIT,         MOI.NO_SOLUTION, "Optimization terminated because the total number of simplex iterations performed exceeded the value specified in the IterationLimit parameter, or because the total number of barrier iterations exceeded the value specified in the BarIterLimit parameter."),
+    (8,  MOI.NODE_LIMIT,              MOI.NO_SOLUTION, "Optimization terminated because the total number of branch-and-cut nodes explored exceeded the value specified in the NodeLimit parameter."),
+    (9,  MOI.TIME_LIMIT,              MOI.NO_SOLUTION, "Optimization terminated because the time expended exceeded the value specified in the TimeLimit parameter."),
+    (10, MOI.SOLUTION_LIMIT,          MOI.NO_SOLUTION, "Optimization terminated because the number of solutions found reached the value specified in the SolutionLimit parameter."),
+    (11, MOI.INTERRUPTED,             MOI.NO_SOLUTION, "Optimization was terminated by the user."),
+    (12, MOI.NUMERICAL_ERROR,         MOI.NO_SOLUTION, "Optimization was terminated due to unrecoverable numerical difficulties."),
+    (13, MOI.OTHER_LIMIT,             MOI.FEASIBLE_POINT, "Unable to satisfy optimality tolerances; a sub-optimal solution is available."),
+    (14, MOI.OTHER_ERROR,             MOI.NO_SOLUTION, "An asynchronous optimization call was made, but the associated optimization run is not yet complete."),
+    (15, MOI.OBJECTIVE_LIMIT,         MOI.NO_SOLUTION, "User specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached.")
 ]
+
+function _raw_status(model::Optimizer)
+    valueP = Ref{Cint}()
+    ret = GRBgetintattr(model, "Status", valueP)
+    _check_ret(model, ret)
+    @assert 1 <= valueP[] <= 15
+    return RAW_STATUS_STRINGS[valueP[]]
+end
 
 function MOI.get(model::Optimizer, attr::MOI.RawStatusString)
     _throw_if_optimize_in_progress(model, attr)
-    status_code = get_status_code(model.inner)
-    if 1 <= status_code <= length(RAW_STATUS_STRINGS)
-        return RAW_STATUS_STRINGS[status_code][2]
-    end
-    return MOI.OTHER_ERROR
+    return _raw_status(model)[4]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.TerminationStatus)
     _throw_if_optimize_in_progress(model, attr)
-    status_code = get_status_code(model.inner)
-    if 1 <= status_code <= length(RAW_STATUS_STRINGS)
-        return RAW_STATUS_STRINGS[status_code][1]
-    end
-    return MOI.OTHER_ERROR
+    return _raw_status(model)[2]
+end
+
+function _get_intattr(model, key)
+    p = Ref{Cint}()
+    ret = GRBgetintattr(model, key, p)
+    _check_ret(model, ret)
+    return p[]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
@@ -1994,81 +2299,71 @@ function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
     if attr.N != 1
         return MOI.NO_SOLUTION
     end
-    stat = get_status(model.inner)
-    if stat == :optimal
-        return MOI.FEASIBLE_POINT
-    elseif stat == :solution_limit
-        return MOI.FEASIBLE_POINT
-    elseif (stat == :inf_or_unbd || stat == :unbounded) && _has_primal_ray(model)
-        return MOI.INFEASIBILITY_CERTIFICATE
-    elseif stat == :suboptimal
-        return MOI.FEASIBLE_POINT
-    elseif is_mip(model.inner) && get_sol_count(model.inner) > 0
-        return MOI.FEASIBLE_POINT
+    term = MOI.get(model, MOI.TerminationStatus())
+    if term == MOI.DUAL_INFEASIBLE || term == MOI.INFEASIBLE_OR_UNBOUNDED
+        if _has_primal_ray(model)
+            return MOI.INFEASIBILITY_CERTIFICATE
+        else
+            return MOI.NO_SOLUTION
+        end
     end
-    return MOI.NO_SOLUTION
+    valueP = Ref{Cint}()
+    ret = GRBgetintattr(model, "SolCount", valueP)
+    _check_ret(model, ret)
+    return valueP[] > 0 ? MOI.FEASIBLE_POINT : MOI.NO_SOLUTION
 end
 
 function _has_dual_ray(model::Optimizer)
-    try
-        # Note: for performance reasons, we try to get 1 element because for
-        # some versions of Gurobi, we cannot query 0 elements without error.
-        get_dblattrarray(model.inner, "FarkasDual", 1, 1)
-        return true
-    catch ex
-        if isa(ex, GurobiError)
-            return false
-        else
-            rethrow(ex)
-        end
-    end
+    # Note: for performance reasons, we try to get 1 element because for
+    # some versions of Gurobi, we cannot query 0 elements without error.
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattrarray(model, "FarkasDual", 0, 1, valueP)
+    return ret == 0
 end
+
+_is_mip(model::Optimizer) = _get_intattr(model, "IsMIP") != 0
+_is_qcp(model::Optimizer) = _get_intattr(model, "IsQCP") != 0
 
 function MOI.get(model::Optimizer, attr::MOI.DualStatus)
     _throw_if_optimize_in_progress(model, attr)
     if attr.N != 1
         return MOI.NO_SOLUTION
-    end
-    stat = get_status(model.inner)
-    if is_mip(model.inner)
+    elseif _is_mip(model)
         return MOI.NO_SOLUTION
-    elseif is_qcp(model.inner) && MOI.get(model, MOI.RawParameter("QCPDual")) != 1
+    elseif _is_qcp(model) && MOI.get(model, MOI.RawParameter("QCPDual")) != 1
         return MOI.NO_SOLUTION
-    elseif stat == :optimal
-        return MOI.FEASIBLE_POINT
-    elseif stat == :solution_limit
-        return MOI.FEASIBLE_POINT
-    elseif (stat == :inf_or_unbd || stat == :infeasible) && _has_dual_ray(model)
-        return MOI.INFEASIBILITY_CERTIFICATE
-    elseif stat == :suboptimal
-        return MOI.FEASIBLE_POINT
     end
-    return MOI.NO_SOLUTION
+    term = MOI.get(model, MOI.TerminationStatus())
+    if term == MOI.INFEASIBLE || term == MOI.INFEASIBLE_OR_UNBOUNDED
+        if _has_dual_ray(model)
+            return MOI.INFEASIBILITY_CERTIFICATE
+        else
+            return MOI.NO_SOLUTION
+        end
+    end
+    valueP = Ref{Cint}()
+    ret = GRBgetintattr(model, "SolCount", valueP)
+    _check_ret(model, ret)
+    return valueP[] > 0 ? MOI.FEASIBLE_POINT : MOI.NO_SOLUTION
 end
 
 function _has_primal_ray(model::Optimizer)
-    try
-        # Note: for performance reasons, we try to get 1 element because for
-        # some versions of Gurobi, we cannot query 0 elements without error.
-        get_dblattrarray(model.inner, "UnbdRay", 1, 1)
-        return true
-    catch ex
-        if isa(ex, GurobiError)
-            return false
-        else
-            rethrow(ex)
-        end
-    end
+    # Note: for performance reasons, we try to get 1 element because for
+    # some versions of Gurobi, we cannot query 0 elements without error.
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattrarray(model, "UnbdRay", 0, 1, valueP)
+    return ret == 0
 end
 
 function MOI.get(model::Optimizer, attr::MOI.VariablePrimal, x::MOI.VariableIndex)
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    if model.has_unbounded_ray
-        return get_dblattrelement(model.inner, "UnbdRay", _info(model, x).column)
-    else
-        return get_dblattrelement(model.inner, "X", _info(model, x).column)
-    end
+    key = model.has_unbounded_ray ? "UnbdRay" : "X"
+    column = _info(model, x).column
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, key, Cint(column - 1), valueP)
+    _check_ret(model, ret)
+    return valueP[]
 end
 
 function MOI.get(
@@ -2088,9 +2383,13 @@ function MOI.get(
     MOI.check_result_index_bounds(model, attr)
     row = _info(model, c).row
     _update_if_necessary(model)
-    rhs = get_dblattrelement(model.inner, "RHS", row)
-    slack = get_dblattrelement(model.inner, "Slack", row)
-    return rhs - slack
+    rhs = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "RHS", Cint(row - 1), rhs)
+    _check_ret(model, ret)
+    slack = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "Slack", Cint(row - 1), slack)
+    _check_ret(model, ret)
+    return rhs[] - slack[]
 end
 
 function MOI.get(
@@ -2099,11 +2398,15 @@ function MOI.get(
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    row = _info(model, c).row
+    row = Cint(_info(model, c).row - 1)
     _update_if_necessary(model)
-    rhs = get_dblattrelement(model.inner, "QCRHS", row)
-    slack = get_dblattrelement(model.inner, "QCSlack", row)
-    return rhs - slack
+    rhs = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "QCRHS", row, rhs)
+    _check_ret(model, ret)
+    slack = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "QCSlack", row, slack)
+    _check_ret(model, ret)
+    return rhs[] - slack[]
 end
 
 function _dual_multiplier(model::Optimizer)
@@ -2111,25 +2414,30 @@ function _dual_multiplier(model::Optimizer)
 end
 
 function MOI.get(
-    model::Optimizer, attr::MOI.ConstraintDual,
+    model::Optimizer,
+    attr::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    reduced_cost = get_dblattrelement(model.inner, "RC", _info(model, c).column)
+    reduced_cost = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(
+        model, "RC", Cint(_info(model, c).column - 1), reduced_cost
+    )
+    _check_ret(model, ret)
     sense = MOI.get(model, MOI.ObjectiveSense())
     # The following is a heuristic for determining whether the reduced cost
     # applies to the lower or upper bound. It can be wrong by at most
     # `FeasibilityTol`.
-    if sense == MOI.MIN_SENSE && reduced_cost < 0
+    if sense == MOI.MIN_SENSE && reduced_cost[] < 0
         # If minimizing, the reduced cost must be negative (ignoring
         # tolerances).
-        return reduced_cost
-    elseif sense == MOI.MAX_SENSE && reduced_cost > 0
+        return reduced_cost[]
+    elseif sense == MOI.MAX_SENSE && reduced_cost[] > 0
         # If maximizing, the reduced cost must be positive (ignoring
         # tolerances). However, because of the MOI dual convention,
         # we return a negative value.
-        return -reduced_cost
+        return -reduced_cost[]
     else
         # The reduced cost, if non-zero, must related to the lower bound.
         return 0.0
@@ -2142,20 +2450,24 @@ function MOI.get(
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    reduced_cost = get_dblattrelement(model.inner, "RC", _info(model, c).column)
+    reduced_cost = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(
+        model, "RC", Cint(_info(model, c).column - 1), reduced_cost
+    )
+    _check_ret(model, ret)
     sense = MOI.get(model, MOI.ObjectiveSense())
     # The following is a heuristic for determining whether the reduced cost
     # applies to the lower or upper bound. It can be wrong by at most
     # `FeasibilityTol`.
-    if sense == MOI.MIN_SENSE && reduced_cost > 0
+    if sense == MOI.MIN_SENSE && reduced_cost[] > 0
         # If minimizing, the reduced cost must be positive (ignoring
         # tolerances).
-        return reduced_cost
-    elseif sense == MOI.MAX_SENSE && reduced_cost < 0
+        return reduced_cost[]
+    elseif sense == MOI.MAX_SENSE && reduced_cost[] < 0
         # If maximizing, the reduced cost must be negative (ignoring
         # tolerances). However, because of the MOI dual convention,
         # we return a positive value.
-        return -reduced_cost
+        return -reduced_cost[]
     else
         # The reduced cost, if non-zero, must related to the lower bound.
         return 0.0
@@ -2168,8 +2480,13 @@ function MOI.get(
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    return _dual_multiplier(model) * get_dblattrelement(
-        model.inner, "RC", _info(model, c).column)
+    reduced_cost = Ref{Cdouble}()
+    reduced_cost = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(
+        model, "RC", Cint(_info(model, c).column - 1), reduced_cost
+    )
+    _check_ret(model, ret)
+    return _dual_multiplier(model) * reduced_cost[]
 end
 
 function MOI.get(
@@ -2178,8 +2495,12 @@ function MOI.get(
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    return _dual_multiplier(model) * get_dblattrelement(
-        model.inner, "RC", _info(model, c).column)
+    reduced_cost = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(
+        model, "RC", Cint(_info(model, c).column - 1), reduced_cost
+    )
+    _check_ret(model, ret)
+    return _dual_multiplier(model) * reduced_cost[]
 end
 
 function MOI.get(
@@ -2188,12 +2509,19 @@ function MOI.get(
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
+    valueP = Ref{Cdouble}()
     if model.has_infeasibility_cert
-        return -_dual_multiplier(model) * get_dblattrelement(
-            model.inner, "FarkasDual", _info(model, c).row)
+        ret = GRBgetdblattrelement(
+            model, "FarkasDual", Cint(_info(model, c).row - 1), valueP
+        )
+        _check_ret(model, ret)
+        return -_dual_multiplier(model) * valueP[]
     end
-    return _dual_multiplier(model) * get_dblattrelement(
-        model.inner, "Pi", _info(model, c).row)
+    ret = GRBgetdblattrelement(
+        model, "Pi", Cint(_info(model, c).row - 1), valueP
+    )
+    _check_ret(model, ret)
+    return _dual_multiplier(model) * valueP[]
 end
 
 function MOI.get(
@@ -2202,50 +2530,78 @@ function MOI.get(
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    return _dual_multiplier(model) * get_dblattrelement(
-        model.inner, "QCPi", _info(model, c).row)
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(
+        model, "QCPi", Cint(_info(model, c).row - 1), valueP
+    )
+    _check_ret(model, ret)
+    return _dual_multiplier(model) * valueP[]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    return get_dblattr(model.inner, "ObjVal")
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattr(model, "ObjVal", valueP)
+    _check_ret(model, ret)
+    return valueP[]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.ObjectiveBound)
     _throw_if_optimize_in_progress(model, attr)
-    return get_dblattr(model.inner, "ObjBound")
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattr(model, "ObjBound", valueP)
+    _check_ret(model, ret)
+    return valueP[]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.SolveTime)
     _throw_if_optimize_in_progress(model, attr)
-    return get_dblattr(model.inner, "RunTime")
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattr(model, "RunTime", valueP)
+    _check_ret(model, ret)
+    return valueP[]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.SimplexIterations)
     _throw_if_optimize_in_progress(model, attr)
-    return get_dblattr(model.inner, "IterCount")
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattr(model, "IterCount", valueP)
+    _check_ret(model, ret)
+    return valueP[]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.BarrierIterations)
     _throw_if_optimize_in_progress(model, attr)
-    return get_intattr(model.inner, "BarIterCount")
+    valueP = Ref{Cint}()
+    ret = GRBgetintattr(model, "BarIterCount", valueP)
+    _check_ret(model, ret)
+    return Int(valueP[])
 end
 
 function MOI.get(model::Optimizer, attr::MOI.NodeCount)
     _throw_if_optimize_in_progress(model, attr)
-    return get_dblattr(model.inner, "NodeCount")
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattr(model, "NodeCount", valueP)
+    _check_ret(model, ret)
+    return valueP[]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.RelativeGap)
     _throw_if_optimize_in_progress(model, attr)
-    return get_dblattr(model.inner, "MIPGap")
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattr(model, "MIPGap", valueP)
+    _check_ret(model, ret)
+    return valueP[]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.DualObjectiveValue)
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    return get_dblattr(model.inner, "ObjBound")
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattr(model, "ObjBound", valueP)
+    _check_ret(model, ret)
+    return valueP[]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.ResultCount)
@@ -2253,7 +2609,10 @@ function MOI.get(model::Optimizer, attr::MOI.ResultCount)
     if model.has_infeasibility_cert || model.has_unbounded_ray
         return 1
     end
-    return get_intattr(model.inner, "SolCount")
+    valueP = Ref{Cint}()
+    ret = GRBgetintattr(model, "SolCount", valueP)
+    _check_ret(model, ret)
+    return Int(valueP[])
 end
 
 function MOI.get(model::Optimizer, ::MOI.Silent)
@@ -2262,18 +2621,22 @@ end
 
 function MOI.set(model::Optimizer, ::MOI.Silent, flag::Bool)
     model.silent = flag
-    output_flag = flag ? 0 : get(model.params, "OutputFlag", 1)
-    setparam!(model.inner, "OutputFlag", output_flag)
+    output_flag = flag ? 0 : 1
+    MOI.set(model, MOI.RawParameter("OutputFlag"), output_flag)
     return
 end
 
 function MOI.get(model::Optimizer, ::MOI.Name)
     _update_if_necessary(model)
-    return get_strattr(model.inner, "ModelName")
+    valueP = Ref{Ptr{Cchar}}()
+    ret = GRBgetstrattr(model, "ModelName", valueP)
+    _check_ret(model, ret)
+    return unsafe_string(valueP[])
 end
 
 function MOI.set(model::Optimizer, ::MOI.Name, name::String)
-    set_strattr!(model.inner, "ModelName", name)
+    ret = GRBsetstrattr(model, "ModelName", name)
+    _check_ret(model, ret)
     _require_update(model)
     return
 end
@@ -2283,16 +2646,19 @@ function MOI.get(model::Optimizer, ::MOI.ListOfVariableIndices)
     return sort!(collect(keys(model.variable_info)), by = x -> x.value)
 end
 
-MOI.get(model::Optimizer, ::MOI.RawSolver) = model.inner
+MOI.get(model::Optimizer, ::MOI.RawSolver) = model
 
 function MOI.set(
-    model::Optimizer, ::MOI.VariablePrimalStart, x::MOI.VariableIndex,
-    value::Union{Nothing, Float64}
+    model::Optimizer,
+    ::MOI.VariablePrimalStart,
+    x::MOI.VariableIndex,
+    value::Union{Nothing, Float64},
 )
     info = _info(model, x)
     info.start = value
     grb_value = value !== nothing ? value : GRB_UNDEFINED
-    set_dblattrelement!(model.inner, "Start", info.column, grb_value)
+    ret = GRBsetdblattrelement(model, "Start", Cint(info.column - 1), grb_value)
+    _check_ret(model, ret)
     _require_update(model)
     return
 end
@@ -2451,23 +2817,32 @@ function MOI.modify(
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any},
     chg::MOI.ScalarCoefficientChange{Float64}
 )
-    chg_coeffs!(
-        model.inner, _info(model, c).row, _info(model, chg.variable).column,
-        chg.new_coefficient
+    ret = GRBchgcoeffs(
+        model,
+        1,
+        Ref{Cint}(_info(model, c).row - 1),
+        Ref{Cint}(_info(model, chg.variable).column - 1),
+        Ref{Cdouble}(chg.new_coefficient),
     )
+    _check_ret(model, ret)
     _require_update(model)
+    return
 end
 
 function MOI.modify(
     model::Optimizer,
-    c::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
+    ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
     chg::MOI.ScalarCoefficientChange{Float64}
 )
-    set_dblattrelement!(
-        model.inner, "Obj", _info(model, chg.variable).column,
-        chg.new_coefficient
+    ret = GRBsetdblattrelement(
+        model,
+        "Obj",
+        Cint(_info(model, chg.variable).column - 1),
+        chg.new_coefficient,
     )
+    _check_ret(model, ret)
     _require_update(model)
+    return
 end
 
 """
@@ -2491,10 +2866,11 @@ function _replace_with_matching_sparsity!(
     previous::MOI.ScalarAffineFunction,
     replacement::MOI.ScalarAffineFunction, row::Int
 )
-    rows = fill(Cint(row), length(replacement.terms))
-    cols = [Cint(_info(model, t.variable_index).column) for t in replacement.terms]
+    rows = fill(Cint(row - 1), length(replacement.terms))
+    cols = [Cint(_info(model, t.variable_index).column - 1) for t in replacement.terms]
     coefs = MOI.coefficient.(replacement.terms)
-    chg_coeffs!(model.inner, rows, cols, coefs)
+    ret = GRBchgcoeffs(model, length(cols), rows, cols, coefs)
+    _check_ret(model, ret)
     return
 end
 
@@ -2522,15 +2898,17 @@ function _replace_with_different_sparsity!(
     replacement::MOI.ScalarAffineFunction, row::Int
 )
     # First, zero out the old constraint function terms.
-    rows = fill(Cint(row), length(previous.terms))
-    cols = [Cint(_info(model, t.variable_index).column) for t in previous.terms]
+    rows = fill(Cint(row - 1), length(previous.terms))
+    cols = [Cint(_info(model, t.variable_index).column - 1) for t in previous.terms]
     coefs = fill(0.0, length(previous.terms))
-    chg_coeffs!(model.inner, rows, cols, coefs)
+    ret = GRBchgcoeffs(model, length(cols), rows, cols, coefs)
+    _check_ret(model, ret)
     # Next, set the new constraint function terms.
-    rows = fill(Cint(row), length(replacement.terms))
-    cols = [Cint(_info(model, t.variable_index).column) for t in replacement.terms]
+    rows = fill(Cint(row - 1), length(replacement.terms))
+    cols = [Cint(_info(model, t.variable_index).column - 1) for t in replacement.terms]
     coefs = MOI.coefficient.(replacement.terms)
-    chg_coeffs!(model.inner, rows, cols, coefs)
+    ret = GRBchgcoeffs(model, length(cols), rows, cols, coefs)
+    _check_ret(model, ret)
     return
 end
 
@@ -2580,39 +2958,48 @@ function MOI.set(
     else
         _replace_with_different_sparsity!(model, previous, replacement, row)
     end
-    current_rhs = get_dblattrelement(model.inner, "RHS", row)
-    new_rhs = current_rhs - (replacement.constant - previous.constant)
-    set_dblattrelement!(model.inner, "RHS", row, new_rhs)
+    current_rhs = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "RHS", Cint(row - 1), current_rhs)
+    _check_ret(model, ret)
+    new_rhs = current_rhs[] - (replacement.constant - previous.constant)
+    ret = GRBsetdblattrelement(model, "RHS", Cint(row - 1), new_rhs)
+    _check_ret(model, ret)
     _require_update(model)
     return
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintBasisStatus,
+    model::Optimizer,
+    ::MOI.ConstraintBasisStatus,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}
 ) where {S <: SCALAR_SETS}
     row = _info(model, c).row
     _update_if_necessary(model)
-    cbasis = get_intattrelement(model.inner, "CBasis", row)
-    if cbasis == 0
+    valueP = Ref{Cint}()
+    ret = GRBgetintattrelement(model, "CBasis", Cint(row - 1), valueP)
+    _check_ret(model, ret)
+    if valueP[] == 0
         return MOI.BASIC
-    elseif cbasis == -1
+    elseif valueP[] == -1
         return MOI.NONBASIC
     else
-        error("CBasis value of $(cbasis) isn't defined.")
+        error("CBasis value of $(valueP[]) isn't defined.")
     end
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintBasisStatus,
+    model::Optimizer,
+    ::MOI.ConstraintBasisStatus,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}
 ) where {S <: SCALAR_SETS}
     column = _info(model, c).column
     _update_if_necessary(model)
-    vbasis = get_intattrelement(model.inner, "VBasis", column)
-    if vbasis == 0
+    valueP = Ref{Cint}()
+    ret = GRBgetintattrelement(model, "VBasis", Cint(column - 1), valueP)
+    _check_ret(model, ret)
+    if valueP[] == 0
         return MOI.BASIC
-    elseif vbasis == -1
+    elseif valueP[] == -1
         if S <: MOI.LessThan
             return MOI.BASIC
         elseif !(S <: MOI.Interval)
@@ -2620,7 +3007,7 @@ function MOI.get(
         else
             return MOI.NONBASIC_AT_LOWER
         end
-    elseif vbasis == -2
+    elseif valueP[] == -2
         MOI.NONBASIC_AT_UPPER
         if S <: MOI.GreaterThan
             return MOI.BASIC
@@ -2629,22 +3016,24 @@ function MOI.get(
         else
             return MOI.NONBASIC_AT_UPPER
         end
-    elseif vbasis == -3
+    elseif valueP[] == -3
         return MOI.SUPER_BASIC
     else
-        error("VBasis value of $(vbasis) isn't defined.")
+        error("VBasis value of $(valueP[]) isn't defined.")
     end
 end
 
 @deprecate compute_conflict MOI.compute_conflict!
 
 function MOI.compute_conflict!(model::Optimizer)
-    computeIIS(model.inner)
+    ret = GRBcomputeIIS(model)
+    _check_ret(model, ret)
+    model.conflict = ret
     return
 end
 
 function _ensure_conflict_computed(model::Optimizer)
-    if model.inner.conflict == -1
+    if model.conflict == -1
         error("Cannot access conflict status. Call " *
             "`Gurobi.compute_conflict(model)` first. In case the model " *
             "is modified, the computed conflict will not be purged.")
@@ -2652,7 +3041,7 @@ function _ensure_conflict_computed(model::Optimizer)
 end
 
 function _is_feasible(model::Optimizer)
-    return model.inner.conflict == Gurobi.GRB_INFEASIBLE
+    return model.conflict == Gurobi.GRB_INFEASIBLE
 end
 
 """
@@ -2668,7 +3057,7 @@ computed conflict. It returns an integer:
 struct ConflictStatus <: MOI.AbstractModelAttribute end
 
 function MOI.get(model::Optimizer, ::ConflictStatus)
-    return model.inner.conflict
+    return model.conflict
 end
 
 function MOI.get(model::Optimizer, ::MOI.ConflictStatus)
@@ -2691,11 +3080,13 @@ function MOI.get(
     _ensure_conflict_computed(model)
     if _is_feasible(model)
         return MOI.NOT_IN_CONFLICT
-    elseif get_intattrelement(model.inner, "IISUB", _info(model, index).column) > 0
-        return MOI.IN_CONFLICT
-    else
-        return MOI.NOT_IN_CONFLICT
     end
+    p = Ref{Cint}()
+    ret = GRBgetintattrelement(
+        model, "IISUB", Cint(_info(model, index).column - 1), p
+    )
+    _check_ret(model, ret)
+    return p[] > 0 ? MOI.IN_CONFLICT : MOI.NOT_IN_CONFLICT
 end
 
 function MOI.get(
@@ -2705,11 +3096,13 @@ function MOI.get(
     _ensure_conflict_computed(model)
     if _is_feasible(model)
         return MOI.NOT_IN_CONFLICT
-    elseif get_intattrelement(model.inner, "IISLB", _info(model, index).column) > 0
-        return MOI.IN_CONFLICT
-    else
-        return MOI.NOT_IN_CONFLICT
     end
+    p = Ref{Cint}()
+    ret = GRBgetintattrelement(
+        model, "IISLB", Cint(_info(model, index).column - 1), p
+    )
+    _check_ret(model, ret)
+    return p[] > 0 ? MOI.IN_CONFLICT : MOI.NOT_IN_CONFLICT
 end
 
 function MOI.get(
@@ -2721,13 +3114,23 @@ function MOI.get(
     _ensure_conflict_computed(model)
     if _is_feasible(model)
         return MOI.NOT_IN_CONFLICT
-    elseif get_intattrelement(model.inner, "IISLB", _info(model, index).column) > 0
-        return MOI.IN_CONFLICT
-    elseif get_intattrelement(model.inner, "IISUB", _info(model, index).column) > 0
-        return MOI.IN_CONFLICT
-    else
-        return MOI.NOT_IN_CONFLICT
     end
+    p = Ref{Cint}()
+    ret = GRBgetintattrelement(
+        model, "IISLB", Cint(_info(model, index).column - 1), p
+    )
+    _check_ret(model, ret)
+    if p[] > 0
+        return MOI.IN_CONFLICT
+    end
+    ret = GRBgetintattrelement(
+        model, "IISUB", Cint(_info(model, index).column - 1), p
+    )
+    _check_ret(model, ret)
+    if p[] > 0
+        return MOI.IN_CONFLICT
+    end
+    return MOI.NOT_IN_CONFLICT
 end
 
 function MOI.get(
@@ -2739,11 +3142,13 @@ function MOI.get(
     _ensure_conflict_computed(model)
     if _is_feasible(model)
         return MOI.NOT_IN_CONFLICT
-    elseif get_intattrelement(model.inner, "IISConstr", _info(model, index).row) > 0
-        return MOI.IN_CONFLICT
-    else
-        return MOI.NOT_IN_CONFLICT
     end
+    p = Ref{Cint}()
+    ret = GRBgetintattrelement(
+        model, "IISConstr", Cint(_info(model, index).row - 1), p
+    )
+    _check_ret(model, ret)
+    return p[] > 0 ? MOI.IN_CONFLICT : MOI.NOT_IN_CONFLICT
 end
 
 function MOI.get(
@@ -2756,180 +3161,226 @@ function MOI.get(
     _ensure_conflict_computed(model)
     if _is_feasible(model)
         return MOI.NOT_IN_CONFLICT
-    elseif get_intattrelement(model.inner, "IISQConstr", _info(model, index).row) > 0
-        return MOI.IN_CONFLICT
-    else
-        return MOI.NOT_IN_CONFLICT
     end
+    p = Ref{Cint}()
+    ret = GRBgetintattrelement(
+        model, "IISQConstr", Cint(_info(model, index).row - 1), p
+    )
+    _check_ret(model, ret)
+    return p[] > 0 ? MOI.IN_CONFLICT : MOI.NOT_IN_CONFLICT
 end
 
 ###
-### Constraint attributes
+### Gurobi-specific attributes
 ###
 
-# Gurobi constraint attributes as documented at:
-# https://www.gurobi.com/documentation/8.1/refman/linear_constraint_attribut.html
-# The keys in CONSTR_ATTR_TYPE are listed in the order that they appear in the
-# documentation.
+struct ModelAttribute <: MOI.AbstractModelAttribute
+    name::String
+end
 
-# TODO(odow): abstract types are used for the values in the dictionary so that
-# we can check if the user passes in an appropriate type for the attribute.
-# This could be improved.
-
-const CONSTR_ATTR_TYPE = Dict(
-    "Sense" => Char,
-    "RHS" => Real,
-    "ConstrName" => String,
-    "Pi" => Real,
-    "Slack" => Real,
-    "CBasis" => Integer,
-    "DStart" => Real,
-    "Lazy" => Integer,
-    "IISConstr" => Integer,
-    "SARHSLow" => Real,
-    "SARHSUp" => Real,
-    "FarkasDual" => Real
-)
-
-const GETTER_FOR_ELEM_ATTR_TYPE = Dict(
-    Integer => Gurobi.get_intattrelement,
-    Real => Gurobi.get_dblattrelement,
-    Char => Gurobi.get_charattrelement,
-    String => Gurobi.get_strattrelement
-)
-
-const SETTER_FOR_ELEM_ATTR_TYPE = Dict(
-    Integer => Gurobi.set_intattrelement!,
-    Real => Gurobi.set_dblattrelement!,
-    Char => Gurobi.set_charattrelement!,
-    String => Gurobi.set_strattrelement!
-)
+struct VariableAttribute <: MOI.AbstractVariableAttribute
+    name::String
+end
 
 struct ConstraintAttribute <: MOI.AbstractConstraintAttribute
     name::String
 end
 
+_supported_attrtypes(::ModelAttribute) = (0,)
+_supported_attrtypes(::VariableAttribute) = (1,)
+_supported_attrtypes(::ConstraintAttribute) = (2, 3, 4, 5)
+
+function _supported(model, attr)
+    attrtypeP = Ref{Cint}()
+    ret = GRBgetattrinfo(model, attr.name, C_NULL, attrtypeP, C_NULL)
+    _check_ret(model, ret)
+    return attrtypeP[] in _supported_attrtypes(attr)
+end
+
+function MOI.supports(model::Optimizer, attr::ModelAttribute)
+    return _supported(model, attr)
+end
+
 function MOI.supports(
-    ::Optimizer, attr::ConstraintAttribute, ::Type{<:MOI.ConstraintIndex}
+    model::Optimizer, attr::VariableAttribute, ::Type{MOI.VariableIndex}
 )
-    return attr.name ∈ keys(CONSTR_ATTR_TYPE)
+    return _supported(model, attr)
+end
+
+function MOI.supports(
+    model::Optimizer, attr::ConstraintAttribute, ::Type{<:MOI.ConstraintIndex}
+)
+    return _supported(model, attr)
+end
+
+_check_argument(::String, ::Any, ::Type{S}, ::T) where {S, T <: S} = nothing
+function _check_argument(
+    attr::String, T, ::Type{S}, value
+) where {S}
+    throw(
+        ArgumentError(
+            "Attribute $(attr) requires $(T) arguments. Provided argument " *
+            "was of type $(typeof(value))."
+        )
+    )
+end
+
+function _set_attribute(model::Optimizer, attr::ModelAttribute, value)
+    name = attr.name
+    datatypeP, attrtypeP = Ref{Cint}(), Ref{Cint}()
+    ret = GRBgetattrinfo(model, name, datatypeP, attrtypeP, C_NULL)
+    _check_ret(model, ret)
+    if !(attrtypeP[] in _supported_attrtypes(attr))
+        throw(MOI.UnsupportedAttribute(attr))
+    end
+    ret = if datatypeP[] == 1
+        _check_argument(name, Int, Integer, value)
+        GRBsetintattr(model, name, value)
+    elseif datatypeP[] == 2
+        _check_argument(name, Cdouble, Real, value)
+        GRBsetdblattr(model, name, value)
+    else
+        @assert datatypeP[] == 3
+        _check_argument(name, String, String, value)
+        GRBsetstrattr(model, name, value)
+    end
+    _check_ret(model, ret)
+    return
+end
+
+function _get_attribute(model::Optimizer, attr::ModelAttribute)
+    name = attr.name
+    datatypeP, attrtypeP = Ref{Cint}(), Ref{Cint}()
+    ret = GRBgetattrinfo(model, name, datatypeP, attrtypeP, C_NULL)
+    _check_ret(model, ret)
+    if !(attrtypeP[] in _supported_attrtypes(attr))
+        throw(MOI.UnsupportedAttribute(attr))
+    end
+    if datatypeP[] == 1
+        p = Ref{Cint}()
+        ret = GRBgetintattr(model, name, p)
+        _check_ret(model, ret)
+        return Int(p[])
+    elseif datatypeP[] == 2
+        p = Ref{Cdouble}()
+        ret = GRBgetdblattr(model, name, p)
+        _check_ret(model, ret)
+        return p[]
+    else
+        @assert datatypeP[] == 3
+        valueP = Ref{Ptr{Cchar}}()
+        ret = GRBgetstrattr(model, name, valueP)
+        _check_ret(model, ret)
+        return unsafe_string(valueP[])
+    end
+    return
+end
+
+function _set_attribute(model::Optimizer, attr, element::Cint, value)
+    name = attr.name
+    datatypeP, attrtypeP = Ref{Cint}(), Ref{Cint}()
+    ret = GRBgetattrinfo(model, name, datatypeP, attrtypeP, C_NULL)
+    _check_ret(model, ret)
+    if !(attrtypeP[] in _supported_attrtypes(attr))
+        throw(MOI.UnsupportedAttribute(attr))
+    end
+    ret = if datatypeP[] == 0
+        _check_argument(name, Char, Union{Char, Cchar}, value)
+        GRBsetcharattrelement(model, name, element, value)
+    elseif datatypeP[] == 1
+        _check_argument(name, Int, Integer, value)
+        GRBsetintattrelement(model, name, element, value)
+    elseif datatypeP[] == 2
+        _check_argument(name, Cdouble, Real, value)
+        GRBsetdblattrelement(model, name, element, value)
+    else
+        @assert datatypeP[] == 3
+        _check_argument(name, String, String, value)
+        GRBsetstrattrelement(model, name, element, value)
+    end
+    _check_ret(model, ret)
+    return
+end
+
+function _get_attribute(model::Optimizer, attr, element::Cint)
+    name = attr.name
+    datatypeP, attrtypeP = Ref{Cint}(), Ref{Cint}()
+    ret = GRBgetattrinfo(model, name, datatypeP, attrtypeP, C_NULL)
+    _check_ret(model, ret)
+    if !(attrtypeP[] in _supported_attrtypes(attr))
+        throw(MOI.UnsupportedAttribute(attr))
+    end
+    if datatypeP[] == 0
+        p = Ref{Cchar}()
+        ret = GRBgetcharattrelement(model, name, element, p)
+        _check_ret(model, ret)
+        return Char(p[])
+    elseif datatypeP[] == 1
+        p = Ref{Cint}()
+        ret = GRBgetintattrelement(model, name, element, p)
+        _check_ret(model, ret)
+        return Int(p[])
+    elseif datatypeP[] == 2
+        p = Ref{Cdouble}()
+        ret = GRBgetdblattrelement(model, name, element, p)
+        _check_ret(model, ret)
+        return p[]
+    else
+        @assert datatypeP[] == 3
+        valueP = Ref{Ptr{Cchar}}()
+        ret = GRBgetstrattrelement(model, name, element, valueP)
+        _check_ret(model, ret)
+        return unsafe_string(valueP[])
+    end
+    return
 end
 
 """
-    MOI.set(model::Optimizer, attr::ConstraintAttribute,
-            ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any},
-            value::T) where T
+    MOI.set(
+        model::Optimizer,
+        attr::ConstraintAttribute,
+        ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:Any},
+        value
+    )
 
 Set a constraint attribute.
-
-Checks that the attribute exists and that value is correctly typed, but lets
-Gurobi handle cases where an attribute's value cannot be set.
-
-Caveat: might fail due to incorrect type for an attribute that cannot be set
-anyway.
 """
 function MOI.set(
     model::Optimizer, attr::ConstraintAttribute,
     ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}},
     value::T
 ) where T
-    MOI.supports(model, attr, typeof(ci)) ||
-        throw(MOI.UnsupportedAttribute(attr))
-    if !(T <: CONSTR_ATTR_TYPE[attr.name])
-        throw(ArgumentError(
-            "Attribute $(attr.name) is $(CONSTR_ATTR_TYPE[attr.name]) but $T provided."
-        ))
-    end
-    setter! = SETTER_FOR_ELEM_ATTR_TYPE[CONSTR_ATTR_TYPE[attr.name]]
-    setter!(model.inner, attr.name, _info(model, ci).row, value)
+    _set_attribute(model, attr, Cint(_info(model, ci).row - 1), value)
     _require_update(model)
     return
 end
 
 function MOI.get(
-    model::Optimizer, attr::ConstraintAttribute,
+    model::Optimizer,
+    attr::ConstraintAttribute,
     ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}}
 )
-    MOI.supports(model, attr, typeof(ci)) ||
-        throw(MOI.UnsupportedAttribute(attr))
-    getter = GETTER_FOR_ELEM_ATTR_TYPE[CONSTR_ATTR_TYPE[attr.name]]
     _update_if_necessary(model)
-    return getter(model.inner, attr.name, _info(model, ci).row)
-end
-
-###
-### Variable attributes
-###
-
-# Gurobi variable attributes as documented at:
-# https://www.gurobi.com/documentation/8.1/refman/variable_attributes.html
-# The keys in VAR_ATTR_TYPE are listed in the order in which they appear in the
-# documentation.
-const VAR_ATTR_TYPE = Dict(
-    "LB" => Real,
-    "UB" => Real,
-    "Obj" => Real,
-    "VType" => Char,
-    "VarName" => String,
-    "X" => Real,
-    "Xn" => Real,
-    "RC" => Real,
-    "BarX" => Real,
-    "Start" => Real,
-    "VarHintVal" => Real,
-    "VarHintPri" => Integer,
-    "BranchPriority" => Integer,
-    "Partition" => Integer,
-    "VBasis" => Integer,
-    "PStart" => Real,
-    "IISLB" => Integer,
-    "IISUB" => Integer,
-    "PWLObjCvx" => Integer,
-    "SAOBJLow" => Real,
-    "SAObjUp" => Real,
-    "SALBLow" => Real,
-    "SALBUp" => Real,
-    "SAUBLow" => Real,
-    "SAUBUp" => Real,
-    "UnbdRay" => Real,
-)
-
-struct VariableAttribute <: MOI.AbstractVariableAttribute
-    name::String
-end
-
-function MOI.supports(
-    ::Optimizer, attr::VariableAttribute, ::Type{<:MOI.VariableIndex}
-)
-    return attr.name ∈ keys(VAR_ATTR_TYPE)
+    return _get_attribute(model, attr, Cint(_info(model, ci).row - 1))
 end
 
 """
-    MOI.set(model::Optimizer, attr::VariableAttribute,
-            vi::MOI.VariableIndex, value::T) where T
+    MOI.set(
+        model::Optimizer,
+        attr::VariableAttribute,
+        vi::MOI.VariableIndex,
+        value
+    )
 
 Set a variable attribute.
-
-Checks that the attribute exists and that value is correctly typed, but lets
-Gurobi handle cases where an attribute's value cannot be set.
-
-Caveat: might fail due to incorrect type for an attribute that cannot be set
-anyway.
 """
 function MOI.set(
-    model::Optimizer, attr::VariableAttribute,
-    vi::MOI.VariableIndex, value::T
+    model::Optimizer,
+    attr::VariableAttribute,
+    vi::MOI.VariableIndex,
+    value::T,
 ) where T
-    MOI.supports(model, attr, typeof(vi)) ||
-        throw(MOI.UnsupportedAttribute(attr))
-    if !(T <: VAR_ATTR_TYPE[attr.name])
-        throw(ArgumentError(
-            "Attribute $(attr.name) is $(VAR_ATTR_TYPE[attr.name]) but " *
-            "$T provided."
-        ))
-    end
-    setter! = SETTER_FOR_ELEM_ATTR_TYPE[VAR_ATTR_TYPE[attr.name]]
-    setter!(model.inner, attr.name, _info(model, vi).column, value)
+    _set_attribute(model, attr, Cint(_info(model, vi).column - 1), value)
     _require_update(model)
     return
 end
@@ -2937,130 +3388,24 @@ end
 function MOI.get(
     model::Optimizer, attr::VariableAttribute, vi::MOI.VariableIndex
 )
-    MOI.supports(model, attr, typeof(vi)) ||
-        throw(MOI.UnsupportedAttribute(attr))
-    getter = GETTER_FOR_ELEM_ATTR_TYPE[VAR_ATTR_TYPE[attr.name]]
     _update_if_necessary(model)
-    return getter(model.inner, attr.name, _info(model, vi).column)
-end
-
-###
-### Model attributes
-###
-
-# Gurobi model attributes as documented at:
-# https://www.gurobi.com/documentation/8.1/refman/model_attributes.html
-# The keys in MODEL_ATTR_TYPE are listed in the order in which they appear in
-# the documentation.
-const MODEL_ATTR_TYPE = Dict(
-    "NumConstrs" => Integer,
-    "NumVars" => Integer,
-    "NumSOS" => Integer,
-    "NumQConstrs" => Integer,
-    "NumGenConstrs" => Integer,
-    "NumNZs" => Integer,
-    "DNumNZs" => Real,
-    "NumQNZs" => Integer,
-    "NumQCNZs" => Integer,
-    "NumIntVars" => Integer,
-    "NumBinVars" => Integer,
-    "NumPWLObjVars" => Integer,
-    "ModelName" => String,
-    "ModelSense" => Integer,
-    "ObjCon" => Real,
-    "ObjVal" => Real,
-    "ObjBound" => Real,
-    "ObjBoundC" => Real,
-    "PoolObjBound" => Real,
-    "PoolObjVal" => Real,
-    "MIPGap" => Real,
-    "Runtime" => Real,
-    "Status" => Integer,
-    "SolCount" => Integer,
-    "IterCount" => Real,
-    "BarIterCount" => Integer,
-    "NodeCount" => Real,
-    "IsMIP" => Integer,
-    "IsQP" => Integer,
-    "IsQCP" => Integer,
-    "IsMultiObj" => Integer,
-    "IISMinimal" => Integer,
-    "MaxCoeff" => Real,
-    "MinCoeff" => Real,
-    "MaxBound" => Real,
-    "MinBound" => Real,
-    "MaxObjCoeff" => Real,
-    "MinObjCoeff" => Real,
-    "MaxRHS" => Real,
-    "MinRHS" => Real,
-    "MaxQCCoeff" => Real,
-    "MinQCCoeff" => Real,
-    "MaxQCLCoeff" => Real,
-    "MinQCLCoeff" => Real,
-    "MaxQCRHS" => Real,
-    "MinQCRHS" => Real,
-    "MaxQObjCoeff" => Real,
-    "MinQObjCoeff" => Real,
-    "Kappa" => Real,
-    "KappaExact" => Real,
-    "FarkasProof" => Real,
-    "TuneResultCount" => Integer,
-    "NumStart" => Integer,
-    "LicenseExpiration" => Integer,
-    "JobID" => String,
-    "Server" => String,
-)
-
-const GETTER_FOR_MODEL_ATTR_TYPE = Dict(
-    Integer => Gurobi.get_intattr,
-    Real => Gurobi.get_dblattr,
-    String => Gurobi.get_strattr,
-)
-
-const SETTER_FOR_MODEL_ATTR_TYPE = Dict(
-    Integer => Gurobi.set_intattr!,
-    Real => Gurobi.set_dblattr!,
-    String => Gurobi.set_strattr!
-)
-
-struct ModelAttribute <: MOI.AbstractModelAttribute
-    name::String
-end
-
-function MOI.supports(::Optimizer, attr::ModelAttribute)
-    return attr.name ∈ keys(MODEL_ATTR_TYPE)
+    return _get_attribute(model, attr, Cint(_info(model, vi).column - 1))
 end
 
 """
-    MOI.set(model::Optimizer, attr::ModelAttribute, value::T) where T
+    MOI.set(model::Optimizer, attr::ModelAttribute, value)
 
 Set a model attribute.
-
-Checks that the attribute exists and that value is correctly typed, but lets
-Gurobi handle cases where an attribute's value cannot be set.
-
-Caveat: might fail due to incorrect type for an attribute that cannot be set
-anyway.
 """
-function MOI.set(model::Optimizer, attr::ModelAttribute, value::T) where T
-    MOI.supports(model, attr) || throw(MOI.UnsupportedAttribute(attr))
-    if !(T <: MODEL_ATTR_TYPE[attr.name])
-        throw(ArgumentError(
-            "Attribute $(attr.name) is $(MODEL_ATTR_TYPE[attr.name]) but " *
-            "$T provided."
-        ))
-    end
-    setter! = SETTER_FOR_MODEL_ATTR_TYPE[MODEL_ATTR_TYPE[attr.name]]
-    setter!(model.inner, attr.name, value)
+function MOI.set(model::Optimizer, attr::ModelAttribute, value)
+    _set_attribute(model, attr, value)
     _require_update(model)
     return
 end
 
 function MOI.get(model::Optimizer, attr::ModelAttribute)
-    MOI.supports(model, attr) || throw(MOI.UnsupportedAttribute(attr))
-    getter = GETTER_FOR_MODEL_ATTR_TYPE[MODEL_ATTR_TYPE[attr.name]]
     _update_if_necessary(model)
-    return getter(model.inner, attr.name)
+    return _get_attribute(model, attr)
 end
 
 ###
@@ -3098,16 +3443,20 @@ function MOI.add_constraint(
         # is set after, then it will call `_set_variable_lower_bound` and
         # update `lower_bound_if_soc` accordingly.
         t_info.lower_bound_if_soc = lb
-        set_dblattrelement!(model.inner, "LB", t_info.column, 0.0)
+        ret = GRBsetdblattrelement(model, "LB", Cint(t_info.column - 1), 0.0)
+        _check_ret(model, ret)
     end
     t_info.num_soc_constraints += 1
 
     # Now add the quadratic constraint.
 
-    I = Cint[_info(model, v).column for v in f.variables]
+    I = Cint[_info(model, v).column - 1 for v in f.variables]
     V = fill(Cdouble(-1.0), length(f.variables))
     V[1] = 1.0
-    add_qconstr!(model.inner, Cint[], Cdouble[], I, I, V, Cchar('>'), 0.0)
+    ret = GRBaddqconstr(
+        model, 0, Cint[], Cdouble[], length(I), I, I, V, Cchar('>'), 0.0, ""
+    )
+    _check_ret(model, ret)
     _require_update(model)
     model.last_constraint_index += 1
     model.quadratic_constraint_info[model.last_constraint_index] =
@@ -3132,7 +3481,8 @@ function MOI.delete(
     _update_if_necessary(model)
     f = MOI.get(model, MOI.ConstraintFunction(), c)
     info = _info(model, c)
-    delqconstrs!(model.inner, [info.row])
+    ret = GRBdelqconstrs(model, 1, [Cint(info.row - 1)])
+    _check_ret(model, ret)
     _require_update(model)
     for (key, info_2) in model.quadratic_constraint_info
         if info_2.row > info.row
@@ -3164,7 +3514,10 @@ function MOI.delete(
         t_info.lower_bound_if_bounded == t_info.lower_bound_if_soc
     tmp_lower_bound = t_info.lower_bound_if_soc
     t_info.lower_bound_if_soc = NaN
-    set_dblattrelement!(model.inner, "LB", t_info.column, tmp_lower_bound)
+    ret = GRBsetdblattrelement(
+        model, "LB", Cint(t_info.column - 1), tmp_lower_bound
+    )
+    _check_ret(model, ret)
     _require_update(model)
     return
 end
@@ -3181,7 +3534,7 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.SecondOrderCone}
 )
     _update_if_necessary(model)
-    a, b, I, J, V = getqconstr(model.inner, _info(model, c).row)
+    a, b, I, J, V = _getqconstr(model, Cint(_info(model, c).row - 1))
     @assert length(a) == length(b) == 0  # Check for no linear terms.
     t = nothing
     x = MOI.VariableIndex[]
@@ -3225,7 +3578,8 @@ function MOI.set(
         delete!(model.name_to_constraint_index, info.name)
     end
     _update_if_necessary(model)
-    set_strattrelement!(model.inner, "QCName", info.row, name)
+    ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
+    _check_ret(model, ret)
     _require_update(model)
     info.name = name
     if model.name_to_constraint_index === nothing || isempty(name)

@@ -1,11 +1,3 @@
-if haskey(ENV, "GITHUB_ACTIONS")
-    # We're being run as part of a Github action. The most likely case is that
-    # this is the auto-merge action as part of the General registry.
-    # For now, skip the installation.
-    @info("Detected a Github action. Skipping installation.")
-    exit(0)
-end
-
 using Libdl
 
 const DEPS_FILE = joinpath(@__DIR__, "deps.jl")
@@ -28,8 +20,6 @@ end
 
 const ALIASES = [
     "gurobi90",
-    "gurobi81", "gurobi80",
-    "gurobi75", "gurobi70"
 ]
 
 paths_to_try = copy(ALIASES)
@@ -63,6 +53,26 @@ for l in paths_to_try
     end
 end
 
+function _print_GUROBI_HOME_help()
+    println("""
+    You should set the `GUROBI_HOME` environment variable to point to the
+    install location then try again. For example (updating the path to the
+    correct location if needed):
+    ```
+    # On Windows, this might be
+    ENV["GUROBI_HOME"] = `C:\\Program Files\\gurobi902\\win64\\"
+    # On OSX, this might be
+    ENV["GUROBI_HOME"] = `/Library/gurobi902/mac64/"
+    # On Unix, this might be
+    ENV["GUROBI_HOME"] = `/opt/gurobi902/linux64/"
+
+    import Pkg
+    Pkg.add("Gurobi")
+    Pkg.build("Gurobi")
+    ```
+    """)
+end
+
 function diagnose_gurobi_install()
     println("""
     Unable to locate Gurobi installation. Running some common diagnostics.
@@ -81,13 +91,6 @@ function diagnose_gurobi_install()
         Found GUROBI_HOME =  $(ENV["GUROBI_HOME"])
 
         Does this point to the correct install location?
-        - on Windows, this might be `C:\\Program Files\\gurobi810\\win64\\`
-        - alternatively, on Windows, this might be `C:/Program Files/gurobi810/win64/`
-        - on OSX, this might be `/Library/gurobi810/mac64/`
-        - on Unix, this might be `/home/my_user/gurobi810/linux64/`
-
-        Note: this has to be a full path, not a path relative to your current
-        directory or your home directory.
 
         We're going to look for the Gurobi library in this directory:
             $(dir)
@@ -101,50 +104,44 @@ function diagnose_gurobi_install()
             println("""
 
             We were looking for (but could not find) a file named like
-            `libgurobiXXX.so`, `libgurobiXXX.dylib`, or `gurobiXXX.dll`. You
-            should update your GUROBI_HOME environment variable to point to the
-            correct location.
-            """)
+            `libgurobiXXX.so`, `libgurobiXXX.dylib`, or `gurobiXXX.dll`.\n\n""")
+
+            _print_GUROBI_HOME_help()
         catch ex
             if typeof(ex) <: SystemError
                 println("""
                 Aha! We tried looking in `$(dir)`, but something went wrong. Are
                 you sure that your GUROBI_HOME environment variable is correct?
                 When combined with the appropriate suffix (e.g., `lib` or
-                `bin`, it needs to point to a valid directory.
-                """)
+                `bin`, it needs to point to a valid directory.\n\n""")
+                _print_GUROBI_HOME_help()
             else
                 rethrow(ex)
             end
         end
     else
         try
-            println("""
-            Looking for a version of Gurobi in your path:
-            """)
             # Try to call `gurobi_cl`. This should work if Gurobi is on the
             # system path. If it succeeds, it will print out the version.
-            run(`gurobi_cl --version`)
+            io = IOBuffer()
+            run(pipeline(`gurobi_cl --version`; stdout = io))
+            seekstart(io)
             println("""
 
             We couldn't find the `GUROBI_HOME` environment variable, but we
-            found this version of Gurobi on your path. Is this version one of
-            the supported versions listed above? If not, you should edit your
-            `PATH` to point to the correct version.
-            """)
+            found this version of Gurobi on your path.
+
+            $(read(io, String))
+            Is this version one of the supported versions listed above? If not,
+            you should edit your `PATH` to point to the correct version, or set
+            the `GUROBI_HOME` environment variable.\n\n""")
+            _print_GUROBI_HOME_help()
         catch
             println("""
 
             We could not find a version of Gurobi in your path, and we could
-            not find the environment variable `GUROBI_HOME`. You should set
-            the `GUROBI_HOME` environment variable to point to the install
-            location. For example:
-            - on Windows, this might be `C:\\Program Files\\gurobi810\\win64\\`
-            - on OSX, this might be `/Library/gurobi810/mac64/`
-            - on Unix, this might be `/opt/gurobi810/linux64/`
-
-            Alternatively, you can add the Gurobi install directory to your path.
-            """)
+            not find the environment variable `GUROBI_HOME`.\n\n""")
+            _print_GUROBI_HOME_help()
         end
     end
 end

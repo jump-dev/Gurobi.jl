@@ -1,9 +1,11 @@
+module TestMultiobjective
+
 using Gurobi
 using Test
 
 const MOI = Gurobi.MOI
 
-@testset "MultiObjective Example" begin
+function test_multiobjective()
     model = Gurobi.Optimizer()
     MOI.set(model, MOI.Silent(), true)
     MOI.Utilities.loadfromstring!(model, """
@@ -57,6 +59,7 @@ const MOI = Gurobi.MOI
     @test MOI.get(model, Gurobi.MultiObjectivePriority(2)) == 2
 
     MOI.optimize!(model)
+
     @test MOI.get(model, MOI.VariablePrimal(), x) ≈ BFS[1].x
     @test MOI.get(model, MOI.VariablePrimal(), y) ≈ BFS[1].y
     @test MOI.get(model, Gurobi.MultiObjectiveValue(1)) ≈ BFS[1].f1
@@ -68,8 +71,13 @@ const MOI = Gurobi.MOI
     @test MOI.get(model, Gurobi.MultiObjectivePriority(2)) == 1
 
     MOI.optimize!(model)
+
     @test MOI.get(model, MOI.VariablePrimal(), x) ≈ BFS[3].x
     @test MOI.get(model, MOI.VariablePrimal(), y) ≈ BFS[3].y
     @test MOI.get(model, Gurobi.MultiObjectiveValue(1)) ≈ BFS[3].f1
     @test MOI.get(model, Gurobi.MultiObjectiveValue(2)) ≈ BFS[3].f2
 end
+
+end
+
+TestMultiobjective.test_multiobjective()

@@ -1,43 +1,21 @@
 struct NumberOfObjectives <: MOI.AbstractModelAttribute end
 
 function MOI.set(model::Optimizer, ::NumberOfObjectives, n::Integer)
-    set_intattr!(model.inner, "NumObj", n)
+    ret = GRBsetintattr(model, "NumObj", n)
+    _check_ret(model, ret)
     return
 end
 
 function MOI.get(model::Optimizer, ::NumberOfObjectives)
-    return get_intattr(model.inner, "NumObj")
+    _update_if_necessary(model)
+    n = Ref{Cint}()
+    ret = GRBgetintattr(model, "NumObj", n)
+    _check_ret(model, ret)
+    return n[]
 end
 
 struct MultiObjectiveFunction <: MOI.AbstractModelAttribute
     index::Int
-end
-
-function c_api_setobjectiven(
-    model,
-    index::Cint,
-    priority::Cint,
-    weight::Cdouble,
-    abstol::Cdouble,
-    reltol::Cdouble,
-    name::String,
-    constant::Cdouble,
-    lnz::Cint,
-    lind::Vector{Cint},
-    lval::Vector{Cdouble}
-)
-    ret = @grb_ccall(
-        setobjectiven,
-        Cint,
-        (
-            Ptr{Cvoid}, Cint, Cint, Cdouble, Cdouble, Cdouble, Ptr{Cchar},
-            Cdouble, Cint, Ptr{Cint}, Ptr{Cdouble}
-        ),
-        model, index, priority, weight, abstol, reltol, name, constant, lnz, lind, lval
-    )
-    if ret != 0
-        throw(GurobiError(model.env, ret))
-    end
 end
 
 function MOI.set(
@@ -53,19 +31,20 @@ function MOI.set(
     end
     indices, coefficients = _indices_and_coefficients(model, f)
     _update_if_necessary(model)
-    c_api_setobjectiven(
-        model.inner,
+    ret = GRBsetobjectiven(
+        model,
         Cint(attr.index - 1),
         Cint(0),
         1.0,
         0.0,
         0.0,
-        "",
+        "Objective $(attr.index)",
         f.constant,
-        Cint(length(indices)),
-        Cint.(indices) .- Cint(1),
+        length(indices),
+        indices,
         coefficients
     )
+    _check_ret(model, ret)
     _require_update(model)
     return
 end
@@ -77,8 +56,11 @@ end
 function MOI.set(
     model::Gurobi.Optimizer, attr::MultiObjectivePriority, priority::Int
 )
-    set_int_param!(model.inner, "ObjNumber", attr.index - 1)
-    set_intattr!(model.inner, "ObjNPriority", priority)
+    env = GRBgetenv(model)
+    ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
+    _check_ret(env, ret)
+    ret = GRBsetintattr(model, "ObjNPriority", priority)
+    _check_ret(model, ret)
     _require_update(model)
     return
 end
@@ -87,8 +69,13 @@ function MOI.get(
     model::Gurobi.Optimizer, attr::MultiObjectivePriority
 )
     _update_if_necessary(model)
-    set_int_param!(model.inner, "ObjNumber", attr.index - 1)
-    return get_intattr(model.inner, "ObjNPriority")
+    env = GRBgetenv(model)
+    ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
+    _check_ret(env, ret)
+    n = Ref{Cint}()
+    ret = GRBgetintattr(model, "ObjNPriority", n)
+    _check_ret(model, ret)
+    return Int(n[])
 end
 
 struct MultiObjectiveWeight <: MOI.AbstractModelAttribute
@@ -98,8 +85,11 @@ end
 function MOI.set(
     model::Gurobi.Optimizer, attr::MultiObjectiveWeight, weight::Float64
 )
-    set_int_param!(model.inner, "ObjNumber", attr.index - 1)
-    set_dblattr!(model.inner, "ObjNWeight", weight)
+    env = GRBgetenv(model)
+    ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
+    _check_ret(env, ret)
+   ret = GRBsetdblattr(model, "ObjNWeight", weight)
+    _check_ret(model, ret)
     _require_update(model)
     return
 end
@@ -108,8 +98,13 @@ function MOI.get(
     model::Gurobi.Optimizer, attr::MultiObjectiveWeight
 )
     _update_if_necessary(model)
-    set_int_param!(model.inner, "ObjNumber", attr.index - 1)
-    return get_dblattr(model.inner, "ObjNWeight")
+    env = GRBgetenv(model)
+    ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
+    _check_ret(env, ret)
+    weight = Ref{Cdouble}()
+    ret = GRBgetdblattr(model, "ObjNWeight", weight)
+    _check_ret(model, ret)
+    return weight[]
 end
 
 struct MultiObjectiveValue <: MOI.AbstractModelAttribute
@@ -119,6 +114,11 @@ end
 function MOI.get(
     model::Gurobi.Optimizer, attr::MultiObjectiveValue
 )
-    set_int_param!(model.inner, "ObjNumber", attr.index - 1)
-    return get_dblattr(model.inner, "ObjNVal")
+    env = GRBgetenv(model)
+    ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
+    _check_ret(env, ret)
+    val = Ref{Cdouble}()
+    ret = GRBgetdblattr(model, "ObjNVal", val)
+    _check_ret(model, ret)
+    return val[]
 end
