@@ -2251,22 +2251,22 @@ end
 # documentation:
 # https://www.com/documentation/8.1/refman/optimization_status_codes.html#sec:StatusCodes
 const RAW_STATUS_STRINGS = [
-    # Gurobi Code, TerminationStatus, PrimalStatus, RawStatusString
-    (1,  MOI.OPTIMIZE_NOT_CALLED,     MOI.NO_SOLUTION, "Model is loaded, but no solution information is available."),
-    (2,  MOI.OPTIMAL,                 MOI.FEASIBLE_POINT, "Model was solved to optimality (subject to tolerances), and an optimal solution is available."),
-    (3,  MOI.INFEASIBLE,              MOI.NO_SOLUTION, "Model was proven to be infeasible."),
-    (4,  MOI.INFEASIBLE_OR_UNBOUNDED, MOI.NO_SOLUTION, "Model was proven to be either infeasible or unbounded. To obtain a more definitive conclusion, set the DualReductions parameter to 0 and reoptimize."),
-    (5,  MOI.DUAL_INFEASIBLE,         MOI.NO_SOLUTION, "Model was proven to be unbounded. Important note: an unbounded status indicates the presence of an unbounded ray that allows the objective to improve without limit. It says nothing about whether the model has a feasible solution. If you require information on feasibility, you should set the objective to zero and reoptimize."),
-    (6,  MOI.OBJECTIVE_LIMIT,         MOI.NO_SOLUTION, "Optimal objective for model was proven to be worse than the value specified in the Cutoff parameter. No solution information is available."),
-    (7,  MOI.ITERATION_LIMIT,         MOI.NO_SOLUTION, "Optimization terminated because the total number of simplex iterations performed exceeded the value specified in the IterationLimit parameter, or because the total number of barrier iterations exceeded the value specified in the BarIterLimit parameter."),
-    (8,  MOI.NODE_LIMIT,              MOI.NO_SOLUTION, "Optimization terminated because the total number of branch-and-cut nodes explored exceeded the value specified in the NodeLimit parameter."),
-    (9,  MOI.TIME_LIMIT,              MOI.NO_SOLUTION, "Optimization terminated because the time expended exceeded the value specified in the TimeLimit parameter."),
-    (10, MOI.SOLUTION_LIMIT,          MOI.NO_SOLUTION, "Optimization terminated because the number of solutions found reached the value specified in the SolutionLimit parameter."),
-    (11, MOI.INTERRUPTED,             MOI.NO_SOLUTION, "Optimization was terminated by the user."),
-    (12, MOI.NUMERICAL_ERROR,         MOI.NO_SOLUTION, "Optimization was terminated due to unrecoverable numerical difficulties."),
-    (13, MOI.OTHER_LIMIT,             MOI.FEASIBLE_POINT, "Unable to satisfy optimality tolerances; a sub-optimal solution is available."),
-    (14, MOI.OTHER_ERROR,             MOI.NO_SOLUTION, "An asynchronous optimization call was made, but the associated optimization run is not yet complete."),
-    (15, MOI.OBJECTIVE_LIMIT,         MOI.NO_SOLUTION, "User specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached.")
+    # TerminationStatus,          RawStatusString
+    (MOI.OPTIMIZE_NOT_CALLED,     "Model is loaded, but no solution information is available."),
+    (MOI.OPTIMAL,                 "Model was solved to optimality (subject to tolerances), and an optimal solution is available."),
+    (MOI.INFEASIBLE,              "Model was proven to be infeasible."),
+    (MOI.INFEASIBLE_OR_UNBOUNDED, "Model was proven to be either infeasible or unbounded. To obtain a more definitive conclusion, set the DualReductions parameter to 0 and reoptimize."),
+    (MOI.DUAL_INFEASIBLE,         "Model was proven to be unbounded. Important note: an unbounded status indicates the presence of an unbounded ray that allows the objective to improve without limit. It says nothing about whether the model has a feasible solution. If you require information on feasibility, you should set the objective to zero and reoptimize."),
+    (MOI.OBJECTIVE_LIMIT,         "Optimal objective for model was proven to be worse than the value specified in the Cutoff parameter. No solution information is available."),
+    (MOI.ITERATION_LIMIT,         "Optimization terminated because the total number of simplex iterations performed exceeded the value specified in the IterationLimit parameter, or because the total number of barrier iterations exceeded the value specified in the BarIterLimit parameter."),
+    (MOI.NODE_LIMIT,              "Optimization terminated because the total number of branch-and-cut nodes explored exceeded the value specified in the NodeLimit parameter."),
+    (MOI.TIME_LIMIT,              "Optimization terminated because the time expended exceeded the value specified in the TimeLimit parameter."),
+    (MOI.SOLUTION_LIMIT,          "Optimization terminated because the number of solutions found reached the value specified in the SolutionLimit parameter."),
+    (MOI.INTERRUPTED,             "Optimization was terminated by the user."),
+    (MOI.NUMERICAL_ERROR,         "Optimization was terminated due to unrecoverable numerical difficulties."),
+    (MOI.LOCALLY_SOLVED,          "Unable to satisfy optimality tolerances; a sub-optimal solution is available."),
+    (MOI.OTHER_ERROR,             "An asynchronous optimization call was made, but the associated optimization run is not yet complete."),
+    (MOI.OBJECTIVE_LIMIT,         "User specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached.")
 ]
 
 function _raw_status(model::Optimizer)
@@ -2279,12 +2279,12 @@ end
 
 function MOI.get(model::Optimizer, attr::MOI.RawStatusString)
     _throw_if_optimize_in_progress(model, attr)
-    return _raw_status(model)[4]
+    return _raw_status(model)[2]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.TerminationStatus)
     _throw_if_optimize_in_progress(model, attr)
-    return _raw_status(model)[2]
+    return _raw_status(model)[1]
 end
 
 function _get_intattr(model, key)
