@@ -3,31 +3,42 @@ import MathOptInterface
 const MOI = MathOptInterface
 const CleverDicts = MOI.Utilities.CleverDicts
 
-@enum(VariableType, CONTINUOUS, BINARY, INTEGER, SEMIINTEGER, SEMICONTINUOUS)
-@enum(BoundType, NONE, LESS_THAN, GREATER_THAN, LESS_AND_GREATER_THAN, INTERVAL, EQUAL_TO)
-@enum(ObjectiveType, SINGLE_VARIABLE, SCALAR_AFFINE, SCALAR_QUADRATIC)
-@enum(CallbackState, CB_NONE, CB_GENERIC, CB_LAZY, CB_USER_CUT, CB_HEURISTIC)
+@enum(
+    _BoundType,
+    _NONE,
+    _LESS_THAN,
+    _GREATER_THAN,
+    _LESS_AND_GREATER_THAN,
+    _INTERVAL,
+    _EQUAL_TO
+)
+@enum(_ObjectiveType, _SINGLE_VARIABLE, _SCALAR_AFFINE, _SCALAR_QUADRATIC)
+@enum(
+    _CallbackState, _CB_NONE, _CB_GENERIC, _CB_LAZY, _CB_USER_CUT, _CB_HEURISTIC
+)
 
-const SCALAR_SETS = Union{
-    MOI.GreaterThan{Float64}, MOI.LessThan{Float64},
-    MOI.EqualTo{Float64}, MOI.Interval{Float64}
+const _SCALAR_SETS = Union{
+    MOI.GreaterThan{Float64},
+    MOI.LessThan{Float64},
+    MOI.EqualTo{Float64},
+    MOI.Interval{Float64},
 }
 
 # Union used by many methods because interval constraints are not supported.
-const SUPPORTED_SCALAR_SETS = Union{
+const _SUPPORTED_SCALAR_SETS = Union{
     MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.EqualTo{Float64}
 }
 
-mutable struct VariableInfo
+mutable struct _VariableInfo
     index::MOI.VariableIndex
     column::Int
-    bound::BoundType
+    bound::_BoundType
     # Both fields below are cached values to avoid triggering a model_update!
     # if the variable bounds are queried. They are NaN only if `bound` is
-    # NONE. EQUAL_TO sets both of them. See also `lower_bound_if_soc`.
+    # _NONE. _EQUAL_TO sets both of them. See also `lower_bound_if_soc`.
     lower_bound_if_bounded::Float64
     upper_bound_if_bounded::Float64
-    type::VariableType
+    type::Char
     start::Union{Float64, Nothing}
     name::String
     # Storage for constraint names associated with variables because Gurobi
@@ -46,21 +57,21 @@ mutable struct VariableInfo
     # `lower_bound_if_soc` (in all such cases just one of them is NaN).
     lower_bound_if_soc::Float64
     num_soc_constraints::Int
-    function VariableInfo(index::MOI.VariableIndex, column::Int)
+    function _VariableInfo(index::MOI.VariableIndex, column::Int)
         return new(
-            index, column, NONE, NaN, NaN, CONTINUOUS, nothing,
+            index, column, _NONE, NaN, NaN, GRB_CONTINUOUS, nothing,
             "", "", "", "", NaN, 0
         )
     end
 end
 
-mutable struct ConstraintInfo
+mutable struct _ConstraintInfo
     row::Int
     set::MOI.AbstractSet
     # Storage for constraint names. Where possible, these are also stored in
     # the Gurobi model.
     name::String
-    ConstraintInfo(row::Int, set) = new(row, set, "")
+    _ConstraintInfo(row::Int, set) = new(row, set, "")
 end
 
 mutable struct Env
@@ -114,17 +125,17 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     silent::Bool
 
     # An enum to remember what objective is currently stored in the model.
-    objective_type::ObjectiveType
+    objective_type::_ObjectiveType
 
     # A flag to keep track of MOI.FEASIBILITY_SENSE, since Gurobi only stores
     # MIN_SENSE or MAX_SENSE. This allows us to differentiate between MIN_SENSE
     # and FEASIBILITY_SENSE.
     is_feasibility::Bool
 
-    # A mapping from the MOI.VariableIndex to the Gurobi column. VariableInfo
+    # A mapping from the MOI.VariableIndex to the Gurobi column. _VariableInfo
     # also stores some additional fields like what bounds have been added, the
     # variable type, and the names of SingleVariable-in-Set constraints.
-    variable_info::CleverDicts.CleverDict{MOI.VariableIndex, VariableInfo}
+    variable_info::CleverDicts.CleverDict{MOI.VariableIndex, _VariableInfo}
 
     # If you add variables to a model that had variables deleted AND has
     # not called `update_model!` since the deletion, then the newly created
@@ -150,13 +161,13 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     # constraints cannot be distinguished from previously created ones.
     last_constraint_index::Int
     # ScalarAffineFunction{Float64}-in-Set storage.
-    affine_constraint_info::Dict{Int, ConstraintInfo}
+    affine_constraint_info::Dict{Int, _ConstraintInfo}
     # ScalarQuadraticFunction{Float64}-in-Set storage.
-    quadratic_constraint_info::Dict{Int, ConstraintInfo}
+    quadratic_constraint_info::Dict{Int, _ConstraintInfo}
     # VectorOfVariables-in-Set storage.
-    sos_constraint_info::Dict{Int, ConstraintInfo}
+    sos_constraint_info::Dict{Int, _ConstraintInfo}
     # Note: we do not have a singlevariable_constraint_info dictionary. Instead,
-    # data associated with these constraints are stored in the VariableInfo
+    # data associated with these constraints are stored in the _VariableInfo
     # objects.
 
     # Mappings from variable and constraint names to their indices. These are
@@ -174,7 +185,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     # Callback fields.
     callback_variable_primal::Vector{Float64}
     has_generic_callback::Bool
-    callback_state::CallbackState
+    callback_state::_CallbackState
     lazy_callback::Union{Nothing, Function}
     user_cut_callback::Union{Nothing, Function}
     heuristic_callback::Union{Nothing, Function}
@@ -218,13 +229,13 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
             model.params[string(name)] = value
         end
         model.silent = false
-        model.variable_info = CleverDicts.CleverDict{MOI.VariableIndex, VariableInfo}()
+        model.variable_info = CleverDicts.CleverDict{MOI.VariableIndex, _VariableInfo}()
         model.next_column = 1
         model.last_constraint_index = 1
         model.columns_deleted_since_last_update = Int[]
-        model.affine_constraint_info = Dict{Int, ConstraintInfo}()
-        model.quadratic_constraint_info = Dict{Int, ConstraintInfo}()
-        model.sos_constraint_info = Dict{Int, ConstraintInfo}()
+        model.affine_constraint_info = Dict{Int, _ConstraintInfo}()
+        model.quadratic_constraint_info = Dict{Int, _ConstraintInfo}()
+        model.sos_constraint_info = Dict{Int, _ConstraintInfo}()
         model.callback_variable_primal = Float64[]
         MOI.empty!(model)
         finalizer(model) do m
@@ -312,7 +323,7 @@ function MOI.empty!(model::Optimizer)
         MOI.set(model, MOI.Silent(), true)
     end
     model.needs_update = false
-    model.objective_type = SCALAR_AFFINE
+    model.objective_type = _SCALAR_AFFINE
     model.is_feasibility = true
     empty!(model.variable_info)
     model.next_column = 1
@@ -325,7 +336,7 @@ function MOI.empty!(model::Optimizer)
     model.has_unbounded_ray = false
     model.has_infeasibility_cert = false
     empty!(model.callback_variable_primal)
-    model.callback_state = CB_NONE
+    model.callback_state = _CB_NONE
     model.has_generic_callback = false
     model.lazy_callback = nothing
     model.user_cut_callback = nothing
@@ -337,7 +348,7 @@ end
 
 function MOI.is_empty(model::Optimizer)
     model.needs_update && return false
-    model.objective_type != SCALAR_AFFINE && return false
+    model.objective_type != _SCALAR_AFFINE && return false
     model.is_feasibility == false && return false
     !isempty(model.variable_info) && return false
     !isone(model.next_column) && return false
@@ -350,7 +361,7 @@ function MOI.is_empty(model::Optimizer)
     model.has_unbounded_ray && return false
     model.has_infeasibility_cert && return false
     !isempty(model.callback_variable_primal) && return false
-    model.callback_state != CB_NONE && return false
+    model.callback_state != _CB_NONE && return false
     model.has_generic_callback && return false
     model.lazy_callback !== nothing && return false
     model.user_cut_callback !== nothing && return false
@@ -621,7 +632,7 @@ _sense_and_rhs(s::MOI.EqualTo{Float64}) = (Cchar('='), s.value)
 ### Variables
 ###
 
-# Short-cuts to return the VariableInfo associated with an index.
+# Short-cuts to return the _VariableInfo associated with an index.
 function _info(model::Optimizer, key::MOI.VariableIndex)
     if haskey(model.variable_info, key)
         return model.variable_info[key]
@@ -646,10 +657,10 @@ function _get_next_column(model::Optimizer)
 end
 
 function MOI.add_variable(model::Optimizer)
-    # Initialize `VariableInfo` with a dummy `VariableIndex` and a column,
+    # Initialize `_VariableInfo` with a dummy `VariableIndex` and a column,
     # because we need `add_item` to tell us what the `VariableIndex` is.
     index = CleverDicts.add_item(
-        model.variable_info, VariableInfo(MOI.VariableIndex(0), 0)
+        model.variable_info, _VariableInfo(MOI.VariableIndex(0), 0)
     )
     info = _info(model, index)
     # Now, set `.index` and `.column`.
@@ -678,10 +689,10 @@ function MOI.add_variables(model::Optimizer, N::Int)
     _check_ret(model, ret)
     indices = Vector{MOI.VariableIndex}(undef, N)
     for i in 1:N
-        # Initialize `VariableInfo` with a dummy `VariableIndex` and a column,
+        # Initialize `_VariableInfo` with a dummy `VariableIndex` and a column,
         # because we need `add_item` to tell us what the `VariableIndex` is.
         index = CleverDicts.add_item(
-            model.variable_info, VariableInfo(MOI.VariableIndex(0), 0)
+            model.variable_info, _VariableInfo(MOI.VariableIndex(0), 0)
         )
         info = _info(model, index)
         # Now, set `.index` and `.column`.
@@ -841,7 +852,7 @@ function MOI.set(
         model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
         convert(MOI.ScalarAffineFunction{Float64}, f)
     )
-    model.objective_type = SINGLE_VARIABLE
+    model.objective_type = _SINGLE_VARIABLE
     return
 end
 
@@ -853,7 +864,7 @@ end
 function MOI.set(
     model::Optimizer, ::MOI.ObjectiveFunction{F}, f::F
 ) where {F <: MOI.ScalarAffineFunction{Float64}}
-    if model.objective_type == SCALAR_QUADRATIC
+    if model.objective_type == _SCALAR_QUADRATIC
         # We need to zero out the existing quadratic objective.
         ret = GRBdelq(model)
         _check_ret(model, ret)
@@ -872,13 +883,13 @@ function MOI.set(
     ret = GRBsetdblattr(model, "ObjCon", f.constant)
     _check_ret(model, ret)
     _require_update(model)
-    model.objective_type = SCALAR_AFFINE
+    model.objective_type = _SCALAR_AFFINE
 end
 
 function MOI.get(
     model::Optimizer, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}
 )
-    if model.objective_type == SCALAR_QUADRATIC
+    if model.objective_type == _SCALAR_QUADRATIC
         error("Unable to get objective function. Currently: " *
             "$(model.objective_type).")
     end
@@ -918,7 +929,7 @@ function MOI.set(
     ret = GRBaddqpterms(model, length(I), I, J, V)
     _check_ret(model, ret)
     _require_update(model)
-    model.objective_type = SCALAR_QUADRATIC
+    model.objective_type = _SCALAR_QUADRATIC
     return
 end
 
@@ -1012,7 +1023,7 @@ function MOI.is_valid(
 )
     if haskey(model.variable_info, MOI.VariableIndex(c.value))
         info = _info(model, c)
-        return info.bound == LESS_THAN || info.bound == LESS_AND_GREATER_THAN
+        return info.bound == _LESS_THAN || info.bound == _LESS_AND_GREATER_THAN
     end
     return false
 end
@@ -1023,7 +1034,7 @@ function MOI.is_valid(
 )
     if haskey(model.variable_info, MOI.VariableIndex(c.value))
         info = _info(model, c)
-        return info.bound == GREATER_THAN || info.bound == LESS_AND_GREATER_THAN
+        return info.bound == _GREATER_THAN || info.bound == _LESS_AND_GREATER_THAN
     end
     return false
 end
@@ -1033,7 +1044,7 @@ function MOI.is_valid(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
 )
     return haskey(model.variable_info, MOI.VariableIndex(c.value)) &&
-        _info(model, c).bound == INTERVAL
+        _info(model, c).bound == _INTERVAL
 end
 
 function MOI.is_valid(
@@ -1041,7 +1052,7 @@ function MOI.is_valid(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
 )
     return haskey(model.variable_info, MOI.VariableIndex(c.value)) &&
-        _info(model, c).bound == EQUAL_TO
+        _info(model, c).bound == _EQUAL_TO
 end
 
 function MOI.is_valid(
@@ -1049,7 +1060,7 @@ function MOI.is_valid(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne}
 )
     return haskey(model.variable_info, MOI.VariableIndex(c.value)) &&
-        _info(model, c).type == BINARY
+        _info(model, c).type == GRB_BINARY
 end
 
 function MOI.is_valid(
@@ -1057,7 +1068,7 @@ function MOI.is_valid(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Integer}
 )
     return haskey(model.variable_info, MOI.VariableIndex(c.value)) &&
-        _info(model, c).type == INTEGER
+        _info(model, c).type == GRB_INTEGER
 end
 
 function MOI.is_valid(
@@ -1065,7 +1076,7 @@ function MOI.is_valid(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semicontinuous{Float64}}
 )
     return haskey(model.variable_info, MOI.VariableIndex(c.value)) &&
-        _info(model, c).type == SEMICONTINUOUS
+        _info(model, c).type == GRB_SEMICONT
 end
 
 function MOI.is_valid(
@@ -1073,7 +1084,7 @@ function MOI.is_valid(
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semiinteger{Float64}}
 )
     return haskey(model.variable_info, MOI.VariableIndex(c.value)) &&
-        _info(model, c).type == SEMIINTEGER
+        _info(model, c).type == GRB_SEMIINT
 end
 
 function MOI.get(
@@ -1099,21 +1110,23 @@ _bounds(s::MOI.EqualTo{Float64}) = (s.value, s.value)
 _bounds(s::MOI.Interval{Float64}) = (s.lower, s.upper)
 
 function _throw_if_existing_lower(
-    bound::BoundType, var_type::VariableType, new_set::Type{<:MOI.AbstractSet},
-    variable::MOI.VariableIndex
+    bound::_BoundType,
+    var_type::Char,
+    new_set::Type{<:MOI.AbstractSet},
+    variable::MOI.VariableIndex,
 )
-    existing_set = if bound == LESS_AND_GREATER_THAN || bound == GREATER_THAN
+    existing_set = if bound == _LESS_AND_GREATER_THAN || bound == _GREATER_THAN
         MOI.GreaterThan{Float64}
-    elseif bound == INTERVAL
+    elseif bound == _INTERVAL
         MOI.Interval{Float64}
-    elseif bound == EQUAL_TO
+    elseif bound == _EQUAL_TO
         MOI.EqualTo{Float64}
-    elseif var_type == SEMIINTEGER
+    elseif var_type == GRB_SEMIINT
         MOI.Semiinteger{Float64}
-    elseif var_type == SEMICONTINUOUS
+    elseif var_type == GRB_SEMICONT
         MOI.Semicontinuous{Float64}
     else
-        nothing  # Also covers `NONE` and `LESS_THAN`.
+        nothing  # Also covers `_NONE` and `_LESS_THAN`.
     end
     if existing_set !== nothing
         throw(MOI.LowerBoundAlreadySet{existing_set, new_set}(variable))
@@ -1121,21 +1134,23 @@ function _throw_if_existing_lower(
 end
 
 function _throw_if_existing_upper(
-    bound::BoundType, var_type::VariableType, new_set::Type{<:MOI.AbstractSet},
-    variable::MOI.VariableIndex
+    bound::_BoundType,
+    var_type::Char,
+    new_set::Type{<:MOI.AbstractSet},
+    variable::MOI.VariableIndex,
 )
-    existing_set = if bound == LESS_AND_GREATER_THAN || bound == LESS_THAN
+    existing_set = if bound == _LESS_AND_GREATER_THAN || bound == _LESS_THAN
         MOI.LessThan{Float64}
-    elseif bound == INTERVAL
+    elseif bound == _INTERVAL
         MOI.Interval{Float64}
-    elseif bound == EQUAL_TO
+    elseif bound == _EQUAL_TO
         MOI.EqualTo{Float64}
-    elseif var_type == SEMIINTEGER
+    elseif var_type == GRB_SEMIINT
         MOI.Semiinteger{Float64}
-    elseif var_type == SEMICONTINUOUS
+    elseif var_type == GRB_SEMICONT
         MOI.Semicontinuous{Float64}
     else
-        nothing  # Also covers `NONE` and `GREATER_THAN`.
+        nothing  # Also covers `_NONE` and `_GREATER_THAN`.
     end
     if existing_set !== nothing
         throw(MOI.UpperBoundAlreadySet{existing_set, new_set}(variable))
@@ -1144,32 +1159,32 @@ end
 
 function MOI.add_constraint(
     model::Optimizer, f::MOI.SingleVariable, s::S
-) where {S <: SCALAR_SETS}
+) where {S <: _SCALAR_SETS}
     info = _info(model, f.variable)
     if S <: MOI.LessThan{Float64}
         _throw_if_existing_upper(info.bound, info.type, S, f.variable)
-        info.bound = info.bound == GREATER_THAN ? LESS_AND_GREATER_THAN : LESS_THAN
+        info.bound = info.bound == _GREATER_THAN ? _LESS_AND_GREATER_THAN : _LESS_THAN
         info.upper_bound_if_bounded = s.upper
     elseif S <: MOI.GreaterThan{Float64}
         _throw_if_existing_lower(info.bound, info.type, S, f.variable)
-        info.bound = info.bound == LESS_THAN ? LESS_AND_GREATER_THAN : GREATER_THAN
+        info.bound = info.bound == _LESS_THAN ? _LESS_AND_GREATER_THAN : _GREATER_THAN
         info.lower_bound_if_bounded = s.lower
     elseif S <: MOI.EqualTo{Float64}
         _throw_if_existing_lower(info.bound, info.type, S, f.variable)
         _throw_if_existing_upper(info.bound, info.type, S, f.variable)
-        info.bound = EQUAL_TO
+        info.bound = _EQUAL_TO
         info.upper_bound_if_bounded = info.lower_bound_if_bounded = s.value
     else
         @assert S <: MOI.Interval{Float64}
         _throw_if_existing_lower(info.bound, info.type, S, f.variable)
         _throw_if_existing_upper(info.bound, info.type, S, f.variable)
-        info.bound = INTERVAL
+        info.bound = _INTERVAL
         info.upper_bound_if_bounded = s.upper
         info.lower_bound_if_bounded = s.lower
     end
     index = MOI.ConstraintIndex{MOI.SingleVariable, typeof(s)}(f.variable.value)
-    # This sets the bounds in the inner model and set the cache in VariableInfo
-    # again (we could just set them there, but then VariableInfo is in a
+    # This sets the bounds in the inner model and set the cache in _VariableInfo
+    # again (we could just set them there, but then _VariableInfo is in a
     # invalid state that trigger some asserts, i.e., has bound but no cache).
     MOI.set(model, MOI.ConstraintSet(), index, s)
     return index
@@ -1177,27 +1192,27 @@ end
 
 function MOI.add_constraints(
     model::Optimizer, f::Vector{MOI.SingleVariable}, s::Vector{S}
-) where {S <: SCALAR_SETS}
+) where {S <: _SCALAR_SETS}
     for (fi, si) in zip(f, s)
         info = _info(model, fi.variable)
         if S <: MOI.LessThan{Float64}
             _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
-            info.bound = info.bound == GREATER_THAN ? LESS_AND_GREATER_THAN : LESS_THAN
+            info.bound = info.bound == _GREATER_THAN ? _LESS_AND_GREATER_THAN : _LESS_THAN
             info.upper_bound_if_bounded = si.upper
         elseif S <: MOI.GreaterThan{Float64}
             _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
-            info.bound = info.bound == LESS_THAN ? LESS_AND_GREATER_THAN : GREATER_THAN
+            info.bound = info.bound == _LESS_THAN ? _LESS_AND_GREATER_THAN : _GREATER_THAN
             info.lower_bound_if_bounded = si.lower
         elseif S <: MOI.EqualTo{Float64}
             _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
             _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
-            info.bound = EQUAL_TO
+            info.bound = _EQUAL_TO
             info.upper_bound_if_bounded = info.lower_bound_if_bounded = si.value
         else
             @assert S <: MOI.Interval{Float64}
             _throw_if_existing_lower(info.bound, info.type, S, fi.variable)
             _throw_if_existing_upper(info.bound, info.type, S, fi.variable)
-            info.bound = INTERVAL
+            info.bound = _INTERVAL
             info.upper_bound_if_bounded = si.upper
             info.lower_bound_if_bounded = si.lower
         end
@@ -1219,10 +1234,10 @@ function MOI.delete(
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
     _check_ret(model, ret)
     _require_update(model)
-    if info.bound == LESS_AND_GREATER_THAN
-        info.bound = GREATER_THAN
+    if info.bound == _LESS_AND_GREATER_THAN
+        info.bound = _GREATER_THAN
     else
-        info.bound = NONE
+        info.bound = _NONE
     end
     info.upper_bound_if_bounded = NaN
     info.lessthan_name = ""
@@ -1278,7 +1293,7 @@ end
 
 Get the current variable lower bound, ignoring a potential bound of `0.0` set
 by a second order cone constraint, if an adequate `SingleVariable` constraint
-is set (i.e., `info.bound` is not `NONE` or `LESS_THAN`) then use a cached
+is set (i.e., `info.bound` is not `_NONE` or `_LESS_THAN`) then use a cached
 value; otherwise update the model if necessary and query the LB from it.
 
 See also `_set_variable_lower_bound`.
@@ -1291,7 +1306,7 @@ function _get_variable_lower_bound(model, info)
         return info.lower_bound_if_soc
     elseif !isnan(info.lower_bound_if_bounded)
         @assert info.bound in (
-            GREATER_THAN, LESS_AND_GREATER_THAN, EQUAL_TO, INTERVAL
+            _GREATER_THAN, _LESS_AND_GREATER_THAN, _EQUAL_TO, _INTERVAL
         )
         return info.lower_bound_if_bounded
     end
@@ -1306,7 +1321,7 @@ end
     _get_variable_upper_bound(model, info)
 
 Get the current variable upper bound, if an adequate `SingleVariable`
-constraint is set (i.e., `info.bound` is not `NONE` or `GREATER_THAN`) then use
+constraint is set (i.e., `info.bound` is not `_NONE` or `_GREATER_THAN`) then use
 a cached value; otherwise update the model if necessary and query the UB from
 it.
 
@@ -1315,7 +1330,7 @@ See also `_get_variable_lower_bound`.
 function _get_variable_upper_bound(model, info)
     if !isnan(info.upper_bound_if_bounded)
         @assert info.bound in (
-            LESS_THAN, LESS_AND_GREATER_THAN, EQUAL_TO, INTERVAL
+            _LESS_THAN, _LESS_AND_GREATER_THAN, _EQUAL_TO, _INTERVAL
         )
         return info.upper_bound_if_bounded
     end
@@ -1333,10 +1348,10 @@ function MOI.delete(
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
     _set_variable_lower_bound(model, info, -Inf)
-    if info.bound == LESS_AND_GREATER_THAN
-        info.bound = LESS_THAN
+    if info.bound == _LESS_AND_GREATER_THAN
+        info.bound = _LESS_THAN
     else
-        info.bound = NONE
+        info.bound = _NONE
     end
     info.lower_bound_if_bounded = NaN
     info.greaterthan_interval_or_equalto_name = ""
@@ -1354,7 +1369,7 @@ function MOI.delete(
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
     _check_ret(model, ret)
     _require_update(model)
-    info.bound = NONE
+    info.bound = _NONE
     info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
     info.greaterthan_interval_or_equalto_name = ""
     model.name_to_constraint_index = nothing
@@ -1371,7 +1386,7 @@ function MOI.delete(
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
     _check_ret(model, ret)
     _require_update(model)
-    info.bound = NONE
+    info.bound = _NONE
     info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
     info.greaterthan_interval_or_equalto_name = ""
     model.name_to_constraint_index = nothing
@@ -1464,7 +1479,7 @@ end
 function MOI.set(
     model::Optimizer, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}, s::S
-) where {S<:SCALAR_SETS}
+) where {S<:_SCALAR_SETS}
     MOI.throw_if_not_valid(model, c)
     lower, upper = _bounds(s)
     info = _info(model, c)
@@ -1490,7 +1505,7 @@ function MOI.add_constraint(
     ret = GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('B'))
     _check_ret(model, ret)
     _require_update(model)
-    info.type = BINARY
+    info.type = GRB_BINARY
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.ZeroOne}(f.variable.value)
 end
 
@@ -1502,7 +1517,7 @@ function MOI.delete(
     ret = GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('C'))
     _check_ret(model, ret)
     _require_update(model)
-    info.type = CONTINUOUS
+    info.type = GRB_CONTINUOUS
     info.type_constraint_name = ""
     model.name_to_constraint_index = nothing
     return
@@ -1523,7 +1538,7 @@ function MOI.add_constraint(
     ret = GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('I'))
     _check_ret(model, ret)
     _require_update(model)
-    info.type = INTEGER
+    info.type = GRB_INTEGER
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.Integer}(f.variable.value)
 end
 
@@ -1535,7 +1550,7 @@ function MOI.delete(
     ret = GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('C'))
     _check_ret(model, ret)
     _require_update(model)
-    info.type = CONTINUOUS
+    info.type = GRB_CONTINUOUS
     info.type_constraint_name = ""
     model.name_to_constraint_index = nothing
     return
@@ -1561,7 +1576,7 @@ function MOI.add_constraint(
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), s.upper)
     _check_ret(model, ret)
     _require_update(model)
-    info.type = SEMICONTINUOUS
+    info.type = GRB_SEMICONT
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semicontinuous{Float64}}(f.variable.value)
 end
 
@@ -1577,7 +1592,7 @@ function MOI.delete(
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
     _check_ret(model, ret)
     _require_update(model)
-    info.type = CONTINUOUS
+    info.type = GRB_CONTINUOUS
     info.type_constraint_name = ""
     model.name_to_constraint_index = nothing
     return
@@ -1608,7 +1623,7 @@ function MOI.add_constraint(
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), s.upper)
     _check_ret(model, ret)
     _require_update(model)
-    info.type = SEMIINTEGER
+    info.type = GRB_SEMIINT
     return MOI.ConstraintIndex{MOI.SingleVariable, MOI.Semiinteger{Float64}}(f.variable.value)
 end
 
@@ -1624,7 +1639,7 @@ function MOI.delete(
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
     _check_ret(model, ret)
     _require_update(model)
-    info.type = CONTINUOUS
+    info.type = GRB_CONTINUOUS
     info.type_constraint_name = ""
     model.name_to_constraint_index = nothing
     return
@@ -1711,14 +1726,14 @@ end
 
 function MOI.add_constraint(
     model::Optimizer, f::MOI.ScalarAffineFunction{Float64},
-    s::SUPPORTED_SCALAR_SETS
+    s::_SUPPORTED_SCALAR_SETS
 )
     if !iszero(f.constant)
         throw(MOI.ScalarFunctionConstantNotZero{Float64, typeof(f), typeof(s)}(f.constant))
     end
     model.last_constraint_index += 1
     model.affine_constraint_info[model.last_constraint_index] =
-        ConstraintInfo(length(model.affine_constraint_info) + 1, s)
+        _ConstraintInfo(length(model.affine_constraint_info) + 1, s)
 
     indices, coefficients = _indices_and_coefficients(model, f)
     sense, rhs = _sense_and_rhs(s)
@@ -1732,7 +1747,7 @@ end
 
 function MOI.add_constraints(
     model::Optimizer, f::Vector{MOI.ScalarAffineFunction{Float64}},
-    s::Vector{<:SUPPORTED_SCALAR_SETS}
+    s::Vector{<:_SUPPORTED_SCALAR_SETS}
 )
     if length(f) != length(s)
         error("Number of functions does not equal number of sets.")
@@ -1767,7 +1782,7 @@ function MOI.add_constraints(
         model.last_constraint_index += 1
         indices[i] = MOI.ConstraintIndex{eltype(f), eltype(s)}(model.last_constraint_index)
         model.affine_constraint_info[model.last_constraint_index] =
-            ConstraintInfo(length(model.affine_constraint_info) + 1, si)
+            _ConstraintInfo(length(model.affine_constraint_info) + 1, si)
     end
     pop!(row_starts)  # Gurobi doesn't need the final row start.
     ret = GC.@preserve GRBaddconstrs(
@@ -1998,7 +2013,7 @@ end
 
 function MOI.add_constraint(
     model::Optimizer,
-    f::MOI.ScalarQuadraticFunction{Float64}, s::SCALAR_SETS
+    f::MOI.ScalarQuadraticFunction{Float64}, s::_SCALAR_SETS
 )
     if !iszero(f.constant)
         throw(MOI.ScalarFunctionConstantNotZero{Float64, typeof(f), typeof(s)}(f.constant))
@@ -2015,7 +2030,7 @@ function MOI.add_constraint(
     _require_update(model)
     model.last_constraint_index += 1
     model.quadratic_constraint_info[model.last_constraint_index] =
-        ConstraintInfo(length(model.quadratic_constraint_info) + 1, s)
+        _ConstraintInfo(length(model.quadratic_constraint_info) + 1, s)
     return MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, typeof(s)}(model.last_constraint_index)
 end
 
@@ -2129,11 +2144,11 @@ end
 ### VectorOfVariables-in-SOS{I|II}
 ###
 
-const SOS = Union{MOI.SOS1{Float64}, MOI.SOS2{Float64}}
+const _SOS = Union{MOI.SOS1{Float64}, MOI.SOS2{Float64}}
 
 function _info(
     model::Optimizer,
-    key::MOI.ConstraintIndex{MOI.VectorOfVariables, <:SOS}
+    key::MOI.ConstraintIndex{MOI.VectorOfVariables, <:_SOS}
 )
     if haskey(model.sos_constraint_info, key.value)
         return model.sos_constraint_info[key.value]
@@ -2157,7 +2172,7 @@ function MOI.is_valid(
 end
 
 function MOI.add_constraint(
-    model::Optimizer, f::MOI.VectorOfVariables, s::SOS
+    model::Optimizer, f::MOI.VectorOfVariables, s::_SOS
 )
     columns = Cint[column(model, v) - 1 for v in f.variables]
     ret = GRBaddsos(
@@ -2172,7 +2187,7 @@ function MOI.add_constraint(
     _check_ret(model, ret)
     model.last_constraint_index += 1
     index = MOI.ConstraintIndex{MOI.VectorOfVariables, typeof(s)}(model.last_constraint_index)
-    model.sos_constraint_info[index.value] = ConstraintInfo(
+    model.sos_constraint_info[index.value] = _ConstraintInfo(
         length(model.sos_constraint_info) + 1, s
     )
     _require_update(model)
@@ -2180,7 +2195,7 @@ function MOI.add_constraint(
 end
 
 function MOI.delete(
-    model::Optimizer, c::MOI.ConstraintIndex{MOI.VectorOfVariables, <:SOS}
+    model::Optimizer, c::MOI.ConstraintIndex{MOI.VectorOfVariables, <:_SOS}
 )
     row = _info(model, c).row
     _update_if_necessary(model)
@@ -2219,7 +2234,7 @@ function MOI.get(
     model::Optimizer,
     ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.VectorOfVariables, S}
-) where {S <: SOS}
+) where {S <: _SOS}
     _update_if_necessary(model)
     nummembersP = Ref{Cint}()
     start = Cint(_info(model, c).row - 1)
@@ -2240,7 +2255,7 @@ function MOI.get(
     model::Optimizer,
     ::MOI.ConstraintFunction,
     c::MOI.ConstraintIndex{MOI.VectorOfVariables, S}
-) where {S <: SOS}
+) where {S <: _SOS}
     _update_if_necessary(model)
     nummembersP = Ref{Cint}()
     start = Cint(_info(model, c).row - 1)
@@ -2284,7 +2299,7 @@ function MOI.optimize!(model::Optimizer)
 
     # Initialize callbacks if necessary.
     if _check_moi_callback_validity(model)
-        MOI.set(model, CallbackFunction(), default_moi_callback(model))
+        MOI.set(model, CallbackFunction(), _default_moi_callback(model))
         model.has_generic_callback = false
     end
 
@@ -2302,7 +2317,7 @@ function MOI.optimize!(model::Optimizer)
 end
 
 function _throw_if_optimize_in_progress(model, attr)
-    if model.callback_state != CB_NONE
+    if model.callback_state != _CB_NONE
         throw(MOI.OptimizeInProgress(attr))
     end
 end
@@ -2310,7 +2325,7 @@ end
 # These strings are taken directly from the following page of the online Gurobi
 # documentation:
 # https://www.com/documentation/8.1/refman/optimization_status_codes.html#sec:StatusCodes
-const RAW_STATUS_STRINGS = [
+const _RAW_STATUS_STRINGS = [
     # TerminationStatus,          RawStatusString
     (MOI.OPTIMIZE_NOT_CALLED,     "Model is loaded, but no solution information is available."),
     (MOI.OPTIMAL,                 "Model was solved to optimality (subject to tolerances), and an optimal solution is available."),
@@ -2334,7 +2349,7 @@ function _raw_status(model::Optimizer)
     ret = GRBgetintattr(model, "Status", valueP)
     _check_ret(model, ret)
     @assert 1 <= valueP[] <= 15
-    return RAW_STATUS_STRINGS[valueP[]]
+    return _RAW_STATUS_STRINGS[valueP[]]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.RawStatusString)
@@ -2743,16 +2758,16 @@ function MOI.get(model::Optimizer, ::MOI.NumberOfConstraints{F, S}) where {F, S}
     return length(MOI.get(model, MOI.ListOfConstraintIndices{F, S}()))
 end
 
-_bound_enums(::Type{<:MOI.LessThan}) = (LESS_THAN, LESS_AND_GREATER_THAN)
-_bound_enums(::Type{<:MOI.GreaterThan}) = (GREATER_THAN, LESS_AND_GREATER_THAN)
-_bound_enums(::Type{<:MOI.Interval}) = (INTERVAL,)
-_bound_enums(::Type{<:MOI.EqualTo}) = (EQUAL_TO,)
+_bound_enums(::Type{<:MOI.LessThan}) = (_LESS_THAN, _LESS_AND_GREATER_THAN)
+_bound_enums(::Type{<:MOI.GreaterThan}) = (_GREATER_THAN, _LESS_AND_GREATER_THAN)
+_bound_enums(::Type{<:MOI.Interval}) = (_INTERVAL,)
+_bound_enums(::Type{<:MOI.EqualTo}) = (_EQUAL_TO,)
 _bound_enums(::Any) = (nothing,)
 
-_type_enums(::Type{MOI.ZeroOne}) = (BINARY,)
-_type_enums(::Type{MOI.Integer}) = (INTEGER,)
-_type_enums(::Type{<:MOI.Semicontinuous}) = (SEMICONTINUOUS,)
-_type_enums(::Type{<:MOI.Semiinteger}) = (SEMIINTEGER,)
+_type_enums(::Type{MOI.ZeroOne}) = (GRB_BINARY,)
+_type_enums(::Type{MOI.Integer}) = (GRB_INTEGER,)
+_type_enums(::Type{<:MOI.Semicontinuous}) = (GRB_SEMICONT,)
+_type_enums(::Type{<:MOI.Semiinteger}) = (GRB_SEMIINT,)
 _type_enums(::Any) = (nothing,)
 
 function MOI.get(
@@ -2822,27 +2837,27 @@ end
 function MOI.get(model::Optimizer, ::MOI.ListOfConstraints)
     constraints = Set{Tuple{DataType, DataType}}()
     for info in values(model.variable_info)
-        if info.bound == NONE
-        elseif info.bound == LESS_THAN
+        if info.bound == _NONE
+        elseif info.bound == _LESS_THAN
             push!(constraints, (MOI.SingleVariable, MOI.LessThan{Float64}))
-        elseif info.bound == GREATER_THAN
+        elseif info.bound == _GREATER_THAN
             push!(constraints, (MOI.SingleVariable, MOI.GreaterThan{Float64}))
-        elseif info.bound == LESS_AND_GREATER_THAN
+        elseif info.bound == _LESS_AND_GREATER_THAN
             push!(constraints, (MOI.SingleVariable, MOI.LessThan{Float64}))
             push!(constraints, (MOI.SingleVariable, MOI.GreaterThan{Float64}))
-        elseif info.bound == EQUAL_TO
+        elseif info.bound == _EQUAL_TO
             push!(constraints, (MOI.SingleVariable, MOI.EqualTo{Float64}))
-        elseif info.bound == INTERVAL
+        elseif info.bound == _INTERVAL
             push!(constraints, (MOI.SingleVariable, MOI.Interval{Float64}))
         end
-        if info.type == CONTINUOUS
-        elseif info.type == BINARY
+        if info.type == GRB_CONTINUOUS
+        elseif info.type == GRB_BINARY
             push!(constraints, (MOI.SingleVariable, MOI.ZeroOne))
-        elseif info.type == INTEGER
+        elseif info.type == GRB_INTEGER
             push!(constraints, (MOI.SingleVariable, MOI.Integer))
-        elseif info.type == SEMICONTINUOUS
+        elseif info.type == GRB_SEMICONT
             push!(constraints, (MOI.SingleVariable, MOI.Semicontinuous{Float64}))
-        elseif info.type == SEMIINTEGER
+        elseif info.type == GRB_SEMIINT
             push!(constraints, (MOI.SingleVariable, MOI.Semiinteger{Float64}))
         end
     end
@@ -2866,12 +2881,12 @@ end
 function MOI.get(model::Optimizer, ::MOI.ObjectiveFunctionType)
     if model.is_feasibility
         return nothing
-    elseif model.objective_type == SINGLE_VARIABLE
+    elseif model.objective_type == _SINGLE_VARIABLE
         return MOI.SingleVariable
-    elseif model.objective_type == SCALAR_AFFINE
+    elseif model.objective_type == _SCALAR_AFFINE
         return MOI.ScalarAffineFunction{Float64}
     else
-        @assert model.objective_type == SCALAR_QUADRATIC
+        @assert model.objective_type == _SCALAR_QUADRATIC
         return MOI.ScalarQuadraticFunction{Float64}
     end
 end
@@ -3004,7 +3019,7 @@ end
 
 function MOI.set(
     model::Optimizer, ::MOI.ConstraintFunction,
-    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:SCALAR_SETS},
+    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, <:_SCALAR_SETS},
     f::MOI.ScalarAffineFunction{Float64}
 )
     previous = MOI.get(model, MOI.ConstraintFunction(), c)
@@ -3036,7 +3051,7 @@ function MOI.get(
     model::Optimizer,
     ::MOI.ConstraintBasisStatus,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, S}
-) where {S <: SCALAR_SETS}
+) where {S <: _SCALAR_SETS}
     row = _info(model, c).row
     _update_if_necessary(model)
     valueP = Ref{Cint}()
@@ -3055,7 +3070,7 @@ function MOI.get(
     model::Optimizer,
     ::MOI.ConstraintBasisStatus,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S},
-) where {S <: SCALAR_SETS}
+) where {S <: _SCALAR_SETS}
     _update_if_necessary(model)
     valueP = Ref{Cint}()
     ret = GRBgetintattrelement(
@@ -3204,7 +3219,7 @@ end
 function MOI.get(
     model::Optimizer, ::MOI.ConstraintConflictStatus,
     index::MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64}, <:SUPPORTED_SCALAR_SETS
+        MOI.ScalarAffineFunction{Float64}, <:_SUPPORTED_SCALAR_SETS
     }
 )
     _ensure_conflict_computed(model)
@@ -3528,7 +3543,7 @@ function MOI.add_constraint(
     _require_update(model)
     model.last_constraint_index += 1
     model.quadratic_constraint_info[model.last_constraint_index] =
-        ConstraintInfo(length(model.quadratic_constraint_info) + 1, s)
+        _ConstraintInfo(length(model.quadratic_constraint_info) + 1, s)
     return MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.SecondOrderCone}(
         model.last_constraint_index
     )
@@ -3573,7 +3588,7 @@ function MOI.delete(
     # < 0 otherwise we wouldn't have needed to overwrite it.
     @assert t_info.lower_bound_if_soc < 0.0
     # Also, if there is a cached value in `t_info.lower_bound_if_bounded`
-    # (i.e., `t_info.bound` is not `NONE` nor `LESS_THAN`), then it has
+    # (i.e., `t_info.bound` is not `_NONE` nor `_LESS_THAN`), then it has
     # followed any changes `t_info.lower_bound_if_soc` has gone through
     # and has the same value. So when LB is set to the old value of
     # `lower_bound_if_soc` below, then `lower_bound_if_bounded` will stay
