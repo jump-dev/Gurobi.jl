@@ -28,10 +28,7 @@ function manual_corrections()
     filename = joinpath(GEN_DIR, "libgrb_api.jl")
     lines = readlines(filename; keep = true)
     for (i, line) in enumerate(lines)
-        if occursin("GRBget", line) || occursin("GRBXget", line)
-            lines[i] = replace(line, "Ptr{Cstring}" => "Ref{Ptr{Cchar}}")
-            lines[i] = replace(line, "Cstring" => "Ptr{Cchar}")
-        end
+        lines[i] = replace(line, "Cstring" => "Ptr{Cchar}")
     end
     open(filename, "w") do io
         print.(Ref(io), lines)

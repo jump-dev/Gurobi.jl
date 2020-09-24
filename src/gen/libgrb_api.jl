@@ -7,7 +7,7 @@ function GRBgetattrinfo(model, attrname, datatypeP, attrtypeP, settableP)
 end
 
 function GRBisattravailable(model, attrname)
-    ccall((:GRBisattravailable, libgurobi), Cint, (Ptr{GRBmodel}, Cstring), model, attrname)
+    ccall((:GRBisattravailable, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}), model, attrname)
 end
 
 function GRBgetintattr(model, attrname, valueP)
@@ -15,7 +15,7 @@ function GRBgetintattr(model, attrname, valueP)
 end
 
 function GRBsetintattr(model, attrname, newvalue)
-    ccall((:GRBsetintattr, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint), model, attrname, newvalue)
+    ccall((:GRBsetintattr, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint), model, attrname, newvalue)
 end
 
 function GRBgetintattrelement(model, attrname, element, valueP)
@@ -23,7 +23,7 @@ function GRBgetintattrelement(model, attrname, element, valueP)
 end
 
 function GRBsetintattrelement(model, attrname, element, newvalue)
-    ccall((:GRBsetintattrelement, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint), model, attrname, element, newvalue)
+    ccall((:GRBsetintattrelement, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint), model, attrname, element, newvalue)
 end
 
 function GRBgetintattrarray(model, attrname, first, len, values)
@@ -31,7 +31,7 @@ function GRBgetintattrarray(model, attrname, first, len, values)
 end
 
 function GRBsetintattrarray(model, attrname, first, len, newvalues)
-    ccall((:GRBsetintattrarray, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Ptr{Cint}), model, attrname, first, len, newvalues)
+    ccall((:GRBsetintattrarray, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Cint}), model, attrname, first, len, newvalues)
 end
 
 function GRBgetintattrlist(model, attrname, len, ind, values)
@@ -39,7 +39,7 @@ function GRBgetintattrlist(model, attrname, len, ind, values)
 end
 
 function GRBsetintattrlist(model, attrname, len, ind, newvalues)
-    ccall((:GRBsetintattrlist, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Ptr{Cint}, Ptr{Cint}), model, attrname, len, ind, newvalues)
+    ccall((:GRBsetintattrlist, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Ptr{Cint}, Ptr{Cint}), model, attrname, len, ind, newvalues)
 end
 
 function GRBgetcharattrelement(model, attrname, element, valueP)
@@ -47,7 +47,7 @@ function GRBgetcharattrelement(model, attrname, element, valueP)
 end
 
 function GRBsetcharattrelement(model, attrname, element, newvalue)
-    ccall((:GRBsetcharattrelement, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, UInt8), model, attrname, element, newvalue)
+    ccall((:GRBsetcharattrelement, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, UInt8), model, attrname, element, newvalue)
 end
 
 function GRBgetcharattrarray(model, attrname, first, len, values)
@@ -55,7 +55,7 @@ function GRBgetcharattrarray(model, attrname, first, len, values)
 end
 
 function GRBsetcharattrarray(model, attrname, first, len, newvalues)
-    ccall((:GRBsetcharattrarray, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Cstring), model, attrname, first, len, newvalues)
+    ccall((:GRBsetcharattrarray, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Cchar}), model, attrname, first, len, newvalues)
 end
 
 function GRBgetcharattrlist(model, attrname, len, ind, values)
@@ -63,7 +63,7 @@ function GRBgetcharattrlist(model, attrname, len, ind, values)
 end
 
 function GRBsetcharattrlist(model, attrname, len, ind, newvalues)
-    ccall((:GRBsetcharattrlist, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Ptr{Cint}, Cstring), model, attrname, len, ind, newvalues)
+    ccall((:GRBsetcharattrlist, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Ptr{Cint}, Ptr{Cchar}), model, attrname, len, ind, newvalues)
 end
 
 function GRBgetdblattr(model, attrname, valueP)
@@ -71,7 +71,7 @@ function GRBgetdblattr(model, attrname, valueP)
 end
 
 function GRBsetdblattr(model, attrname, newvalue)
-    ccall((:GRBsetdblattr, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cdouble), model, attrname, newvalue)
+    ccall((:GRBsetdblattr, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cdouble), model, attrname, newvalue)
 end
 
 function GRBgetdblattrelement(model, attrname, element, valueP)
@@ -79,7 +79,7 @@ function GRBgetdblattrelement(model, attrname, element, valueP)
 end
 
 function GRBsetdblattrelement(model, attrname, element, newvalue)
-    ccall((:GRBsetdblattrelement, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cdouble), model, attrname, element, newvalue)
+    ccall((:GRBsetdblattrelement, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cdouble), model, attrname, element, newvalue)
 end
 
 function GRBgetdblattrarray(model, attrname, first, len, values)
@@ -87,7 +87,7 @@ function GRBgetdblattrarray(model, attrname, first, len, values)
 end
 
 function GRBsetdblattrarray(model, attrname, first, len, newvalues)
-    ccall((:GRBsetdblattrarray, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Ptr{Cdouble}), model, attrname, first, len, newvalues)
+    ccall((:GRBsetdblattrarray, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Cdouble}), model, attrname, first, len, newvalues)
 end
 
 function GRBgetdblattrlist(model, attrname, len, ind, values)
@@ -95,7 +95,7 @@ function GRBgetdblattrlist(model, attrname, len, ind, values)
 end
 
 function GRBsetdblattrlist(model, attrname, len, ind, newvalues)
-    ccall((:GRBsetdblattrlist, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Ptr{Cint}, Ptr{Cdouble}), model, attrname, len, ind, newvalues)
+    ccall((:GRBsetdblattrlist, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Ptr{Cint}, Ptr{Cdouble}), model, attrname, len, ind, newvalues)
 end
 
 function GRBgetstrattr(model, attrname, valueP)
@@ -103,7 +103,7 @@ function GRBgetstrattr(model, attrname, valueP)
 end
 
 function GRBsetstrattr(model, attrname, newvalue)
-    ccall((:GRBsetstrattr, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cstring), model, attrname, newvalue)
+    ccall((:GRBsetstrattr, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Ptr{Cchar}), model, attrname, newvalue)
 end
 
 function GRBgetstrattrelement(model, attrname, element, valueP)
@@ -111,7 +111,7 @@ function GRBgetstrattrelement(model, attrname, element, valueP)
 end
 
 function GRBsetstrattrelement(model, attrname, element, newvalue)
-    ccall((:GRBsetstrattrelement, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cstring), model, attrname, element, newvalue)
+    ccall((:GRBsetstrattrelement, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Ptr{Cchar}), model, attrname, element, newvalue)
 end
 
 function GRBgetstrattrarray(model, attrname, first, len, values)
@@ -119,7 +119,7 @@ function GRBgetstrattrarray(model, attrname, first, len, values)
 end
 
 function GRBsetstrattrarray(model, attrname, first, len, newvalues)
-    ccall((:GRBsetstrattrarray, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Ptr{Cstring}), model, attrname, first, len, newvalues)
+    ccall((:GRBsetstrattrarray, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Ptr{Cchar}}), model, attrname, first, len, newvalues)
 end
 
 function GRBgetstrattrlist(model, attrname, len, ind, values)
@@ -127,7 +127,7 @@ function GRBgetstrattrlist(model, attrname, len, ind, values)
 end
 
 function GRBsetstrattrlist(model, attrname, len, ind, newvalues)
-    ccall((:GRBsetstrattrlist, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Ptr{Cint}, Ptr{Cstring}), model, attrname, len, ind, newvalues)
+    ccall((:GRBsetstrattrlist, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Ptr{Cint}, Ptr{Ptr{Cchar}}), model, attrname, len, ind, newvalues)
 end
 
 function GRBsetcallbackfunc(model, cb, usrdata)
@@ -151,7 +151,7 @@ function GRBcbget(cbdata, where, what, resultP)
 end
 
 function GRBcbsetparam(cbdata, paramname, newvalue)
-    ccall((:GRBcbsetparam, libgurobi), Cint, (Ptr{Cvoid}, Cstring, Cstring), cbdata, paramname, newvalue)
+    ccall((:GRBcbsetparam, libgurobi), Cint, (Ptr{Cvoid}, Ptr{Cchar}, Ptr{Cchar}), cbdata, paramname, newvalue)
 end
 
 function GRBcbsolution(cbdata, solution, objvalP)
@@ -287,7 +287,7 @@ function GRBoptimizeasync(model)
 end
 
 function GRBoptimizebatch(model, batchid)
-    ccall((:GRBoptimizebatch, libgurobi), Cint, (Ptr{GRBmodel}, Cstring), model, batchid)
+    ccall((:GRBoptimizebatch, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}), model, batchid)
 end
 
 function GRBcopymodel(model)
@@ -335,7 +335,7 @@ function GRBlinearizemodel(model, linearizedP)
 end
 
 function GRBresultmodel(model, type, resultP)
-    ccall((:GRBresultmodel, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Ptr{Ptr{GRBmodel}}), model, type, resultP)
+    ccall((:GRBresultmodel, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Ptr{Ptr{GRBmodel}}), model, type, resultP)
 end
 
 function GRBfixedmodel(model)
@@ -343,7 +343,7 @@ function GRBfixedmodel(model)
 end
 
 function GRBloadenvsyscb(envP, logfilename, malloccb, calloccb, realloccb, freecb, threadcreatecb, threadjoincb, syscbusrdata)
-    ccall((:GRBloadenvsyscb, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Cstring, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}), envP, logfilename, malloccb, calloccb, realloccb, freecb, threadcreatecb, threadjoincb, syscbusrdata)
+    ccall((:GRBloadenvsyscb, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Ptr{Cchar}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}), envP, logfilename, malloccb, calloccb, realloccb, freecb, threadcreatecb, threadjoincb, syscbusrdata)
 end
 
 function GRBemptyenvadv(envP, apitype, major, minor, tech, malloccb, calloccb, realloccb, freecb, threadcreatecb, threadjoincb, syscbusrdata)
@@ -351,31 +351,31 @@ function GRBemptyenvadv(envP, apitype, major, minor, tech, malloccb, calloccb, r
 end
 
 function GRBreadmodel(env, filename, modelP)
-    ccall((:GRBreadmodel, libgurobi), Cint, (Ptr{GRBenv}, Cstring, Ptr{Ptr{GRBmodel}}), env, filename, modelP)
+    ccall((:GRBreadmodel, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Cchar}, Ptr{Ptr{GRBmodel}}), env, filename, modelP)
 end
 
 function GRBread(model, filename)
-    ccall((:GRBread, libgurobi), Cint, (Ptr{GRBmodel}, Cstring), model, filename)
+    ccall((:GRBread, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}), model, filename)
 end
 
 function GRBwrite(model, filename)
-    ccall((:GRBwrite, libgurobi), Cint, (Ptr{GRBmodel}, Cstring), model, filename)
+    ccall((:GRBwrite, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}), model, filename)
 end
 
 function GRBismodelfile(filename)
-    ccall((:GRBismodelfile, libgurobi), Cint, (Cstring,), filename)
+    ccall((:GRBismodelfile, libgurobi), Cint, (Ptr{Cchar},), filename)
 end
 
 function GRBisattrfile(filename)
-    ccall((:GRBisattrfile, libgurobi), Cint, (Cstring,), filename)
+    ccall((:GRBisattrfile, libgurobi), Cint, (Ptr{Cchar},), filename)
 end
 
 function GRBfiletype(filename)
-    ccall((:GRBfiletype, libgurobi), Cint, (Cstring,), filename)
+    ccall((:GRBfiletype, libgurobi), Cint, (Ptr{Cchar},), filename)
 end
 
 function GRBisrecordfile(filename)
-    ccall((:GRBisrecordfile, libgurobi), Cint, (Cstring,), filename)
+    ccall((:GRBisrecordfile, libgurobi), Cint, (Ptr{Cchar},), filename)
 end
 
 function GRBgetjsonsolution(model, buffP)
@@ -383,55 +383,55 @@ function GRBgetjsonsolution(model, buffP)
 end
 
 function GRBloadjson(env, fname, buffP)
-    ccall((:GRBloadjson, libgurobi), Cint, (Ptr{GRBenv}, Cstring, Ptr{Cstring}), env, fname, buffP)
+    ccall((:GRBloadjson, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Cchar}, Ptr{Ptr{Cchar}}), env, fname, buffP)
 end
 
 function GRBnewmodel(env, modelP, Pname, numvars, obj, lb, ub, vtype, varnames)
-    ccall((:GRBnewmodel, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Ptr{GRBmodel}}, Cstring, Cint, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Cstring, Ptr{Cstring}), env, modelP, Pname, numvars, obj, lb, ub, vtype, varnames)
+    ccall((:GRBnewmodel, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Ptr{GRBmodel}}, Ptr{Cchar}, Cint, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cchar}, Ptr{Ptr{Cchar}}), env, modelP, Pname, numvars, obj, lb, ub, vtype, varnames)
 end
 
 function GRBloadmodel(env, modelP, Pname, numvars, numconstrs, objsense, objcon, obj, sense, rhs, vbeg, vlen, vind, vval, lb, ub, vtype, varnames, constrnames)
-    ccall((:GRBloadmodel, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Ptr{GRBmodel}}, Cstring, Cint, Cint, Cint, Cdouble, Ptr{Cdouble}, Cstring, Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Cstring, Ptr{Cstring}, Ptr{Cstring}), env, modelP, Pname, numvars, numconstrs, objsense, objcon, obj, sense, rhs, vbeg, vlen, vind, vval, lb, ub, vtype, varnames, constrnames)
+    ccall((:GRBloadmodel, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Ptr{GRBmodel}}, Ptr{Cchar}, Cint, Cint, Cint, Cdouble, Ptr{Cdouble}, Ptr{Cchar}, Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cchar}, Ptr{Ptr{Cchar}}, Ptr{Ptr{Cchar}}), env, modelP, Pname, numvars, numconstrs, objsense, objcon, obj, sense, rhs, vbeg, vlen, vind, vval, lb, ub, vtype, varnames, constrnames)
 end
 
 function GRBXloadmodel(env, modelP, Pname, numvars, numconstrs, objsense, objcon, obj, sense, rhs, vbeg, vlen, vind, vval, lb, ub, vtype, varnames, constrnames)
-    ccall((:GRBXloadmodel, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Ptr{GRBmodel}}, Cstring, Cint, Cint, Cint, Cdouble, Ptr{Cdouble}, Cstring, Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Cstring, Ptr{Cstring}, Ptr{Cstring}), env, modelP, Pname, numvars, numconstrs, objsense, objcon, obj, sense, rhs, vbeg, vlen, vind, vval, lb, ub, vtype, varnames, constrnames)
+    ccall((:GRBXloadmodel, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Ptr{GRBmodel}}, Ptr{Cchar}, Cint, Cint, Cint, Cdouble, Ptr{Cdouble}, Ptr{Cchar}, Ptr{Cdouble}, Ptr{Cint}, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cchar}, Ptr{Ptr{Cchar}}, Ptr{Ptr{Cchar}}), env, modelP, Pname, numvars, numconstrs, objsense, objcon, obj, sense, rhs, vbeg, vlen, vind, vval, lb, ub, vtype, varnames, constrnames)
 end
 
 function GRBaddvar(model, numnz, vind, vval, obj, lb, ub, vtype, varname)
-    ccall((:GRBaddvar, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Ptr{Cint}, Ptr{Cdouble}, Cdouble, Cdouble, Cdouble, UInt8, Cstring), model, numnz, vind, vval, obj, lb, ub, vtype, varname)
+    ccall((:GRBaddvar, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Ptr{Cint}, Ptr{Cdouble}, Cdouble, Cdouble, Cdouble, UInt8, Ptr{Cchar}), model, numnz, vind, vval, obj, lb, ub, vtype, varname)
 end
 
 function GRBaddvars(model, numvars, numnz, vbeg, vind, vval, obj, lb, ub, vtype, varnames)
-    ccall((:GRBaddvars, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Cstring, Ptr{Cstring}), model, numvars, numnz, vbeg, vind, vval, obj, lb, ub, vtype, varnames)
+    ccall((:GRBaddvars, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cchar}, Ptr{Ptr{Cchar}}), model, numvars, numnz, vbeg, vind, vval, obj, lb, ub, vtype, varnames)
 end
 
 function GRBXaddvars(model, numvars, numnz, vbeg, vind, vval, obj, lb, ub, vtype, varnames)
-    ccall((:GRBXaddvars, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Cstring, Ptr{Cstring}), model, numvars, numnz, vbeg, vind, vval, obj, lb, ub, vtype, varnames)
+    ccall((:GRBXaddvars, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cchar}, Ptr{Ptr{Cchar}}), model, numvars, numnz, vbeg, vind, vval, obj, lb, ub, vtype, varnames)
 end
 
 function GRBaddconstr(model, numnz, cind, cval, sense, rhs, constrname)
-    ccall((:GRBaddconstr, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Ptr{Cint}, Ptr{Cdouble}, UInt8, Cdouble, Cstring), model, numnz, cind, cval, sense, rhs, constrname)
+    ccall((:GRBaddconstr, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Ptr{Cint}, Ptr{Cdouble}, UInt8, Cdouble, Ptr{Cchar}), model, numnz, cind, cval, sense, rhs, constrname)
 end
 
 function GRBaddconstrs(model, numconstrs, numnz, cbeg, cind, cval, sense, rhs, constrnames)
-    ccall((:GRBaddconstrs, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Cstring, Ptr{Cdouble}, Ptr{Cstring}), model, numconstrs, numnz, cbeg, cind, cval, sense, rhs, constrnames)
+    ccall((:GRBaddconstrs, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cchar}, Ptr{Cdouble}, Ptr{Ptr{Cchar}}), model, numconstrs, numnz, cbeg, cind, cval, sense, rhs, constrnames)
 end
 
 function GRBXaddconstrs(model, numconstrs, numnz, cbeg, cind, cval, sense, rhs, constrnames)
-    ccall((:GRBXaddconstrs, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Cstring, Ptr{Cdouble}, Ptr{Cstring}), model, numconstrs, numnz, cbeg, cind, cval, sense, rhs, constrnames)
+    ccall((:GRBXaddconstrs, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cchar}, Ptr{Cdouble}, Ptr{Ptr{Cchar}}), model, numconstrs, numnz, cbeg, cind, cval, sense, rhs, constrnames)
 end
 
 function GRBaddrangeconstr(model, numnz, cind, cval, lower, upper, constrname)
-    ccall((:GRBaddrangeconstr, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Ptr{Cint}, Ptr{Cdouble}, Cdouble, Cdouble, Cstring), model, numnz, cind, cval, lower, upper, constrname)
+    ccall((:GRBaddrangeconstr, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Ptr{Cint}, Ptr{Cdouble}, Cdouble, Cdouble, Ptr{Cchar}), model, numnz, cind, cval, lower, upper, constrname)
 end
 
 function GRBaddrangeconstrs(model, numconstrs, numnz, cbeg, cind, cval, lower, upper, constrnames)
-    ccall((:GRBaddrangeconstrs, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cstring}), model, numconstrs, numnz, cbeg, cind, cval, lower, upper, constrnames)
+    ccall((:GRBaddrangeconstrs, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Ptr{Cchar}}), model, numconstrs, numnz, cbeg, cind, cval, lower, upper, constrnames)
 end
 
 function GRBXaddrangeconstrs(model, numconstrs, numnz, cbeg, cind, cval, lower, upper, constrnames)
-    ccall((:GRBXaddrangeconstrs, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cstring}), model, numconstrs, numnz, cbeg, cind, cval, lower, upper, constrnames)
+    ccall((:GRBXaddrangeconstrs, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Ptr{Cchar}}), model, numconstrs, numnz, cbeg, cind, cval, lower, upper, constrnames)
 end
 
 function GRBaddsos(model, numsos, nummembers, types, beg, ind, weight)
@@ -439,71 +439,71 @@ function GRBaddsos(model, numsos, nummembers, types, beg, ind, weight)
 end
 
 function GRBaddgenconstrMax(model, name, resvar, nvars, vars, constant)
-    ccall((:GRBaddgenconstrMax, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Ptr{Cint}, Cdouble), model, name, resvar, nvars, vars, constant)
+    ccall((:GRBaddgenconstrMax, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Cint}, Cdouble), model, name, resvar, nvars, vars, constant)
 end
 
 function GRBaddgenconstrMin(model, name, resvar, nvars, vars, constant)
-    ccall((:GRBaddgenconstrMin, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Ptr{Cint}, Cdouble), model, name, resvar, nvars, vars, constant)
+    ccall((:GRBaddgenconstrMin, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Cint}, Cdouble), model, name, resvar, nvars, vars, constant)
 end
 
 function GRBaddgenconstrAbs(model, name, resvar, argvar)
-    ccall((:GRBaddgenconstrAbs, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint), model, name, resvar, argvar)
+    ccall((:GRBaddgenconstrAbs, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint), model, name, resvar, argvar)
 end
 
 function GRBaddgenconstrAnd(model, name, resvar, nvars, vars)
-    ccall((:GRBaddgenconstrAnd, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Ptr{Cint}), model, name, resvar, nvars, vars)
+    ccall((:GRBaddgenconstrAnd, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Cint}), model, name, resvar, nvars, vars)
 end
 
 function GRBaddgenconstrOr(model, name, resvar, nvars, vars)
-    ccall((:GRBaddgenconstrOr, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Ptr{Cint}), model, name, resvar, nvars, vars)
+    ccall((:GRBaddgenconstrOr, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Cint}), model, name, resvar, nvars, vars)
 end
 
 function GRBaddgenconstrIndicator(model, name, binvar, binval, nvars, vars, vals, sense, rhs)
-    ccall((:GRBaddgenconstrIndicator, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Cint, Ptr{Cint}, Ptr{Cdouble}, UInt8, Cdouble), model, name, binvar, binval, nvars, vars, vals, sense, rhs)
+    ccall((:GRBaddgenconstrIndicator, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Cint, Ptr{Cint}, Ptr{Cdouble}, UInt8, Cdouble), model, name, binvar, binval, nvars, vars, vals, sense, rhs)
 end
 
 function GRBaddgenconstrPWL(model, name, xvar, yvar, npts, xpts, ypts)
-    ccall((:GRBaddgenconstrPWL, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Cint, Ptr{Cdouble}, Ptr{Cdouble}), model, name, xvar, yvar, npts, xpts, ypts)
+    ccall((:GRBaddgenconstrPWL, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Cint, Ptr{Cdouble}, Ptr{Cdouble}), model, name, xvar, yvar, npts, xpts, ypts)
 end
 
 function GRBaddgenconstrPoly(model, name, xvar, yvar, plen, p, options)
-    ccall((:GRBaddgenconstrPoly, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Cint, Ptr{Cdouble}, Cstring), model, name, xvar, yvar, plen, p, options)
+    ccall((:GRBaddgenconstrPoly, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Cint, Ptr{Cdouble}, Ptr{Cchar}), model, name, xvar, yvar, plen, p, options)
 end
 
 function GRBaddgenconstrExpA(model, name, xvar, yvar, a, options)
-    ccall((:GRBaddgenconstrExpA, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Cdouble, Cstring), model, name, xvar, yvar, a, options)
+    ccall((:GRBaddgenconstrExpA, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Cdouble, Ptr{Cchar}), model, name, xvar, yvar, a, options)
 end
 
 function GRBaddgenconstrLogA(model, name, xvar, yvar, a, options)
-    ccall((:GRBaddgenconstrLogA, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Cdouble, Cstring), model, name, xvar, yvar, a, options)
+    ccall((:GRBaddgenconstrLogA, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Cdouble, Ptr{Cchar}), model, name, xvar, yvar, a, options)
 end
 
 function GRBaddgenconstrPow(model, name, xvar, yvar, a, options)
-    ccall((:GRBaddgenconstrPow, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Cdouble, Cstring), model, name, xvar, yvar, a, options)
+    ccall((:GRBaddgenconstrPow, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Cdouble, Ptr{Cchar}), model, name, xvar, yvar, a, options)
 end
 
 function GRBaddgenconstrExp(model, name, xvar, yvar, options)
-    ccall((:GRBaddgenconstrExp, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Cstring), model, name, xvar, yvar, options)
+    ccall((:GRBaddgenconstrExp, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Cchar}), model, name, xvar, yvar, options)
 end
 
 function GRBaddgenconstrLog(model, name, xvar, yvar, options)
-    ccall((:GRBaddgenconstrLog, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Cstring), model, name, xvar, yvar, options)
+    ccall((:GRBaddgenconstrLog, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Cchar}), model, name, xvar, yvar, options)
 end
 
 function GRBaddgenconstrSin(model, name, xvar, yvar, options)
-    ccall((:GRBaddgenconstrSin, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Cstring), model, name, xvar, yvar, options)
+    ccall((:GRBaddgenconstrSin, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Cchar}), model, name, xvar, yvar, options)
 end
 
 function GRBaddgenconstrCos(model, name, xvar, yvar, options)
-    ccall((:GRBaddgenconstrCos, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Cstring), model, name, xvar, yvar, options)
+    ccall((:GRBaddgenconstrCos, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Cchar}), model, name, xvar, yvar, options)
 end
 
 function GRBaddgenconstrTan(model, name, xvar, yvar, options)
-    ccall((:GRBaddgenconstrTan, libgurobi), Cint, (Ptr{GRBmodel}, Cstring, Cint, Cint, Cstring), model, name, xvar, yvar, options)
+    ccall((:GRBaddgenconstrTan, libgurobi), Cint, (Ptr{GRBmodel}, Ptr{Cchar}, Cint, Cint, Ptr{Cchar}), model, name, xvar, yvar, options)
 end
 
 function GRBaddqconstr(model, numlnz, lind, lval, numqnz, qrow, qcol, qval, sense, rhs, QCname)
-    ccall((:GRBaddqconstr, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Ptr{Cint}, Ptr{Cdouble}, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, UInt8, Cdouble, Cstring), model, numlnz, lind, lval, numqnz, qrow, qcol, qval, sense, rhs, QCname)
+    ccall((:GRBaddqconstr, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Ptr{Cint}, Ptr{Cdouble}, Cint, Ptr{Cint}, Ptr{Cint}, Ptr{Cdouble}, UInt8, Cdouble, Ptr{Cchar}), model, numlnz, lind, lval, numqnz, qrow, qcol, qval, sense, rhs, QCname)
 end
 
 function GRBaddcone(model, nummembers, members)
@@ -619,7 +619,7 @@ function GRBterminate(model)
 end
 
 function GRBreplay(filename)
-    ccall((:GRBreplay, libgurobi), Cint, (Cstring,), filename)
+    ccall((:GRBreplay, libgurobi), Cint, (Ptr{Cchar},), filename)
 end
 
 function GRBsetobjective(model, sense, constant, lnz, lind, lval, qnz, qrow, qcol, qval)
@@ -627,7 +627,7 @@ function GRBsetobjective(model, sense, constant, lnz, lind, lval, qnz, qrow, qco
 end
 
 function GRBsetobjectiven(model, index, priority, weight, abstol, reltol, name, constant, lnz, lind, lval)
-    ccall((:GRBsetobjectiven, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Cdouble, Cdouble, Cdouble, Cstring, Cdouble, Cint, Ptr{Cint}, Ptr{Cdouble}), model, index, priority, weight, abstol, reltol, name, constant, lnz, lind, lval)
+    ccall((:GRBsetobjectiven, libgurobi), Cint, (Ptr{GRBmodel}, Cint, Cint, Cdouble, Cdouble, Cdouble, Ptr{Cchar}, Cdouble, Cint, Ptr{Cint}, Ptr{Cdouble}), model, index, priority, weight, abstol, reltol, name, constant, lnz, lind, lval)
 end
 
 function GRBclean2(lenP, ind, val)
@@ -639,7 +639,7 @@ function GRBclean3(lenP, ind0, ind1, val)
 end
 
 function GRBmsg(env, message)
-    ccall((:GRBmsg, libgurobi), Cvoid, (Ptr{GRBenv}, Cstring), env, message)
+    ccall((:GRBmsg, libgurobi), Cvoid, (Ptr{GRBenv}, Ptr{Cchar}), env, message)
 end
 
 function GRBgetlogfile(env, logfileP)
@@ -679,19 +679,19 @@ function GRBgetparamflags(env, parname, valueP)
 end
 
 function GRBsetparam(env, paramname, value)
-    ccall((:GRBsetparam, libgurobi), Cint, (Ptr{GRBenv}, Cstring, Cstring), env, paramname, value)
+    ccall((:GRBsetparam, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Cchar}, Ptr{Cchar}), env, paramname, value)
 end
 
 function GRBsetintparam(env, paramname, value)
-    ccall((:GRBsetintparam, libgurobi), Cint, (Ptr{GRBenv}, Cstring, Cint), env, paramname, value)
+    ccall((:GRBsetintparam, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Cchar}, Cint), env, paramname, value)
 end
 
 function GRBsetdblparam(env, paramname, value)
-    ccall((:GRBsetdblparam, libgurobi), Cint, (Ptr{GRBenv}, Cstring, Cdouble), env, paramname, value)
+    ccall((:GRBsetdblparam, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Cchar}, Cdouble), env, paramname, value)
 end
 
 function GRBsetstrparam(env, paramname, value)
-    ccall((:GRBsetstrparam, libgurobi), Cint, (Ptr{GRBenv}, Cstring, Cstring), env, paramname, value)
+    ccall((:GRBsetstrparam, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Cchar}, Ptr{Cchar}), env, paramname, value)
 end
 
 function GRBgetparamtype(env, paramname)
@@ -707,11 +707,11 @@ function GRBcopyparams(dest, src)
 end
 
 function GRBwriteparams(env, filename)
-    ccall((:GRBwriteparams, libgurobi), Cint, (Ptr{GRBenv}, Cstring), env, filename)
+    ccall((:GRBwriteparams, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Cchar}), env, filename)
 end
 
 function GRBreadparams(env, filename)
-    ccall((:GRBreadparams, libgurobi), Cint, (Ptr{GRBenv}, Cstring), env, filename)
+    ccall((:GRBreadparams, libgurobi), Cint, (Ptr{GRBenv}, Ptr{Cchar}), env, filename)
 end
 
 function GRBgetnumparams(env)
@@ -731,7 +731,7 @@ function GRBgetattrname(model, i, attrnameP)
 end
 
 function GRBloadenv(envP, logfilename)
-    ccall((:GRBloadenv, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Cstring), envP, logfilename)
+    ccall((:GRBloadenv, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Ptr{Cchar}), envP, logfilename)
 end
 
 function GRBemptyenv(envP)
@@ -743,23 +743,23 @@ function GRBstartenv(env)
 end
 
 function GRBloadenvadv(envP, logfilename, apitype, major, minor, tech, server, router, password, group, priority, idletimeout, accessid, secretkey, cb, usrdata, logcb)
-    ccall((:GRBloadenvadv, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Cstring, Cint, Cint, Cint, Cint, Cstring, Cstring, Cstring, Cstring, Cint, Cint, Cstring, Cstring, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}), envP, logfilename, apitype, major, minor, tech, server, router, password, group, priority, idletimeout, accessid, secretkey, cb, usrdata, logcb)
+    ccall((:GRBloadenvadv, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Ptr{Cchar}, Cint, Cint, Cint, Cint, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cchar}, Cint, Cint, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}), envP, logfilename, apitype, major, minor, tech, server, router, password, group, priority, idletimeout, accessid, secretkey, cb, usrdata, logcb)
 end
 
 function GRBloadclientenv(envP, logfilename, computeserver, router, password, group, CStlsinsecure, priority, timeout)
-    ccall((:GRBloadclientenv, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Cstring, Cstring, Cstring, Cstring, Cstring, Cint, Cint, Cdouble), envP, logfilename, computeserver, router, password, group, CStlsinsecure, priority, timeout)
+    ccall((:GRBloadclientenv, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cchar}, Cint, Cint, Cdouble), envP, logfilename, computeserver, router, password, group, CStlsinsecure, priority, timeout)
 end
 
 function GRBloadclientenvadv(envP, logfilename, computeserver, router, password, group, CStlsinsecure, priority, timeout, apitype, major, minor, tech, cb, usrdata)
-    ccall((:GRBloadclientenvadv, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Cstring, Cstring, Cstring, Cstring, Cstring, Cint, Cint, Cdouble, Cint, Cint, Cint, Cint, Ptr{Cvoid}, Ptr{Cvoid}), envP, logfilename, computeserver, router, password, group, CStlsinsecure, priority, timeout, apitype, major, minor, tech, cb, usrdata)
+    ccall((:GRBloadclientenvadv, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cchar}, Cint, Cint, Cdouble, Cint, Cint, Cint, Cint, Ptr{Cvoid}, Ptr{Cvoid}), envP, logfilename, computeserver, router, password, group, CStlsinsecure, priority, timeout, apitype, major, minor, tech, cb, usrdata)
 end
 
 function GRBloadcloudenv(envP, logfilename, accessID, secretKey, pool, priority)
-    ccall((:GRBloadcloudenv, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Cstring, Cstring, Cstring, Cstring, Cint), envP, logfilename, accessID, secretKey, pool, priority)
+    ccall((:GRBloadcloudenv, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cchar}, Cint), envP, logfilename, accessID, secretKey, pool, priority)
 end
 
 function GRBloadcloudenvadv(envP, logfilename, accessID, secretKey, pool, priority, apitype, major, minor, tech, cb, usrdata)
-    ccall((:GRBloadcloudenvadv, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Cstring, Cstring, Cstring, Cstring, Cint, Cint, Cint, Cint, Cint, Ptr{Cvoid}, Ptr{Cvoid}), envP, logfilename, accessID, secretKey, pool, priority, apitype, major, minor, tech, cb, usrdata)
+    ccall((:GRBloadcloudenvadv, libgurobi), Cint, (Ptr{Ptr{GRBenv}}, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cchar}, Ptr{Cchar}, Cint, Cint, Cint, Cint, Cint, Ptr{Cvoid}, Ptr{Cvoid}), envP, logfilename, accessID, secretKey, pool, priority, apitype, major, minor, tech, cb, usrdata)
 end
 
 function GRBgetenv(model)
@@ -803,7 +803,7 @@ function GRBversion(majorP, minorP, technicalP)
 end
 
 function GRBplatform()
-    ccall((:GRBplatform, libgurobi), Cstring, ())
+    ccall((:GRBplatform, libgurobi), Ptr{Cchar}, ())
 end
 
 function GRBlisttokens()
@@ -883,7 +883,7 @@ function GRBupdatebatch(batch)
 end
 
 function GRBwritebatchjsonsolution(batch, filename)
-    ccall((:GRBwritebatchjsonsolution, libgurobi), Cint, (Ptr{GRBbatch}, Cstring), batch, filename)
+    ccall((:GRBwritebatchjsonsolution, libgurobi), Cint, (Ptr{GRBbatch}, Ptr{Cchar}), batch, filename)
 end
 
 function GRBgetnumbatchattributes(env)
@@ -903,5 +903,5 @@ function GRBsync(model)
 end
 
 function GRBpingserver(server, password)
-    ccall((:GRBpingserver, libgurobi), Cint, (Cstring, Cstring), server, password)
+    ccall((:GRBpingserver, libgurobi), Cint, (Ptr{Cchar}, Ptr{Cchar}), server, password)
 end

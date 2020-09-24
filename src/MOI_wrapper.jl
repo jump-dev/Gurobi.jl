@@ -65,28 +65,26 @@ end
 
 mutable struct Env
     ptr_env::Ptr{Cvoid}
+
+    function Env(; finalize = true)
+        a = Ref{Ptr{Cvoid}}()
+        ret = GRBloadenv(a, C_NULL)
+        if ret == 10009
+            error("Gurobi Error 10009: invalid Gurobi license")
+        elseif ret != 0
+            error("Gurobi Error $(ret): failed to create environment")
+        end
+        env = new(a[])
+        if finalize
+            finalizer(env) do e
+                GRBfreeenv(e.ptr_env)
+                e.ptr_env = C_NULL
+            end
+        end
+        return env
+    end
 end
 
-# Note: `Env()` is an outer constructor because sometimes we want to
-# make an `Env` object from a pointer returned from `GRBgetenv`, and
-# sometimes we want to create a new `Env`.
-function Env()
-    a = Ref{Ptr{Cvoid}}()
-    ret = GRBloadenv(a, C_NULL)
-    if ret == 10009
-        error("Gurobi Error 10009: invalid Gurobi license")
-    elseif ret != 0
-        error("Gurobi Error $(ret): failed to create environment")
-    end
-    # TODO(odow): no finalizer is set for Env, because when a model + Env
-    # falls out of scope, Julia's GC will sometimes GC the env first, and
-    # then the model. This causes an error. Thus, `Env`'s are finalized in
-    # the `Model` constructor.
-    # We should probably add a flag to differentiate between envs created
-    # manually, and envs created by `Model()`. CPLEX.jl does something
-    # similar.
-    return Env(a[])
-end
 Base.cconvert(::Type{Ptr{Cvoid}}, x::Env) = x
 Base.unsafe_convert(::Type{Ptr{Cvoid}}, env::Env) = env.ptr_env::Ptr{Cvoid}
 
@@ -178,21 +176,41 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     conflict::Cint
 
     """
-        Optimizer(env = nothing; kwargs...)
+        Optimizer(env::Union{Nothing, Env} = nothing)
 
     Create a new Optimizer object.
 
     You can share Gurobi `Env`s between models by passing an instance of `Env`
-    as the first argument. By default, a new environment is created for every
-    model.
+    as the first argument.
+
+    Set optimizer attributes using `MOI.RawParameter` or
+    `JuMP.set_optimizer_atttribute`.
+
+    ## Example
+
+        using JuMP, Gurobi
+        const env = Gurobi.Env()
+        model = JuMP.Model(() -> Gurobi.Optimizer(env))
+        set_optimizer_attribute(model, "OutputFlag", 0)
     """
     function Optimizer(env::Union{Nothing, Env} = nothing; kwargs...)
         model = new()
         model.inner = C_NULL
-        model.env = env === nothing ? Env() : env
+        # If `env === nothing`, create a new environment. Since we created this
+        # one, skip the finalizer in `Env` and finalize with the finalizer
+        # below.
+        model.env = env === nothing ? Env(finalize = false) : env
         model.params = Dict{String, Any}()
+        if length(kwargs) > 0
+            @warn("""Passing optimizer attributes as keyword arguments to
+            Gurobi.Optimizer is deprecated. Use
+                MOI.set(model, MOI.RawParameter("key"), value)
+            or
+                JuMP.set_optimizer_attribute(model, "key", value)
+            instead.
+            """)
+        end
         for (name, value) in kwargs
-            @info "TODO(odow): Deprecate"
             model.params[string(name)] = value
         end
         model.silent = false
@@ -209,6 +227,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
             ret = GRBfreemodel(m.inner)
             _check_ret(m, ret)
             if env === nothing
+                # We created this environment, so we need to free it.
                 GRBfreeenv(m.env.ptr_env)
                 m.env.ptr_env = C_NULL
             end
@@ -500,7 +519,7 @@ function _indices_and_coefficients(
 )
     i = 1
     for term in f.terms
-        indices[i] = Cint(_info(model, term.variable_index).column - 1)
+        indices[i] = Cint(column(model, term.variable_index) - 1)
         coefficients[i] = term.coefficient
         i += 1
     end
@@ -532,8 +551,8 @@ function _indices_and_coefficients(
     f::MOI.ScalarQuadraticFunction
 )
     for (i, term) in enumerate(f.quadratic_terms)
-        I[i] = Cint(_info(model, term.variable_index_1).column - 1)
-        J[i] = Cint(_info(model, term.variable_index_2).column - 1)
+        I[i] = Cint(column(model, term.variable_index_1) - 1)
+        J[i] = Cint(column(model, term.variable_index_2) - 1)
         V[i] =  term.coefficient
         # Gurobi returns a list of terms. MOI requires 0.5 x' Q x. So, to get
         # from
@@ -550,7 +569,7 @@ function _indices_and_coefficients(
         end
     end
     for (i, term) in enumerate(f.affine_terms)
-        indices[i] = Cint(_info(model, term.variable_index).column - 1)
+        indices[i] = Cint(column(model, term.variable_index) - 1)
         coefficients[i] = term.coefficient
     end
     return
@@ -589,6 +608,17 @@ function _info(model::Optimizer, key::MOI.VariableIndex)
         return model.variable_info[key]
     end
     throw(MOI.InvalidIndex(key))
+end
+
+"""
+    column(model::Optimizer, x::MOI.VariableIndex)
+
+Return the 1-indexed column associated with `x`.
+
+The C API requires 0-indexed columns.
+"""
+function column(model::Optimizer, x::MOI.VariableIndex)
+    return _info(model, x).column
 end
 
 function _get_next_column(model::Optimizer)
@@ -812,8 +842,7 @@ function MOI.set(
     num_vars = length(model.variable_info)
     obj = zeros(Float64, num_vars)
     for term in f.terms
-        column = _info(model, term.variable_index).column
-        obj[column] += term.coefficient
+        obj[column(model, term.variable_index)] += term.coefficient
     end
     # NOTE: variables added may be referred before a `_update_if_necessary`
     # what is the problem we try to prevent below?
@@ -943,6 +972,19 @@ function _info(
         return _info(model, var_index)
     end
     return throw(MOI.InvalidIndex(c))
+end
+
+"""
+    column(model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any})
+
+Return the 1-indexed column associated with `c`.
+
+The C API requires 0-indexed columns.
+"""
+function column(
+    model::Optimizer, c::MOI.ConstraintIndex{MOI.SingleVariable, <:Any}
+)
+    return _info(model, c).column
 end
 
 function MOI.is_valid(
@@ -1709,7 +1751,6 @@ function MOI.add_constraints(
             ConstraintInfo(length(model.affine_constraint_info) + 1, si)
     end
     pop!(row_starts)  # Gurobi doesn't need the final row start.
-    p = pointer(senses)
     ret = GC.@preserve GRBaddconstrs(
         model,
         length(f),
@@ -1717,7 +1758,7 @@ function MOI.add_constraints(
         row_starts,
         columns,
         coefficients,
-        p, # TODO(odow): change Clang to not convert Ptr{Cchar} to Cstring here?
+        senses,
         rhss,
         C_NULL,
     )
@@ -2099,7 +2140,7 @@ end
 function MOI.add_constraint(
     model::Optimizer, f::MOI.VectorOfVariables, s::SOS
 )
-    columns = Cint[_info(model, v).column - 1 for v in f.variables]
+    columns = Cint[column(model, v) - 1 for v in f.variables]
     ret = GRBaddsos(
         model,
         1,
@@ -2359,9 +2400,9 @@ function MOI.get(model::Optimizer, attr::MOI.VariablePrimal, x::MOI.VariableInde
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
     key = model.has_unbounded_ray ? "UnbdRay" : "X"
-    column = _info(model, x).column
+    col = Cint(column(model, x) - 1)
     valueP = Ref{Cdouble}()
-    ret = GRBgetdblattrelement(model, key, Cint(column - 1), valueP)
+    ret = GRBgetdblattrelement(model, key, col, valueP)
     _check_ret(model, ret)
     return valueP[]
 end
@@ -2393,8 +2434,9 @@ function MOI.get(
 end
 
 function MOI.get(
-    model::Optimizer, attr::MOI.ConstraintPrimal,
-    c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, <:Any}
+    model::Optimizer,
+    attr::MOI.ConstraintPrimal,
+    c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64}, <:Any},
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
@@ -2416,13 +2458,13 @@ end
 function MOI.get(
     model::Optimizer,
     attr::MOI.ConstraintDual,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}}
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Float64}},
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
-        model, "RC", Cint(_info(model, c).column - 1), reduced_cost
+        model, "RC", Cint(column(model, c) - 1), reduced_cost
     )
     _check_ret(model, ret)
     sense = MOI.get(model, MOI.ObjectiveSense())
@@ -2445,14 +2487,15 @@ function MOI.get(
 end
 
 function MOI.get(
-    model::Optimizer, attr::MOI.ConstraintDual,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}}
+    model::Optimizer,
+    attr::MOI.ConstraintDual,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Float64}},
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
-        model, "RC", Cint(_info(model, c).column - 1), reduced_cost
+        model, "RC", Cint(column(model, c) - 1), reduced_cost
     )
     _check_ret(model, ret)
     sense = MOI.get(model, MOI.ObjectiveSense())
@@ -2475,29 +2518,31 @@ function MOI.get(
 end
 
 function MOI.get(
-    model::Optimizer, attr::MOI.ConstraintDual,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}}
+    model::Optimizer,
+    attr::MOI.ConstraintDual,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Float64}},
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
     reduced_cost = Ref{Cdouble}()
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
-        model, "RC", Cint(_info(model, c).column - 1), reduced_cost
+        model, "RC", Cint(column(model, c) - 1), reduced_cost
     )
     _check_ret(model, ret)
     return _dual_multiplier(model) * reduced_cost[]
 end
 
 function MOI.get(
-    model::Optimizer, attr::MOI.ConstraintDual,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}}
+    model::Optimizer,
+    attr::MOI.ConstraintDual,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Float64}},
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
-        model, "RC", Cint(_info(model, c).column - 1), reduced_cost
+        model, "RC", Cint(column(model, c) - 1), reduced_cost
     )
     _check_ret(model, ret)
     return _dual_multiplier(model) * reduced_cost[]
@@ -2821,7 +2866,7 @@ function MOI.modify(
         model,
         1,
         Ref{Cint}(_info(model, c).row - 1),
-        Ref{Cint}(_info(model, chg.variable).column - 1),
+        Ref{Cint}(column(model, chg.variable) - 1),
         Ref{Cdouble}(chg.new_coefficient),
     )
     _check_ret(model, ret)
@@ -2837,7 +2882,7 @@ function MOI.modify(
     ret = GRBsetdblattrelement(
         model,
         "Obj",
-        Cint(_info(model, chg.variable).column - 1),
+        Cint(column(model, chg.variable) - 1),
         chg.new_coefficient,
     )
     _check_ret(model, ret)
@@ -2867,7 +2912,7 @@ function _replace_with_matching_sparsity!(
     replacement::MOI.ScalarAffineFunction, row::Int
 )
     rows = fill(Cint(row - 1), length(replacement.terms))
-    cols = [Cint(_info(model, t.variable_index).column - 1) for t in replacement.terms]
+    cols = Cint[column(model, t.variable_index) - 1 for t in replacement.terms]
     coefs = MOI.coefficient.(replacement.terms)
     ret = GRBchgcoeffs(model, length(cols), rows, cols, coefs)
     _check_ret(model, ret)
@@ -2899,13 +2944,13 @@ function _replace_with_different_sparsity!(
 )
     # First, zero out the old constraint function terms.
     rows = fill(Cint(row - 1), length(previous.terms))
-    cols = [Cint(_info(model, t.variable_index).column - 1) for t in previous.terms]
+    cols = Cint[column(model, t.variable_index) - 1 for t in previous.terms]
     coefs = fill(0.0, length(previous.terms))
     ret = GRBchgcoeffs(model, length(cols), rows, cols, coefs)
     _check_ret(model, ret)
     # Next, set the new constraint function terms.
     rows = fill(Cint(row - 1), length(replacement.terms))
-    cols = [Cint(_info(model, t.variable_index).column - 1) for t in replacement.terms]
+    cols = Cint[column(model, t.variable_index) - 1 for t in replacement.terms]
     coefs = MOI.coefficient.(replacement.terms)
     ret = GRBchgcoeffs(model, length(cols), rows, cols, coefs)
     _check_ret(model, ret)
@@ -2990,12 +3035,13 @@ end
 function MOI.get(
     model::Optimizer,
     ::MOI.ConstraintBasisStatus,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S},
 ) where {S <: SCALAR_SETS}
-    column = _info(model, c).column
     _update_if_necessary(model)
     valueP = Ref{Cint}()
-    ret = GRBgetintattrelement(model, "VBasis", Cint(column - 1), valueP)
+    ret = GRBgetintattrelement(
+        model, "VBasis", Cint(column(model, c) - 1), valueP
+    )
     _check_ret(model, ret)
     if valueP[] == 0
         return MOI.BASIC
@@ -3074,8 +3120,9 @@ function MOI.get(model::Optimizer, ::MOI.ConflictStatus)
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintConflictStatus,
-    index::MOI.ConstraintIndex{MOI.SingleVariable, <:MOI.LessThan}
+    model::Optimizer,
+    ::MOI.ConstraintConflictStatus,
+    index::MOI.ConstraintIndex{MOI.SingleVariable, <:MOI.LessThan},
 )
     _ensure_conflict_computed(model)
     if _is_feasible(model)
@@ -3083,15 +3130,16 @@ function MOI.get(
     end
     p = Ref{Cint}()
     ret = GRBgetintattrelement(
-        model, "IISUB", Cint(_info(model, index).column - 1), p
+        model, "IISUB", Cint(column(model, index) - 1), p
     )
     _check_ret(model, ret)
     return p[] > 0 ? MOI.IN_CONFLICT : MOI.NOT_IN_CONFLICT
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintConflictStatus,
-    index::MOI.ConstraintIndex{MOI.SingleVariable, <:MOI.GreaterThan}
+    model::Optimizer,
+    ::MOI.ConstraintConflictStatus,
+    index::MOI.ConstraintIndex{MOI.SingleVariable, <:MOI.GreaterThan},
 )
     _ensure_conflict_computed(model)
     if _is_feasible(model)
@@ -3099,17 +3147,18 @@ function MOI.get(
     end
     p = Ref{Cint}()
     ret = GRBgetintattrelement(
-        model, "IISLB", Cint(_info(model, index).column - 1), p
+        model, "IISLB", Cint(column(model, index) - 1), p
     )
     _check_ret(model, ret)
     return p[] > 0 ? MOI.IN_CONFLICT : MOI.NOT_IN_CONFLICT
 end
 
 function MOI.get(
-    model::Optimizer, ::MOI.ConstraintConflictStatus,
+    model::Optimizer,
+    ::MOI.ConstraintConflictStatus,
     index::MOI.ConstraintIndex{
         MOI.SingleVariable, <:Union{MOI.EqualTo, MOI.Interval}
-    }
+    },
 )
     _ensure_conflict_computed(model)
     if _is_feasible(model)
@@ -3117,14 +3166,14 @@ function MOI.get(
     end
     p = Ref{Cint}()
     ret = GRBgetintattrelement(
-        model, "IISLB", Cint(_info(model, index).column - 1), p
+        model, "IISLB", Cint(column(model, index) - 1), p
     )
     _check_ret(model, ret)
     if p[] > 0
         return MOI.IN_CONFLICT
     end
     ret = GRBgetintattrelement(
-        model, "IISUB", Cint(_info(model, index).column - 1), p
+        model, "IISUB", Cint(column(model, index) - 1), p
     )
     _check_ret(model, ret)
     if p[] > 0
@@ -3380,7 +3429,7 @@ function MOI.set(
     vi::MOI.VariableIndex,
     value::T,
 ) where T
-    _set_attribute(model, attr, Cint(_info(model, vi).column - 1), value)
+    _set_attribute(model, attr, Cint(column(model, vi) - 1), value)
     _require_update(model)
     return
 end
@@ -3389,7 +3438,7 @@ function MOI.get(
     model::Optimizer, attr::VariableAttribute, vi::MOI.VariableIndex
 )
     _update_if_necessary(model)
-    return _get_attribute(model, attr, Cint(_info(model, vi).column - 1))
+    return _get_attribute(model, attr, Cint(column(model, vi) - 1))
 end
 
 """
@@ -3450,7 +3499,7 @@ function MOI.add_constraint(
 
     # Now add the quadratic constraint.
 
-    I = Cint[_info(model, v).column - 1 for v in f.variables]
+    I = Cint[column(model, v) - 1 for v in f.variables]
     V = fill(Cdouble(-1.0), length(f.variables))
     V[1] = 1.0
     ret = GRBaddqconstr(
