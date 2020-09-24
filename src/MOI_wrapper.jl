@@ -3103,8 +3103,6 @@ function MOI.get(
     end
 end
 
-@deprecate compute_conflict MOI.compute_conflict!
-
 function MOI.compute_conflict!(model::Optimizer)
     ret = GRBcomputeIIS(model)
     _check_ret(model, ret)

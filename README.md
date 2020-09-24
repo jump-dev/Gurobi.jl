@@ -1,3 +1,14 @@
+**Gurobi.jl underwent a major rewrite between versions 0.8.1 and 0.9.0. Users of
+JuMP should see no breaking changes, but if you used the lower-level C API
+(e.g., for callbacks), you will need to update your code accordingly.**
+
+**To revert to the old API, use:**
+```julia
+import Pkg
+Pkg.add(Pkg.PackageSpec(name = "Gurobi", version = v"0.8"))
+```
+**Then restart Julia for the change to take effect.**
+
 # Gurobi.jl
 
 Gurobi.jl is a wrapper for the [Gurobi Optimizer](https://www.gurobi.com).
@@ -25,9 +36,9 @@ import Pkg
 # On Mac
 ENV["GUROBI_HOME"] = "/Library/gurobi902/mac64"
 # On Windows
-ENV["GUROBI_HOME"] = "C:/Program Files/gurobi902/win64"
+ENV["GUROBI_HOME"] = "C:\\Program Files\\gurobi902\\win64"
 # ... or perhaps ...
-ENV["GUROBI_HOME"] = "C:/gurobi902/win64"
+ENV["GUROBI_HOME"] = "C:\\gurobi902\\win64"
 
 Pkg.add("Gurobi")
 Pkg.build("Gurobi")

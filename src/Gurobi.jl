@@ -43,4 +43,6 @@ for sym in names(@__MODULE__, all=true)
     end
 end
 
+include("deprecated_functions.jl")
+
 end
