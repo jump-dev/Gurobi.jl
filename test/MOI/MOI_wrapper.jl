@@ -285,6 +285,14 @@ end
             @test env.ptr_env != C_NULL
         end
     end
+    @testset "Manually finalize env and model" begin
+        env = Gurobi.Env()
+        model = Gurobi.Optimizer(env)
+        finalize(env)
+        @test env.finalize_called
+        finalize(model)
+        @test env.ptr_env == C_NULL
+    end
 end
 
 @testset "Conflict refiner" begin
