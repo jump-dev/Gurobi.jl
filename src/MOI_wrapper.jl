@@ -65,8 +65,13 @@ end
 
 mutable struct Env
     ptr_env::Ptr{Cvoid}
+    # These fields keep track of how many models the `Env` is used for to help
+    # with finalizing. If you finalize an Env first, then the model, Gurobi will
+    # throw an error.
+    finalize_called::Bool
+    attached_models::Int
 
-    function Env(; finalize = true)
+    function Env()
         a = Ref{Ptr{Cvoid}}()
         ret = GRBloadenv(a, C_NULL)
         if ret == 10009
@@ -74,9 +79,11 @@ mutable struct Env
         elseif ret != 0
             error("Gurobi Error $(ret): failed to create environment")
         end
-        env = new(a[])
-        if finalize
-            finalizer(env) do e
+        env = new(a[], false, 0)
+        finalizer(env) do e
+            e.finalize_called = true
+            if e.attached_models == 0
+                # Only finalize the model if there are no models using it.
                 GRBfreeenv(e.ptr_env)
                 e.ptr_env = C_NULL
             end
@@ -196,10 +203,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     function Optimizer(env::Union{Nothing, Env} = nothing; kwargs...)
         model = new()
         model.inner = C_NULL
-        # If `env === nothing`, create a new environment. Since we created this
-        # one, skip the finalizer in `Env` and finalize with the finalizer
-        # below.
-        model.env = env === nothing ? Env(finalize = false) : env
+        model.env = env === nothing ? Env() : env
         model.params = Dict{String, Any}()
         if length(kwargs) > 0
             @warn("""Passing optimizer attributes as keyword arguments to
@@ -226,8 +230,14 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         finalizer(model) do m
             ret = GRBfreemodel(m.inner)
             _check_ret(m, ret)
+            m.env.attached_models -= 1
             if env === nothing
-                # We created this environment, so we need to free it.
+                @assert m.env.attached_models == 0
+                # We created this environment. Finalize it now.
+                finalize(m.env)
+            elseif m.env.finalize_called && m.env.attached_models == 0
+                # We delayed finalizing `m.env` earlier because there were still
+                # models attached. Finalize it now.
                 GRBfreeenv(m.env.ptr_env)
                 m.env.ptr_env = C_NULL
             end
@@ -280,12 +290,21 @@ function Base.show(io::IO, model::Optimizer)
 end
 
 function MOI.empty!(model::Optimizer)
+    # Free the current model, if it exists.
+    if model.inner != C_NULL
+        ret = GRBfreemodel(model.inner)
+        _check_ret(model, ret)
+        model.env.attached_models -= 1
+    end
+    # Then create a new one
     a = Ref{Ptr{Cvoid}}()
     ret = GRBnewmodel(
         model.env, a, "", 0, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL
     )
     model.inner = a[]
+    model.env.attached_models += 1
     _check_ret(model, ret)
+    # Reset the parameters in this new environment
     for (name, value) in model.params
         MOI.set(model, MOI.RawParameter(name), value)
     end
