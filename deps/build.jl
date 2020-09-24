@@ -7,14 +7,8 @@ if isfile(DEPS_FILE)
 end
 
 function write_depsfile(path)
-    if Sys.iswindows()
-        # When `path` gets written out to a file, it will escape any
-        # backslashes, so we need to doubly escape them. If your path uses
-        # forward slashes, this operation won't do anything.
-        path = replace(path, "\\" => "\\\\")
-    end
     open(DEPS_FILE, "w") do io
-        println(io, "const libgurobi = \"$(path)\"")
+        println(io, "const libgurobi = \"$(escape_string(path))\"")
     end
 end
 
@@ -60,7 +54,7 @@ function _print_GUROBI_HOME_help()
     correct location if needed):
     ```
     # On Windows, this might be
-    ENV["GUROBI_HOME"] = "C:\\Program Files\\gurobi902\\win64\\"
+    ENV["GUROBI_HOME"] = "C:\\\\Program Files\\\\gurobi902\\\\win64\\\\"
     import Pkg
     Pkg.add("Gurobi")
     Pkg.build("Gurobi")
@@ -82,7 +76,8 @@ end
 
 function diagnose_gurobi_install()
     println("""
-    Unable to locate Gurobi installation. Running some common diagnostics.
+
+    **Unable to locate Gurobi installation. Running some common diagnostics.**
 
     Gurobi.jl only supports the following versions:
     """)
@@ -90,7 +85,6 @@ function diagnose_gurobi_install()
     println("""
 
     Did you download and install one of these versions from gurobi.com?
-
     """)
     if haskey(ENV, "GUROBI_HOME")
         dir = joinpath(ENV["GUROBI_HOME"], Sys.isunix() ? "lib" : "bin")
@@ -134,21 +128,20 @@ function diagnose_gurobi_install()
             run(pipeline(`gurobi_cl --version`; stdout = io))
             seekstart(io)
             println("""
-
             We couldn't find the `GUROBI_HOME` environment variable, but we
-            found this version of Gurobi on your path.
+            found this version of Gurobi on your `PATH`.
 
             $(read(io, String))
             Is this version one of the supported versions listed above? If so,
             we found the executable, but not the libraries we need. Follow the
             advice below to set the `GUROBI_HOME` environment variable. If not,
             you should edit your `PATH` to point to the correct version, or set
-            the `GUROBI_HOME` environment variable.\n\n""")
+            the `GUROBI_HOME` environment variable.\n""")
             _print_GUROBI_HOME_help()
         catch
             println("""
 
-            We could not find a version of Gurobi in your path, and we could
+            We could not find a version of Gurobi in your `PATH`, and we could
             not find the environment variable `GUROBI_HOME`.\n\n""")
             _print_GUROBI_HOME_help()
         end
