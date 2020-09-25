@@ -16,9 +16,11 @@ include("gen/ctypes.jl")
 include("gen/libgrb_common.jl")
 include("gen/libgrb_api.jl")
 
-const _GUROBI_VERSION = VersionNumber(
-    "$GRB_VERSION_MAJOR.$GRB_VERSION_MINOR.$(GRB_VERSION_TECHNICAL)"
-)
+const _GUROBI_VERSION = let
+    majorP, minorP, technicalP = Ref{Cint}(), Ref{Cint}(), Ref{Cint}()
+    GRBversion(majorP, minorP, technicalP)
+    VersionNumber("$(majorP[]).$(minorP[]).$(technicalP[])")
+end
 
 if !(v"9.0.0" <= _GUROBI_VERSION < v"9.1")
     error("""
