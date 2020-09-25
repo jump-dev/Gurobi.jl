@@ -28,18 +28,21 @@ Julia from Gurobi, let them know!*
 ## Installation
 
 First, obtain a license of Gurobi and install Gurobi solver, following the
-instructions on [Gurobi's website](http://www.gurobi.com). Then, run the
-following:
-
+instructions on [Gurobi's website](http://www.gurobi.com). Then, set the
+`GUROBI_HOME` environment variable as appropriate and run `Pkg.add("Gurobi")`,
+the `Pkg.build("Gurobi")`. For example:
 ```julia
-import Pkg
-# On Mac
-ENV["GUROBI_HOME"] = "/Library/gurobi902/mac64"
-# On Windows
+# On Windows, this might be
 ENV["GUROBI_HOME"] = "C:\\Program Files\\gurobi902\\win64"
 # ... or perhaps ...
 ENV["GUROBI_HOME"] = "C:\\gurobi902\\win64"
+import Pkg
+Pkg.add("Gurobi")
+Pkg.build("Gurobi")
 
+# On Mac, this might be
+ENV["GUROBI_HOME"] = "/Library/gurobi902/mac64"
+import Pkg
 Pkg.add("Gurobi")
 Pkg.build("Gurobi")
 ```

@@ -21,12 +21,24 @@ const _GUROBI_VERSION = VersionNumber(
 )
 
 if !(v"9.0.0" <= _GUROBI_VERSION < v"9.1")
-    error(
-        "You have installed version $_GUROBI_VERSION of Gurobi, which is not " *
-        "supported by Gurobi.jl. If the version change was breaking, changes " *
-        "may need to be made to the Julia code. Please open an issue at " *
-        "https://github.com/jump-dev/Gurobi.jl."
-    )
+    error("""
+    You have installed version $_GUROBI_VERSION of Gurobi, which is not
+    supported by Gurobi.jl. We require Gurobi version 9 or greater.
+
+    After installing Gurobi 9, run:
+
+        import Pkg
+        Pkg.rm("Gurobi")
+        Pkg.add("Gurobi")
+
+    Make sure you set the environment variable `GUROBI_HOME` following
+    the instructions in the Gurobi.jl README, which is available at
+    https://github.com/jump-dev/Gurobi.jl.
+
+    If you have a newer version of Gurobi installed, changes may need to be made
+    to the Julia code. Please open an issue at
+    https://github.com/jump-dev/Gurobi.jl.
+    """)
 end
 
 include("MOI_wrapper.jl")
