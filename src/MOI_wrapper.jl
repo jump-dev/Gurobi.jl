@@ -181,7 +181,6 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     # INFEASIBILITY_CERTIFICATE when querying VariablePrimal and ConstraintDual.
     has_unbounded_ray::Bool
     has_infeasibility_cert::Bool
-    interrupted::Bool
 
     # Callback fields.
     callback_variable_primal::Vector{Float64}
@@ -336,7 +335,6 @@ function MOI.empty!(model::Optimizer)
     model.name_to_constraint_index = nothing
     model.has_unbounded_ray = false
     model.has_infeasibility_cert = false
-    model.interrupted = false
     empty!(model.callback_variable_primal)
     model.callback_state = _CB_NONE
     model.has_generic_callback = false
@@ -2304,11 +2302,13 @@ function MOI.optimize!(model::Optimizer)
         MOI.set(model, CallbackFunction(), _default_moi_callback(model))
         model.has_generic_callback = false
     elseif !model.has_generic_callback
-        # TODO(odow): From the docstring of disable_sigint, "External functions
-        # that do not call julia code or julia runtime automatically disable
-        # sigint during their execution." We don't want this though! We want to
-        # be able to SIGINT Gurobi, and then catch it as an interrupt. As a
-        # temporary hack, set a null callback.
+        # From the docstring of disable_sigint, "External functions that do not
+        # call julia code or julia runtime automatically disable sigint during
+        # their execution." We don't want this though! We want to be able to
+        # SIGINT Gurobi, and then catch it as an interrupt. As a hack, until
+        # Julia introduces an interruptible ccall --- which it likely won't
+        # https://github.com/JuliaLang/julia/issues/2622 --- set a null
+        # callback.
         MOI.set(model, CallbackFunction(), (x, y) -> nothing)
     end
 
@@ -2318,49 +2318,11 @@ function MOI.optimize!(model::Optimizer)
     #
     # TODO(odow): Julia 1.5 exposes `Base.exit_on_sigint(::Bool)`.
     ccall(:jl_exit_on_sigint, Cvoid, (Cint,), false)
-    model.interrupted = false
-    ret = try
-        GRBoptimize(model)
-    catch ex
-        # Disable sigint here, because we don't want the user to interrupt our
-        # handle of an interrupt!
-        disable_sigint() do
-            if !(ex isa InterruptException)
-                rethrow(ex)
-            end
-            model.interrupted = true
-            # ==================================================================
-            # It wasn't obvious how to gracefully handle this interrupt, so
-            # @odow talked to Gurobi support. They suggest the following:
-            #
-            # Calling GRBterminate(model) will set a flag in the model to
-            # terminate the optimization as soon as possible. Since this will
-            # not immediately stop the process, you might need to wait until the
-            # status is not "OPTIMIZATION_IN_PROGRESS" anymore. Otherwise, you
-            # might run into a race-condition, with the solver still running,
-            # which produces the errors you have seen.
-            #
-            # So GRBterminate() is the right way to go, you just need to
-            # implement some waiting loop afterwards, checking the status.
-            GRBterminate(model)
-            valueP = Ref{Cint}(1)
-            while GRBgetintattr(model, "Status", valueP) == GRB_ERROR_OPTIMIZATION_IN_PROGRESS
-                sleep(0.5)
-            end
-            # ==================================================================
-        end
-        Cint(0)
-    finally
-        # If the interrupt was thrown from a callback, the callback will not
-        # have exited successfully, and so the callback state won't have been
-        # reset to _CB_NONE yet. Do it here regardless.
-        model.callback_state = _CB_NONE
-        # Reset jl_exit_on_sigint.
-        if !isinteractive()
-            ccall(:jl_exit_on_sigint, Cvoid, (Cint,), true)
-        end
-    end
+    ret = GRBoptimize(model)
     _check_ret(model, ret)
+    if !isinteractive()
+        ccall(:jl_exit_on_sigint, Cvoid, (Cint,), true)
+    end
 
     # Post-optimize caching to speed up the checks in VariablePrimal and
     # ConstraintDual.
@@ -2409,17 +2371,11 @@ function _raw_status(model::Optimizer)
 end
 
 function MOI.get(model::Optimizer, attr::MOI.RawStatusString)
-    if model.interrupted
-        return "Optimization was terminated by the user."
-    end
     _throw_if_optimize_in_progress(model, attr)
     return _raw_status(model)[2]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.TerminationStatus)
-    if model.interrupted
-        return MOI.INTERRUPTED
-    end
     _throw_if_optimize_in_progress(model, attr)
     return _raw_status(model)[1]
 end
