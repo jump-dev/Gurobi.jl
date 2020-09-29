@@ -86,7 +86,7 @@ mutable struct Env
         a = Ref{Ptr{Cvoid}}()
         ret = GRBloadenv(a, C_NULL)
         if ret == 10009
-            error("Gurobi Error 10009: invalid Gurobi license")
+            error("Gurobi Error 10009: Failed to obtain a valid license")
         elseif ret != 0
             error("Gurobi Error $(ret): failed to create environment")
         end

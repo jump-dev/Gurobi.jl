@@ -5,8 +5,10 @@ using Test
 
 const MOI = Gurobi.MOI
 
+const GRB_ENV = Gurobi.Env()
+
 function test_multiobjective()
-    model = Gurobi.Optimizer()
+    model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     MOI.Utilities.loadfromstring!(model, """
     variables: x, y
@@ -80,4 +82,4 @@ end
 
 end
 
-TestMultiobjective.test_multiobjective()
+runtests(TestMultiobjective)
