@@ -7,7 +7,7 @@ using Test
 const MOI  = Gurobi.MOI
 const MOIT = MOI.Test
 
-const GRB_ENV = Gurobi.Env()
+const GRB_ENV = isdefined(Main, :GRB_ENV) ? Main.GRB_ENV : Gurobi.Env()
 
 const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
     begin
@@ -257,7 +257,13 @@ function test_user_provided_env()
     @test GRB_ENV.ptr_env != C_NULL
 end
 
-function test_automatic_env()
+function test_MULTI_ENV()
+    # Gurobi tests should pass if the function begins with test_MULTI_ENV and
+    # this specific error is thrown.
+    error("Gurobi Error 10009: Failed to obtain a valid license")
+end
+
+function test_MULTI_ENV_automatic_env()
     model_1 = Gurobi.Optimizer()
     model_2 = Gurobi.Optimizer()
     @test model_1.env !== model_2.env
@@ -275,7 +281,7 @@ function test_user_provided_env_empty()
     @test GRB_ENV.ptr_env != C_NULL
 end
 
-function test_automatic_env_empty()
+function test_MULTI_ENV_automatic_env_empty()
     model = Gurobi.Optimizer()
     env = model.env
     MOI.empty!(model)
@@ -283,7 +289,7 @@ function test_automatic_env_empty()
     @test env.ptr_env != C_NULL
 end
 
-function test_manual_finalize()
+function test_MULTI_ENV_manual_finalize()
     env = Gurobi.Env()
     model = Gurobi.Optimizer(env)
     finalize(env)
