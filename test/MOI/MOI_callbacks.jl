@@ -4,7 +4,7 @@ using Gurobi, Test, Random
 
 const MOI = Gurobi.MOI
 
-const GRB_ENV = Gurobi.Env()
+const GRB_ENV = isdefined(Main, :GRB_ENV) ? Main.GRB_ENV : Gurobi.Env()
 
 function callback_simple_model()
     model = Gurobi.Optimizer(GRB_ENV)
