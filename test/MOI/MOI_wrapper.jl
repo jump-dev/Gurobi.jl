@@ -18,6 +18,7 @@ const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
         MOI.set(model, MOI.RawParameter("DualReductions"), 0)
         MOI.set(model, MOI.RawParameter("QCPDual"), 1)
         MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
+        MOI.set(model, MOI.RawParameter("NonConvex"), 2)
         model
     end,
     Float64
@@ -79,9 +80,7 @@ function test_contlineartest()
 end
 
 function test_contquadratictest()
-    MOIT.contquadratictest(OPTIMIZER, MOIT.TestConfig(atol=1e-3, rtol=1e-3), [
-        "ncqcp"  # Gurobi doesn't support non-convex problems.
-    ])
+    MOIT.contquadratictest(OPTIMIZER, MOIT.TestConfig(atol=1e-3, rtol=1e-3))
 end
 
 function test_conictest()
