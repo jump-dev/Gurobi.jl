@@ -2309,26 +2309,26 @@ function MOI.optimize!(model::Optimizer)
     # mode. If `true`, then a script would call `atexit` without throwing the
     # `InterruptException`. `false` is the default in interactive mode.
     ccall(:jl_exit_on_sigint, Cvoid, (Cint,), false)
-    try
-        model.interrupted = false
-        ret = GRBoptimize(model)
-        _check_ret(model, ret)
+    model.interrupted = false
+    ret = try
+        GRBoptimize(model)
     catch ex
         # Catch the case where the interrupt was thrown from a callback. Since
         # the callback will not have exited successfully, the callback state
         # won't have been reset to _CB_NONE yet.
         model.callback_state = _CB_NONE
-        if ex isa InterruptException
-            model.interrupted = true
-            GRBterminate(model)
-        else
+        if !(ex isa InterruptException)
             rethrow(ex)
         end
+        model.interrupted = true
+        GRBterminate(model)
+        Cint(0)
     finally
         if !isinteractive()
             ccall(:jl_exit_on_sigint, Cvoid, (Cint,), true)
         end
     end
+    _check_ret(model, ret)
 
     # Post-optimize caching to speed up the checks in VariablePrimal and
     # ConstraintDual.
