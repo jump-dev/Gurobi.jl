@@ -3,10 +3,11 @@ module TestCallbacks
 using Gurobi, Test, Random
 
 const MOI = Gurobi.MOI
-const GUROBI_ENV = Gurobi.Env()
+
+const GRB_ENV = Gurobi.Env()
 
 function callback_simple_model()
-    model = Gurobi.Optimizer(GUROBI_ENV)
+    model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.RawParameter("OutputFlag"), 0)
     MOI.set(model, MOI.RawParameter("Cuts"), 0)
     MOI.set(model, MOI.RawParameter("Presolve"), 0)
@@ -25,7 +26,7 @@ function callback_simple_model()
 end
 
 function callback_knapsack_model()
-    model = Gurobi.Optimizer(GUROBI_ENV)
+    model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.RawParameter("OutputFlag"), 0)
     MOI.set(model, MOI.RawParameter("Cuts"), 0)
     MOI.set(model, MOI.RawParameter("Presolve"), 0)
@@ -427,17 +428,6 @@ function test_CallbackFunction_callback_HeuristicSolution()
     @test Gurobi.GRB_CB_MIPNODE in cb_calls
 end
 
-function runtests()
-    for name in names(@__MODULE__; all = true)
-        if !startswith("$(name)", "test_")
-            continue
-        end
-        @testset "$(name)" begin
-            getfield(@__MODULE__, name)()
-        end
-    end
-end
-
 end  # module TestCallbacks
 
-TestCallbacks.runtests()
+runtests(TestCallbacks)
