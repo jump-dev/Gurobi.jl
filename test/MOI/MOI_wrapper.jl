@@ -1021,7 +1021,7 @@ function test_Attributes()
 end
 
 function test_GRBterminate()
-    model = Gurobi.Optimizer(GUROBI_ENV)
+    model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variable(model)
     MOI.set(model, Gurobi.CallbackFunction(), (cb_data, cb_where) -> begin
@@ -1032,7 +1032,7 @@ function test_GRBterminate()
 end
 
 function test_InterruptException()
-    model = Gurobi.Optimizer(GUROBI_ENV)
+    model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variable(model)
     MOI.set(model, Gurobi.CallbackFunction(), (cb_data, cb_where) -> begin

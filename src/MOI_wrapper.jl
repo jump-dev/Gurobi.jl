@@ -2303,7 +2303,7 @@ function MOI.optimize!(model::Optimizer)
     if _check_moi_callback_validity(model)
         MOI.set(model, CallbackFunction(), _default_moi_callback(model))
         model.has_generic_callback = false
-    else
+    elseif !model.has_generic_callback
         # TODO(odow): From the docstring of disable_sigint, "External functions
         # that do not call julia code or julia runtime automatically disable
         # sigint during their execution." We don't want this though! We want to
