@@ -1020,6 +1020,28 @@ function test_Attributes()
     @test MOI.get(model, MOI.SimplexIterations()) == 0
 end
 
+function test_GRBterminate()
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variable(model)
+    MOI.set(model, Gurobi.CallbackFunction(), (cb_data, cb_where) -> begin
+        GRBterminate(model)
+    end)
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INTERRUPTED
+end
+
+function test_InterruptException()
+    model = Gurobi.Optimizer(GUROBI_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variable(model)
+    MOI.set(model, Gurobi.CallbackFunction(), (cb_data, cb_where) -> begin
+        throw(InterruptException())
+    end)
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INTERRUPTED
+end
+
 end
 
 runtests(TestMOIWrapper)

@@ -181,6 +181,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     # INFEASIBILITY_CERTIFICATE when querying VariablePrimal and ConstraintDual.
     has_unbounded_ray::Bool
     has_infeasibility_cert::Bool
+    interrupted::Bool
 
     # Callback fields.
     callback_variable_primal::Vector{Float64}
@@ -335,6 +336,7 @@ function MOI.empty!(model::Optimizer)
     model.name_to_constraint_index = nothing
     model.has_unbounded_ray = false
     model.has_infeasibility_cert = false
+    model.interrupted = false
     empty!(model.callback_variable_primal)
     model.callback_state = _CB_NONE
     model.has_generic_callback = false
@@ -2303,8 +2305,30 @@ function MOI.optimize!(model::Optimizer)
         model.has_generic_callback = false
     end
 
-    ret = GRBoptimize(model)
-    _check_ret(model, ret)
+    # Catch [CTRL+C], even when Julia is run from a script not in interactive
+    # mode. If `true`, then a script would call `atexit` without throwing the
+    # `InterruptException`. `false` is the default in interactive mode.
+    ccall(:jl_exit_on_sigint, Cvoid, (Cint,), false)
+    try
+        model.interrupted = false
+        ret = GRBoptimize(model)
+        _check_ret(model, ret)
+    catch ex
+        # Catch the case where the interrupt was thrown from a callback. Since
+        # the callback will not have exited successfully, the callback state
+        # won't have been reset to _CB_NONE yet.
+        model.callback_state = _CB_NONE
+        if ex isa InterruptException
+            model.interrupted = true
+            GRBterminate(model)
+        else
+            rethrow(ex)
+        end
+    finally
+        if !isinteractive()
+            ccall(:jl_exit_on_sigint, Cvoid, (Cint,), true)
+        end
+    end
 
     # Post-optimize caching to speed up the checks in VariablePrimal and
     # ConstraintDual.
@@ -2353,11 +2377,17 @@ function _raw_status(model::Optimizer)
 end
 
 function MOI.get(model::Optimizer, attr::MOI.RawStatusString)
+    if model.interrupted
+        return "Optimization was terminated by the user."
+    end
     _throw_if_optimize_in_progress(model, attr)
     return _raw_status(model)[2]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.TerminationStatus)
+    if model.interrupted
+        return MOI.INTERRUPTED
+    end
     _throw_if_optimize_in_progress(model, attr)
     return _raw_status(model)[1]
 end
