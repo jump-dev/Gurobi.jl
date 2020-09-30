@@ -46,6 +46,7 @@ end
 include("MOI_wrapper.jl")
 include("MOI_callbacks.jl")
 include("MOI_multi_objective.jl")
+include("MOI_indicator_constraint.jl")
 
 # Gurobi exports all `GRBXXX` symbols. If you don't want all of these symbols in
 # your environment, then use `import Gurobi` instead of `using Gurobi`.

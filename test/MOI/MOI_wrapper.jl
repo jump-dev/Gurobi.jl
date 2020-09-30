@@ -95,10 +95,7 @@ function test_conictest()
 end
 
 function test_intlinear()
-    MOIT.intlineartest(OPTIMIZER, CONFIG, [
-        # Indicator sets not supported.
-        "indicator1", "indicator2", "indicator3", "indicator4"
-    ])
+    MOIT.intlineartest(OPTIMIZER, CONFIG)
 end
 
 function test_solvername()
@@ -1023,6 +1020,102 @@ function test_Attributes()
     @test MOI.get(model, MOI.NodeCount()) == 0
     @test MOI.get(model, MOI.BarrierIterations()) == 0
     @test MOI.get(model, MOI.SimplexIterations()) == 0
+end
+
+function test_indicator_name()
+    MOI.empty!(OPTIMIZER)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
+    f = MOI.VectorAffineFunction(
+        [
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x[1])),
+            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
+        ],
+        [0.0, 0.0],
+    )
+    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    c = MOI.add_constraint(model, f, s)
+    MOI.set(model, MOI.ConstraintName(), c, "my_indicator")
+    @test MOI.get(model, MOI.ConstraintName(), c) == "my_indicator"
+end
+
+function test_indicator_on_one()
+    MOI.empty!(OPTIMIZER)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
+    f = MOI.VectorAffineFunction(
+        [
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x[1])),
+            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
+        ],
+        [0.0, 0.0],
+    )
+    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    c = MOI.add_constraint(model, f, s)
+    @test MOI.get(model, MOI.ConstraintSet(), c) == s
+    @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c), f)
+end
+
+function test_indicator_on_zero()
+    MOI.empty!(OPTIMIZER)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
+    f = MOI.VectorAffineFunction(
+        [
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x[1])),
+            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
+        ],
+        [0.0, 0.0],
+    )
+    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ZERO}(MOI.GreaterThan(1.0))
+    c = MOI.add_constraint(model, f, s)
+    @test MOI.get(model, MOI.ConstraintSet(), c) == s
+    @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c), f)
+end
+
+function test_indicator_nonconstant_x()
+    MOI.empty!(OPTIMIZER)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
+    f = MOI.VectorAffineFunction(
+        [
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(-1.0, x[1])),
+            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
+        ],
+        [0.0, 0.0],
+    )
+    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    @test_throws ErrorException MOI.add_constraint(model, f, s)
+end
+
+function test_indicator_too_many_indicators()
+    MOI.empty!(OPTIMIZER)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
+    f = MOI.VectorAffineFunction(
+        [
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(-1.0, x[1])),
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(2.0, x[2])),
+        ],
+        [0.0, 0.0],
+    )
+    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    @test_throws ErrorException MOI.add_constraint(model, f, s)
+end
+
+function test_indicator_nonconstant()
+    MOI.empty!(OPTIMIZER)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
+    f = MOI.VectorAffineFunction(
+        [
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x[1])),
+            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
+        ],
+        [1.0, 0.0],
+    )
+    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    @test_throws ErrorException MOI.add_constraint(model, f, s)
 end
 
 end
