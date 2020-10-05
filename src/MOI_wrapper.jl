@@ -166,6 +166,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     quadratic_constraint_info::Dict{Int, _ConstraintInfo}
     # VectorOfVariables-in-Set storage.
     sos_constraint_info::Dict{Int, _ConstraintInfo}
+    # VectorAffineFunction-in-Set storage.
+    indicator_constraint_info::Dict{Int, _ConstraintInfo}
     # Note: we do not have a singlevariable_constraint_info dictionary. Instead,
     # data associated with these constraints are stored in the _VariableInfo
     # objects.
@@ -236,6 +238,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         model.affine_constraint_info = Dict{Int, _ConstraintInfo}()
         model.quadratic_constraint_info = Dict{Int, _ConstraintInfo}()
         model.sos_constraint_info = Dict{Int, _ConstraintInfo}()
+        model.indicator_constraint_info = Dict{Int, _ConstraintInfo}()
         model.callback_variable_primal = Float64[]
         MOI.empty!(model)
         finalizer(model) do m
@@ -331,6 +334,7 @@ function MOI.empty!(model::Optimizer)
     empty!(model.affine_constraint_info)
     empty!(model.quadratic_constraint_info)
     empty!(model.sos_constraint_info)
+    empty!(model.indicator_constraint_info)
     model.name_to_variable = nothing
     model.name_to_constraint_index = nothing
     model.has_unbounded_ray = false
@@ -457,6 +461,7 @@ MOI.supports(::Optimizer, ::MOI.ConstraintName, ::Type{<:MOI.ConstraintIndex}) =
 
 MOI.supports(::Optimizer, ::MOI.Name) = true
 MOI.supports(::Optimizer, ::MOI.Silent) = true
+MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = true
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
 MOI.supports(::Optimizer, ::MOI.ObjectiveSense) = true
 MOI.supports(::Optimizer, ::MOI.RawParameter) = true
@@ -624,9 +629,9 @@ function _indices_and_coefficients(
     return indices, coefficients, I, J, V
 end
 
-_sense_and_rhs(s::MOI.LessThan{Float64}) = (Cchar('<'), s.upper)
-_sense_and_rhs(s::MOI.GreaterThan{Float64}) = (Cchar('>'), s.lower)
-_sense_and_rhs(s::MOI.EqualTo{Float64}) = (Cchar('='), s.value)
+_sense_and_rhs(s::MOI.LessThan{Float64}) = (GRB_LESS_EQUAL, s.upper)
+_sense_and_rhs(s::MOI.GreaterThan{Float64}) = (GRB_GREATER_EQUAL, s.lower)
+_sense_and_rhs(s::MOI.EqualTo{Float64}) = (GRB_EQUAL, s.value)
 
 ###
 ### Variables
@@ -2722,6 +2727,23 @@ function MOI.set(model::Optimizer, ::MOI.Silent, flag::Bool)
     MOI.set(model, MOI.RawParameter("OutputFlag"), output_flag)
     return
 end
+
+function MOI.get(model::Optimizer, ::MOI.NumberOfThreads)
+    x = MOI.get(model, MOI.RawParameter("Threads"))
+    # Instead of default `0`, return `nothing`
+    return x == 0 ? nothing : x
+end
+
+function MOI.set(model::Optimizer, ::MOI.NumberOfThreads, x::Int)
+    MOI.set(model, MOI.RawParameter("Threads"), x)
+    return
+end
+
+function MOI.set(model::Optimizer, ::MOI.NumberOfThreads, ::Nothing)
+    MOI.set(model, MOI.RawParameter("Threads"), 0)
+    return
+end
+
 
 function MOI.get(model::Optimizer, ::MOI.Name)
     _update_if_necessary(model)

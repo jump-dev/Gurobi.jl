@@ -7,7 +7,7 @@ using Test
 const MOI  = Gurobi.MOI
 const MOIT = MOI.Test
 
-const GRB_ENV = Gurobi.Env()
+const GRB_ENV = isdefined(Main, :GRB_ENV) ? Main.GRB_ENV : Gurobi.Env()
 
 const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
     begin
@@ -18,6 +18,7 @@ const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
         MOI.set(model, MOI.RawParameter("DualReductions"), 0)
         MOI.set(model, MOI.RawParameter("QCPDual"), 1)
         MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
+        MOI.set(model, MOI.RawParameter("NonConvex"), 2)
         model
     end,
     Float64
@@ -61,8 +62,6 @@ function test_unittest()
         # TODO(odow): bug! We can't delete a vector of variables if one is in
         # a second order cone.
         "delete_soc_variables",
-        # TODO(odow): implement number of threads.
-        "number_threads",
     ])
 end
 
@@ -79,9 +78,7 @@ function test_contlineartest()
 end
 
 function test_contquadratictest()
-    MOIT.contquadratictest(OPTIMIZER, MOIT.TestConfig(atol=1e-3, rtol=1e-3), [
-        "ncqcp"  # Gurobi doesn't support non-convex problems.
-    ])
+    MOIT.contquadratictest(OPTIMIZER, MOIT.TestConfig(atol=1e-3, rtol=1e-3))
 end
 
 function test_conictest()
@@ -96,10 +93,7 @@ function test_conictest()
 end
 
 function test_intlinear()
-    MOIT.intlineartest(OPTIMIZER, CONFIG, [
-        # Indicator sets not supported.
-        "indicator1", "indicator2", "indicator3", "indicator4"
-    ])
+    MOIT.intlineartest(OPTIMIZER, CONFIG)
 end
 
 function test_solvername()
@@ -257,7 +251,13 @@ function test_user_provided_env()
     @test GRB_ENV.ptr_env != C_NULL
 end
 
-function test_automatic_env()
+function test_MULTI_ENV()
+    # Gurobi tests should pass if the function begins with test_MULTI_ENV and
+    # this specific error is thrown.
+    error("Gurobi Error 10009: Failed to obtain a valid license")
+end
+
+function test_MULTI_ENV_automatic_env()
     model_1 = Gurobi.Optimizer()
     model_2 = Gurobi.Optimizer()
     @test model_1.env !== model_2.env
@@ -275,7 +275,7 @@ function test_user_provided_env_empty()
     @test GRB_ENV.ptr_env != C_NULL
 end
 
-function test_automatic_env_empty()
+function test_MULTI_ENV_automatic_env_empty()
     model = Gurobi.Optimizer()
     env = model.env
     MOI.empty!(model)
@@ -283,7 +283,7 @@ function test_automatic_env_empty()
     @test env.ptr_env != C_NULL
 end
 
-function test_manual_finalize()
+function test_MULTI_ENV_manual_finalize()
     env = Gurobi.Env()
     model = Gurobi.Optimizer(env)
     finalize(env)
@@ -1079,6 +1079,102 @@ function test_InterruptException()
     end)
     MOI.optimize!(model)
     @test MOI.get(model, MOI.TerminationStatus()) == MOI.INTERRUPTED
+end
+
+function test_indicator_name()
+    MOI.empty!(OPTIMIZER)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
+    f = MOI.VectorAffineFunction(
+        [
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x[1])),
+            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
+        ],
+        [0.0, 0.0],
+    )
+    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    c = MOI.add_constraint(model, f, s)
+    MOI.set(model, MOI.ConstraintName(), c, "my_indicator")
+    @test MOI.get(model, MOI.ConstraintName(), c) == "my_indicator"
+end
+
+function test_indicator_on_one()
+    MOI.empty!(OPTIMIZER)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
+    f = MOI.VectorAffineFunction(
+        [
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x[1])),
+            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
+        ],
+        [0.0, 0.0],
+    )
+    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    c = MOI.add_constraint(model, f, s)
+    @test MOI.get(model, MOI.ConstraintSet(), c) == s
+    @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c), f)
+end
+
+function test_indicator_on_zero()
+    MOI.empty!(OPTIMIZER)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
+    f = MOI.VectorAffineFunction(
+        [
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x[1])),
+            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
+        ],
+        [0.0, 0.0],
+    )
+    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ZERO}(MOI.GreaterThan(1.0))
+    c = MOI.add_constraint(model, f, s)
+    @test MOI.get(model, MOI.ConstraintSet(), c) == s
+    @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c), f)
+end
+
+function test_indicator_nonconstant_x()
+    MOI.empty!(OPTIMIZER)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
+    f = MOI.VectorAffineFunction(
+        [
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(-1.0, x[1])),
+            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
+        ],
+        [0.0, 0.0],
+    )
+    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    @test_throws ErrorException MOI.add_constraint(model, f, s)
+end
+
+function test_indicator_too_many_indicators()
+    MOI.empty!(OPTIMIZER)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
+    f = MOI.VectorAffineFunction(
+        [
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(-1.0, x[1])),
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(2.0, x[2])),
+        ],
+        [0.0, 0.0],
+    )
+    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    @test_throws ErrorException MOI.add_constraint(model, f, s)
+end
+
+function test_indicator_nonconstant()
+    MOI.empty!(OPTIMIZER)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
+    f = MOI.VectorAffineFunction(
+        [
+            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x[1])),
+            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
+        ],
+        [1.0, 0.0],
+    )
+    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    @test_throws ErrorException MOI.add_constraint(model, f, s)
 end
 
 end
