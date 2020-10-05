@@ -62,8 +62,6 @@ function test_unittest()
         # TODO(odow): bug! We can't delete a vector of variables if one is in
         # a second order cone.
         "delete_soc_variables",
-        # TODO(odow): implement number of threads.
-        "number_threads",
     ])
 end
 
