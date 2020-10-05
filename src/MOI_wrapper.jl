@@ -457,6 +457,7 @@ MOI.supports(::Optimizer, ::MOI.ConstraintName, ::Type{<:MOI.ConstraintIndex}) =
 
 MOI.supports(::Optimizer, ::MOI.Name) = true
 MOI.supports(::Optimizer, ::MOI.Silent) = true
+MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = true
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
 MOI.supports(::Optimizer, ::MOI.ObjectiveSense) = true
 MOI.supports(::Optimizer, ::MOI.RawParameter) = true
@@ -2704,6 +2705,23 @@ function MOI.set(model::Optimizer, ::MOI.Silent, flag::Bool)
     MOI.set(model, MOI.RawParameter("OutputFlag"), output_flag)
     return
 end
+
+function MOI.get(model::Optimizer, ::MOI.NumberOfThreads)
+    x = MOI.get(model, MOI.RawParameter("Threads"))
+    # Instead of default `0`, return `nothing`
+    return x == 0 ? nothing : x
+end
+
+function MOI.set(model::Optimizer, ::MOI.NumberOfThreads, x::Int)
+    MOI.set(model, MOI.RawParameter("Threads"), x)
+    return
+end
+
+function MOI.set(model::Optimizer, ::MOI.NumberOfThreads, ::Nothing)
+    MOI.set(model, MOI.RawParameter("Threads"), 0)
+    return
+end
+
 
 function MOI.get(model::Optimizer, ::MOI.Name)
     _update_if_necessary(model)
