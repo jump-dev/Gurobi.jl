@@ -19,13 +19,20 @@ function Base.unsafe_convert(::Type{Ptr{Cvoid}}, x::_CallbackUserData)
 end
 
 function _gurobi_callback_wrapper(
-    ::Ptr{Cvoid},
+    p_model::Ptr{Cvoid},
     cb_data::Ptr{Cvoid},
     cb_where::Cint,
     p_user_data::Ptr{Cvoid}
 )
     user_data = unsafe_pointer_to_objref(p_user_data)::_CallbackUserData
-    user_data.callback(CallbackData(user_data.model, cb_data), cb_where)
+    try
+        user_data.callback(CallbackData(user_data.model, cb_data), cb_where)
+    catch ex
+        GRBterminate(p_model)
+        if !(ex isa InterruptException)
+            rethrow(ex)
+        end
+    end
     return Cint(0)
 end
 

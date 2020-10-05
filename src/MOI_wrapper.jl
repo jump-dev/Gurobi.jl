@@ -2306,10 +2306,28 @@ function MOI.optimize!(model::Optimizer)
     if _check_moi_callback_validity(model)
         MOI.set(model, CallbackFunction(), _default_moi_callback(model))
         model.has_generic_callback = false
+    elseif !model.has_generic_callback
+        # From the docstring of disable_sigint, "External functions that do not
+        # call julia code or julia runtime automatically disable sigint during
+        # their execution." We don't want this though! We want to be able to
+        # SIGINT Gurobi, and then catch it as an interrupt. As a hack, until
+        # Julia introduces an interruptible ccall --- which it likely won't
+        # https://github.com/JuliaLang/julia/issues/2622 --- set a null
+        # callback.
+        MOI.set(model, CallbackFunction(), (x, y) -> nothing)
     end
 
+    # Catch [CTRL+C], even when Julia is run from a script not in interactive
+    # mode. If `true`, then a script would call `atexit` without throwing the
+    # `InterruptException`. `false` is the default in interactive mode.
+    #
+    # TODO(odow): Julia 1.5 exposes `Base.exit_on_sigint(::Bool)`.
+    ccall(:jl_exit_on_sigint, Cvoid, (Cint,), false)
     ret = GRBoptimize(model)
     _check_ret(model, ret)
+    if !isinteractive()
+        ccall(:jl_exit_on_sigint, Cvoid, (Cint,), true)
+    end
 
     # Post-optimize caching to speed up the checks in VariablePrimal and
     # ConstraintDual.
