@@ -1,21 +1,47 @@
 const _DEPRECATED_ERROR_MESSAGE = """
 The C API of Gurobi.jl has been rewritten to expose the complete C API, and
-all old functions have been removed.
+all old functions have been removed. For more information, see the Discourse
+announcement: https://discourse.julialang.org/t/ann-upcoming-breaking-changes-to-cplex-jl-and-gurobi-jl
 
-For example:
+Here is a brief summary of the changes.
 
-    model = Gurobi.Optimizer()
-    stat = Gurobi.get_status_code(model.inner)
-
-is now:
-
-    model = Gurobi.Optimizer()
+* Constants have changed. For example `CB_MIPNODE` is now `GRB_CB_MIPNODE`
+    to match the C API.
+* Function names have changed. For example `free_env(env)` is now
+    `GRBfreeenv(env)`.
+* For users of `Gurobi.Optimizer()`, `model.inner` is now a pointer to the C 
+    model, instead of a `Gurobi.Model` object. However, conversion means that 
+    you should always pass `model` instead of `model.inner` to the low-level 
+    functions. For example:
+    ```julia
+    model = direct_model(Gurobi.Optimizer())
+    grb_model = backend(model)  # grb_model is Gurobi.Optimizer
+    # Old
+    Gurobi.tune_model(grb_model.inner)
+    # New
+    GRBtunemodel(grb_model)
+    ```
+* Some functions have been removed entirely. For example:
+    ```julia
+    using JuMP, Gurobi
+    model = direct_model(Gurobi.Optimizer())
+    optimize!(model)
+    grb_model = backend(model)
+    stat = Gurobi.get_status_code(grb_model.inner)
+    ```
+    is now:
+    ```julia
+    using JuMP, Gurobi
+    model = direct_model(Gurobi.Optimizer())
+    optimize!(model)
     valueP = Ref{Cint}()
-    ret = GRBgetintattr(model, "Status", valueP)
+    grb_model = backend(model)
+    ret = GRBgetintattr(grb_model, "Status", valueP)
     if ret != 0
         # Do something because the call failed
     end
     stat = valueP[]
+    ```
 
 The new API is more verbose, but the names and function arguments are now
 identical to the C API, documentation for which is available at:
