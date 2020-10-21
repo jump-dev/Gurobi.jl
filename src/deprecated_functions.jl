@@ -9,9 +9,9 @@ Here is a brief summary of the changes.
     to match the C API.
 * Function names have changed. For example `free_env(env)` is now
     `GRBfreeenv(env)`.
-* For users of `Gurobi.Optimizer()`, `model.inner` is now a pointer to the C 
-    model, instead of a `Gurobi.Model` object. However, conversion means that 
-    you should always pass `model` instead of `model.inner` to the low-level 
+* For users of `Gurobi.Optimizer()`, `model.inner` is now a pointer to the C
+    model, instead of a `Gurobi.Model` object. However, conversion means that
+    you should always pass `model` instead of `model.inner` to the low-level
     functions. For example:
     ```julia
     model = direct_model(Gurobi.Optimizer())
@@ -244,7 +244,7 @@ export computeIIS
 compute_conflict(args...; kwargs...) = error(_DEPRECATED_ERROR_MESSAGE)
 
 copy(args...; kwargs...) = error(_DEPRECATED_ERROR_MESSAGE)
-export copy
+# export copy # Don't export this copy.
 
 cvec(args...; kwargs...) = error(_DEPRECATED_ERROR_MESSAGE)
 
@@ -460,7 +460,7 @@ presolve_model(args...; kwargs...) = error(_DEPRECATED_ERROR_MESSAGE)
 export presolve_model
 
 read(args...; kwargs...) = error(_DEPRECATED_ERROR_MESSAGE)
-export read
+# export read # Don't export this read
 
 read_model(args...; kwargs...) = error(_DEPRECATED_ERROR_MESSAGE)
 export read_model

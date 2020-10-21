@@ -1,6 +1,7 @@
 **Gurobi.jl underwent a major rewrite between versions 0.8.1 and 0.9.0. Users of
 JuMP should see no breaking changes, but if you used the lower-level C API
-(e.g., for callbacks), you will need to update your code accordingly.**
+(e.g., for callbacks), you will need to update your code accordingly. For a full
+description of the changes, read [this discourse post](https://discourse.julialang.org/t/ann-upcoming-breaking-changes-to-cplex-jl-and-gurobi-jl/47814).**
 
 **To revert to the old API, use:**
 ```julia
@@ -26,6 +27,8 @@ by Gurobi. If you are a commercial customer interested in official support for
 Julia from Gurobi, let them know!*
 
 ## Installation
+
+**Minimum version requirement:** Gurobi.jl requires Gurobi version 9.0.
 
 First, obtain a license of Gurobi and install Gurobi solver, following the
 instructions on [Gurobi's website](http://www.gurobi.com). Then, set the
