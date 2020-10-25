@@ -16,10 +16,14 @@ include("gen/ctypes.jl")
 include("gen/libgrb_common.jl")
 include("gen/libgrb_api.jl")
 
-const _GUROBI_VERSION = let
-    majorP, minorP, technicalP = Ref{Cint}(), Ref{Cint}(), Ref{Cint}()
-    GRBversion(majorP, minorP, technicalP)
-    VersionNumber("$(majorP[]).$(minorP[]).$(technicalP[])")
+const _GUROBI_VERSION = if libgurobi == "julia_registryci_automerge"
+    VersionNumber(9, 0, 0)
+else
+    let
+        majorP, minorP, technicalP = Ref{Cint}(), Ref{Cint}(), Ref{Cint}()
+        GRBversion(majorP, minorP, technicalP)
+        VersionNumber("$(majorP[]).$(minorP[]).$(technicalP[])")
+    end
 end
 
 if !(v"9.0.0" <= _GUROBI_VERSION < v"9.1")
