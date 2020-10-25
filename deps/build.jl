@@ -71,6 +71,8 @@ function _print_GUROBI_HOME_help()
     Pkg.add("Gurobi")
     Pkg.build("Gurobi")
     ```
+    **Note: your path may differ. Check which folder you installed the Gurobi
+    binary in, and update the path accordingly.**
     """)
 end
 
@@ -85,6 +87,7 @@ function diagnose_gurobi_install()
     println("""
 
     Did you download and install one of these versions from gurobi.com?
+    Installing Gurobi.jl via the Julia package manager is _not_ sufficient!
     """)
     if haskey(ENV, "GUROBI_HOME")
         dir = joinpath(ENV["GUROBI_HOME"], Sys.isunix() ? "lib" : "bin")
@@ -148,7 +151,11 @@ function diagnose_gurobi_install()
     end
 end
 
-if !found && !haskey(ENV, "GUROBI_JL_SKIP_LIB_CHECK")
+if haskey(ENV, "GUROBI_JL_SKIP_LIB_CHECK")
+    # Skip!
+elseif get(ENV, "JULIA_REGISTRYCI_AUTOMERGE", "false") == "true"
+    write_depsfile("julia_registryci_automerge")
+elseif !found
     diagnose_gurobi_install()
     error("""
     Unable to locate Gurobi installation. If the advice above did not help,
