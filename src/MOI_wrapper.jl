@@ -2525,17 +2525,20 @@ The Farkas dual of the variable is ā, and it applies to the upper bound if ā
 and it applies to the lower bound if ā > 0.
 """
 function _farkas_variable_dual(model::Optimizer, col::Cint)
-    valueP = Ref{Cint}()
-    ret = GRBgetintattr(model, "NumConstrs", valueP)
+    numnzP = Ref{Cint}()
+    ret = GRBgetvars(model, numnzP, C_NULL, C_NULL, C_NULL, col, 1)
+    _check_ret(model, ret)
+    vbeg = Vector{Cint}(undef, 2)
+    vind = Vector{Cint}(undef, numnzP[])
+    vval = Vector{Cdouble}(undef, numnzP[])
+    ret = GRBgetvars(model, numnzP, vbeg, vind, vval, col, 1)
     _check_ret(model, ret)
     ā = 0.0
-    λ, a = Ref{Cdouble}(), Ref{Cdouble}()
-    for row = 1:valueP[]
-        ret = GRBgetdblattrelement(model, "FarkasDual", Cint(row - 1), λ)
+    λ = Ref{Cdouble}()
+    for (ind, val) in zip(vind, vval)
+        ret = GRBgetdblattrelement(model, "FarkasDual", ind, λ)
         _check_ret(model, ret)
-        ret = GRBgetcoeff(model, Cint(row - 1), col, a)
-        _check_ret(model, ret)
-        ā += λ[] * a[]
+        ā += λ[] * val
     end
     return ā
 end
