@@ -2533,14 +2533,10 @@ function _farkas_variable_dual(model::Optimizer, col::Cint)
     vval = Vector{Cdouble}(undef, numnzP[])
     ret = GRBgetvars(model, numnzP, vbeg, vind, vval, col, 1)
     _check_ret(model, ret)
-    ā = 0.0
-    λ = Ref{Cdouble}()
-    for (ind, val) in zip(vind, vval)
-        ret = GRBgetdblattrelement(model, "FarkasDual", ind, λ)
-        _check_ret(model, ret)
-        ā += λ[] * val
-    end
-    return ā
+    λ = Vector{Cdouble}(undef, numnzP[])
+    ret = GRBgetdblattrlist(model, "FarkasDual", length(vind), vind, λ)
+    _check_ret(model, ret)
+    return sum(x * y for (x, y) in zip(vval, λ))
 end
 
 function MOI.get(
@@ -2552,7 +2548,7 @@ function MOI.get(
     MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
         dual = _farkas_variable_dual(model, Cint(column(model, c) - 1))
-        return min(dual, 0.0)
+        return _dual_multiplier(model) * min(dual, 0.0)
     end
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
@@ -2587,7 +2583,7 @@ function MOI.get(
     MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
         dual = _farkas_variable_dual(model, Cint(column(model, c) - 1))
-        return max(dual, 0.0)
+        return _dual_multiplier(model) * max(dual, 0.0)
     end
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
@@ -2621,7 +2617,7 @@ function MOI.get(
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
-        return _farkas_variable_dual(model, Cint(column(model, c) - 1))
+        return _dual_multiplier(model) * _farkas_variable_dual(model, Cint(column(model, c) - 1))
     end
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
@@ -2639,7 +2635,7 @@ function MOI.get(
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
-        return _farkas_variable_dual(model, Cint(column(model, c) - 1))
+        return _dual_multiplier(model) * _farkas_variable_dual(model, Cint(column(model, c) - 1))
     end
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
