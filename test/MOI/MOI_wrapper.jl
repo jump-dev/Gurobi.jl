@@ -70,11 +70,7 @@ function test_modificationtest()
 end
 
 function test_contlineartest()
-    MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis = true), [
-        # This requires an infeasiblity certificate for a variable bound.
-        "linear12"
-    ])
-    MOIT.linear12test(OPTIMIZER, MOIT.TestConfig(infeas_certificates=false))
+    MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis = true))
 end
 
 function test_contquadratictest()
