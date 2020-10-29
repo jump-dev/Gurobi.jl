@@ -2536,7 +2536,7 @@ function _farkas_variable_dual(model::Optimizer, col::Cint)
     λ = Vector{Cdouble}(undef, numnzP[])
     ret = GRBgetdblattrlist(model, "FarkasDual", length(vind), vind, λ)
     _check_ret(model, ret)
-    return sum(x * y for (x, y) in zip(vval, λ))
+    return λ' * vval
 end
 
 function MOI.get(
