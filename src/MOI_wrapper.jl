@@ -2548,7 +2548,7 @@ function MOI.get(
     MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
         dual = _farkas_variable_dual(model, Cint(column(model, c) - 1))
-        return _dual_multiplier(model) * min(dual, 0.0)
+        return min(dual, 0.0)
     end
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
@@ -2583,7 +2583,7 @@ function MOI.get(
     MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
         dual = _farkas_variable_dual(model, Cint(column(model, c) - 1))
-        return _dual_multiplier(model) * max(dual, 0.0)
+        return max(dual, 0.0)
     end
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
@@ -2617,7 +2617,7 @@ function MOI.get(
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
-        return _dual_multiplier(model) * _farkas_variable_dual(model, Cint(column(model, c) - 1))
+        return _farkas_variable_dual(model, Cint(column(model, c) - 1))
     end
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
@@ -2635,7 +2635,7 @@ function MOI.get(
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
-        return _dual_multiplier(model) * _farkas_variable_dual(model, Cint(column(model, c) - 1))
+        return _farkas_variable_dual(model, Cint(column(model, c) - 1))
     end
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
@@ -2657,7 +2657,7 @@ function MOI.get(
             model, "FarkasDual", Cint(_info(model, c).row - 1), valueP
         )
         _check_ret(model, ret)
-        return -_dual_multiplier(model) * valueP[]
+        return -valueP[]
     end
     ret = GRBgetdblattrelement(
         model, "Pi", Cint(_info(model, c).row - 1), valueP

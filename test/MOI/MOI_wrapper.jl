@@ -1195,6 +1195,10 @@ function test_farkas_dual_min()
     @test MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
     clb_dual = MOI.get.(model, MOI.ConstraintDual(), clb)
     c_dual = MOI.get(model, MOI.ConstraintDual(), c)
+    @show clb_dual, c_dual
+    @test clb_dual[1] > 1e-6
+    @test clb_dual[2] > 1e-6
+    @test c_dual[1] < -1e-6
     @test clb_dual[1] ≈ -2 * c_dual atol = 1e-6
     @test clb_dual[2] ≈ -c_dual atol = 1e-6
 end
@@ -1221,6 +1225,10 @@ function test_farkas_dual_max()
     @test MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
     clb_dual = MOI.get.(model, MOI.ConstraintDual(), clb)
     c_dual = MOI.get(model, MOI.ConstraintDual(), c)
+    @show clb_dual, c_dual
+    @test clb_dual[1] > 1e-6
+    @test clb_dual[2] > 1e-6
+    @test c_dual[1] < -1e-6
     @test clb_dual[1] ≈ -2 * c_dual atol = 1e-6
     @test clb_dual[2] ≈ -c_dual atol = 1e-6
 end
