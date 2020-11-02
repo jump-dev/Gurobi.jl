@@ -2548,7 +2548,11 @@ function MOI.get(
     MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
         dual = _farkas_variable_dual(model, Cint(column(model, c) - 1))
-        return min(dual, 0.0)
+        if MOI.get(model, MOI.ObjectiveSense()) == MOI.MIN_SENSE
+            return min(dual, 0.0)
+        else
+            return min(-dual, 0.0)
+        end
     end
     reduced_cost = Ref{Cdouble}()
     ret = GRBgetdblattrelement(
@@ -2583,6 +2587,7 @@ function MOI.get(
     MOI.check_result_index_bounds(model, attr)
     if model.has_infeasibility_cert
         dual = _farkas_variable_dual(model, Cint(column(model, c) - 1))
+        @show dual
         return max(dual, 0.0)
     end
     reduced_cost = Ref{Cdouble}()
@@ -2657,6 +2662,7 @@ function MOI.get(
             model, "FarkasDual", Cint(_info(model, c).row - 1), valueP
         )
         _check_ret(model, ret)
+        @show valueP[]
         return -valueP[]
     end
     ret = GRBgetdblattrelement(
