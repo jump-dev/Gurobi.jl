@@ -12,26 +12,39 @@ end
 
 using CEnum
 
-include("gen/ctypes.jl")
-include("gen/libgrb_common.jl")
-include("gen/libgrb_api.jl")
-
 const _GUROBI_VERSION = if libgurobi == "julia_registryci_automerge"
-    VersionNumber(9, 0, 0)
+    VersionNumber(9, 1, 0)
 else
     let
         majorP, minorP, technicalP = Ref{Cint}(), Ref{Cint}(), Ref{Cint}()
-        GRBversion(majorP, minorP, technicalP)
-        VersionNumber("$(majorP[]).$(minorP[]).$(technicalP[])")
+        ccall(
+            (:GRBversion, libgurobi),
+            Cvoid,
+            (Ptr{Cint}, Ptr{Cint}, Ptr{Cint}),
+            majorP, minorP, technicalP,
+        )
+        VersionNumber(majorP[], minorP[], technicalP[])
     end
 end
 
-if !(v"9.0.0" <= _GUROBI_VERSION < v"9.1")
+function _is_patch(x::VersionNumber, reference::VersionNumber)
+    return x.major == reference.major && x.minor == reference.minor
+end
+
+if _is_patch(_GUROBI_VERSION, v"9.0")
+    include("gen90/ctypes.jl")
+    include("gen90/libgrb_common.jl")
+    include("gen90/libgrb_api.jl")
+elseif _is_patch(_GUROBI_VERSION, v"9.1")
+    include("gen91/ctypes.jl")
+    include("gen91/libgrb_common.jl")
+    include("gen91/libgrb_api.jl")
+else
     error("""
     You have installed version $_GUROBI_VERSION of Gurobi, which is not
-    supported by Gurobi.jl. We require Gurobi version 9 or greater.
+    supported by Gurobi.jl. We require Gurobi version 9.0 or 9.1.
 
-    After installing Gurobi 9, run:
+    After installing a supported version of Gurobi, run:
 
         import Pkg
         Pkg.rm("Gurobi")

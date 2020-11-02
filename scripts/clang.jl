@@ -1,17 +1,20 @@
 # TODO(odow):
 #
-# This script can be used to build the C interface to Gurobi. However, it requires
-# you to manually do the following steps first:
-#
-# 1) Copy gurobi_c.h from Gurobi into this /scripts directory
+# This script can be used to build the C interface to Gurobi. However, it
+# requires you to manually set the path to the appropriate gurobi_c.h.
 
 import Clang
 
 const LIBGRB_HEADERS = [
-    joinpath(@__DIR__, "gurobi_c.h"),
+    "/Library/gurobi910/mac64/include/gurobi_c.h",
 ]
 
-const GEN_DIR = joinpath(dirname(@__DIR__), "src", "gen")
+const GRB_VERSION = "91"
+
+const GEN_DIR = joinpath(dirname(@__DIR__), "src", "gen$(GRB_VERSION)")
+if !isdir(GEN_DIR)
+    mkdir(GEN_DIR)
+end
 
 wc = Clang.init(
     headers = LIBGRB_HEADERS,
@@ -36,4 +39,4 @@ function manual_corrections()
 end
 manual_corrections()
 
-rm(joinpath(dirname(@__DIR__), "src", "gen", "LibTemplate.jl"))
+rm(joinpath(GEN_DIR, "LibTemplate.jl"))
