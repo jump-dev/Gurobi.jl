@@ -36,15 +36,15 @@ instructions on [Gurobi's website](http://www.gurobi.com). Then, set the
 the `Pkg.build("Gurobi")`. For example:
 ```julia
 # On Windows, this might be
-ENV["GUROBI_HOME"] = "C:\\Program Files\\gurobi902\\win64"
+ENV["GUROBI_HOME"] = "C:\\Program Files\\gurobi910\\win64"
 # ... or perhaps ...
-ENV["GUROBI_HOME"] = "C:\\gurobi902\\win64"
+ENV["GUROBI_HOME"] = "C:\\gurobi910\\win64"
 import Pkg
 Pkg.add("Gurobi")
 Pkg.build("Gurobi")
 
 # On Mac, this might be
-ENV["GUROBI_HOME"] = "/Library/gurobi902/mac64"
+ENV["GUROBI_HOME"] = "/Library/gurobi910/mac64"
 import Pkg
 Pkg.add("Gurobi")
 Pkg.build("Gurobi")

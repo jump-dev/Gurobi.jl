@@ -13,7 +13,7 @@ function write_depsfile(path)
 end
 
 const ALIASES = [
-    "gurobi90",
+    "gurobi90", "gurobi91"
 ]
 
 paths_to_try = copy(ALIASES)
@@ -54,19 +54,19 @@ function _print_GUROBI_HOME_help()
     correct location if needed):
     ```
     # On Windows, this might be
-    ENV["GUROBI_HOME"] = "C:\\\\Program Files\\\\gurobi902\\\\win64\\\\"
+    ENV["GUROBI_HOME"] = "C:\\\\Program Files\\\\gurobi910\\\\win64\\\\"
     import Pkg
     Pkg.add("Gurobi")
     Pkg.build("Gurobi")
 
     # On OSX, this might be
-    ENV["GUROBI_HOME"] = "/Library/gurobi902/mac64/"
+    ENV["GUROBI_HOME"] = "/Library/gurobi910/mac64/"
     import Pkg
     Pkg.add("Gurobi")
     Pkg.build("Gurobi")
 
     # On Unix, this might be
-    ENV["GUROBI_HOME"] = "/opt/gurobi902/linux64/"
+    ENV["GUROBI_HOME"] = "/opt/gurobi910/linux64/"
     import Pkg
     Pkg.add("Gurobi")
     Pkg.build("Gurobi")
@@ -128,7 +128,7 @@ function diagnose_gurobi_install()
             # Try to call `gurobi_cl`. This should work if Gurobi is on the
             # system path. If it succeeds, it will print out the version.
             io = IOBuffer()
-            run(pipeline(`gurobi_cl --version`; stdout = io))
+            run(pipeline(`gurobi_cl --version`; stdout=io))
             seekstart(io)
             println("""
             We couldn't find the `GUROBI_HOME` environment variable, but we

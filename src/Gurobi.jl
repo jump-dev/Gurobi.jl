@@ -17,7 +17,7 @@ include("gen/libgrb_common.jl")
 include("gen/libgrb_api.jl")
 
 const _GUROBI_VERSION = if libgurobi == "julia_registryci_automerge"
-    VersionNumber(9, 0, 0)
+    VersionNumber(9, 1, 0)
 else
     let
         majorP, minorP, technicalP = Ref{Cint}(), Ref{Cint}(), Ref{Cint}()
@@ -26,7 +26,7 @@ else
     end
 end
 
-if !(v"9.0.0" <= _GUROBI_VERSION < v"9.1")
+if !(v"9.0.0" <= _GUROBI_VERSION <= v"9.1")
     error("""
     You have installed version $_GUROBI_VERSION of Gurobi, which is not
     supported by Gurobi.jl. We require Gurobi version 9 or greater.
