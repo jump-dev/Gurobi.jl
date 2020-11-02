@@ -28,7 +28,7 @@ Julia from Gurobi, let them know!*
 
 ## Installation
 
-**Minimum version requirement:** Gurobi.jl requires Gurobi version 9.0 or 9.1
+**Minimum version requirement:** Gurobi.jl requires Gurobi version 9.0 or 9.1.
 
 First, obtain a license of Gurobi and install Gurobi solver, following the
 instructions on [Gurobi's website](http://www.gurobi.com). Then, set the
