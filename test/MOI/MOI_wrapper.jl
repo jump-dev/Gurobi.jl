@@ -1211,6 +1211,68 @@ function test_farkas_dual_min()
     @test clb_dual[2] ≈ -c_dual atol = 1e-6
 end
 
+function test_farkas_dual_min_interval()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
+    x = MOI.add_variables(model, 2)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.SingleVariable}(),
+        MOI.SingleVariable(x[1]),
+    )
+    clb = MOI.add_constraint.(
+        model, MOI.SingleVariable.(x), MOI.Interval(0.0, 10.0)
+    )
+    c = MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([2.0, 1.0], x), 0.0),
+        MOI.LessThan(-1.0),
+    )
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
+    @test MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
+    clb_dual = MOI.get.(model, MOI.ConstraintDual(), clb)
+    c_dual = MOI.get(model, MOI.ConstraintDual(), c)
+    @show clb_dual, c_dual
+    @test clb_dual[1] > -1e-6
+    @test clb_dual[2] > -1e-6
+    @test c_dual[1] < 1e-6
+    @test clb_dual[1] ≈ -2 * c_dual atol = 1e-6
+    @test clb_dual[2] ≈ -c_dual atol = 1e-6
+end
+
+function test_farkas_dual_min_equalto()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
+    x = MOI.add_variables(model, 2)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.SingleVariable}(),
+        MOI.SingleVariable(x[1]),
+    )
+    clb = MOI.add_constraint.(model, MOI.SingleVariable.(x), MOI.EqualTo(0.0))
+    c = MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([2.0, 1.0], x), 0.0),
+        MOI.LessThan(-1.0),
+    )
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
+    @test MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
+    clb_dual = MOI.get.(model, MOI.ConstraintDual(), clb)
+    c_dual = MOI.get(model, MOI.ConstraintDual(), c)
+    @show clb_dual, c_dual
+    @test clb_dual[1] > -1e-6
+    @test clb_dual[2] > -1e-6
+    @test c_dual[1] < 1e-6
+    @test clb_dual[1] ≈ -2 * c_dual atol = 1e-6
+    @test clb_dual[2] ≈ -c_dual atol = 1e-6
+end
+
 function test_farkas_dual_min_ii()
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
