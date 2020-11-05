@@ -1364,6 +1364,8 @@ function test_farkas_dual_max_ii()
     @show clb_dual, c_dual
     @test clb_dual[1] < 1e-6
     @test clb_dual[2] < 1e-6
+    # Confirmed bug in Gurobi <=9.1 and fixed in next release. When updating for new 
+    # release, confirm fixed and add a conditional check on `_GRB_VERSION`.
     @test_broken c_dual[1] < 1e-6
     @test_broken clb_dual[1] ≈ 2 * c_dual atol = 1e-6
     @test_broken clb_dual[2] ≈ c_dual atol = 1e-6
