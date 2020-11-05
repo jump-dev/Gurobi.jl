@@ -70,11 +70,7 @@ function test_modificationtest()
 end
 
 function test_contlineartest()
-    MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis = true), [
-        # This requires an infeasiblity certificate for a variable bound.
-        "linear12"
-    ])
-    MOIT.linear12test(OPTIMIZER, MOIT.TestConfig(infeas_certificates=false))
+    MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis = true))
 end
 
 function test_contquadratictest()
@@ -1082,7 +1078,8 @@ function test_InterruptException()
 end
 
 function test_indicator_name()
-    MOI.empty!(OPTIMIZER)
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
     MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
     f = MOI.VectorAffineFunction(
@@ -1099,7 +1096,8 @@ function test_indicator_name()
 end
 
 function test_indicator_on_one()
-    MOI.empty!(OPTIMIZER)
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
     MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
     f = MOI.VectorAffineFunction(
@@ -1116,7 +1114,8 @@ function test_indicator_on_one()
 end
 
 function test_indicator_on_zero()
-    MOI.empty!(OPTIMIZER)
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
     MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
     f = MOI.VectorAffineFunction(
@@ -1133,7 +1132,8 @@ function test_indicator_on_zero()
 end
 
 function test_indicator_nonconstant_x()
-    MOI.empty!(OPTIMIZER)
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
     MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
     f = MOI.VectorAffineFunction(
@@ -1148,7 +1148,8 @@ function test_indicator_nonconstant_x()
 end
 
 function test_indicator_too_many_indicators()
-    MOI.empty!(OPTIMIZER)
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
     MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
     f = MOI.VectorAffineFunction(
@@ -1163,7 +1164,8 @@ function test_indicator_too_many_indicators()
 end
 
 function test_indicator_nonconstant()
-    MOI.empty!(OPTIMIZER)
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
     MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
     f = MOI.VectorAffineFunction(
@@ -1175,6 +1177,198 @@ function test_indicator_nonconstant()
     )
     s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
     @test_throws ErrorException MOI.add_constraint(model, f, s)
+end
+
+function test_farkas_dual_min()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
+    x = MOI.add_variables(model, 2)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.SingleVariable}(),
+        MOI.SingleVariable(x[1]),
+    )
+    clb = MOI.add_constraint.(
+        model, MOI.SingleVariable.(x), MOI.GreaterThan(0.0)
+    )
+    c = MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([2.0, 1.0], x), 0.0),
+        MOI.LessThan(-1.0),
+    )
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
+    @test MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
+    clb_dual = MOI.get.(model, MOI.ConstraintDual(), clb)
+    c_dual = MOI.get(model, MOI.ConstraintDual(), c)
+    @show clb_dual, c_dual
+    @test clb_dual[1] > -1e-6
+    @test clb_dual[2] > -1e-6
+    @test c_dual[1] < 1e-6
+    @test clb_dual[1] ≈ -2 * c_dual atol = 1e-6
+    @test clb_dual[2] ≈ -c_dual atol = 1e-6
+end
+
+function test_farkas_dual_min_interval()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
+    x = MOI.add_variables(model, 2)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.SingleVariable}(),
+        MOI.SingleVariable(x[1]),
+    )
+    clb = MOI.add_constraint.(
+        model, MOI.SingleVariable.(x), MOI.Interval(0.0, 10.0)
+    )
+    c = MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([2.0, 1.0], x), 0.0),
+        MOI.LessThan(-1.0),
+    )
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
+    @test MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
+    clb_dual = MOI.get.(model, MOI.ConstraintDual(), clb)
+    c_dual = MOI.get(model, MOI.ConstraintDual(), c)
+    @show clb_dual, c_dual
+    @test clb_dual[1] > -1e-6
+    @test clb_dual[2] > -1e-6
+    @test c_dual[1] < 1e-6
+    @test clb_dual[1] ≈ -2 * c_dual atol = 1e-6
+    @test clb_dual[2] ≈ -c_dual atol = 1e-6
+end
+
+function test_farkas_dual_min_equalto()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
+    x = MOI.add_variables(model, 2)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.SingleVariable}(),
+        MOI.SingleVariable(x[1]),
+    )
+    clb = MOI.add_constraint.(model, MOI.SingleVariable.(x), MOI.EqualTo(0.0))
+    c = MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([2.0, 1.0], x), 0.0),
+        MOI.LessThan(-1.0),
+    )
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
+    @test MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
+    clb_dual = MOI.get.(model, MOI.ConstraintDual(), clb)
+    c_dual = MOI.get(model, MOI.ConstraintDual(), c)
+    @show clb_dual, c_dual
+    @test clb_dual[1] > -1e-6
+    @test clb_dual[2] > -1e-6
+    @test c_dual[1] < 1e-6
+    @test clb_dual[1] ≈ -2 * c_dual atol = 1e-6
+    @test clb_dual[2] ≈ -c_dual atol = 1e-6
+end
+
+function test_farkas_dual_min_ii()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
+    x = MOI.add_variables(model, 2)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(-1.0, x[1])], 0.0),
+    )
+    clb = MOI.add_constraint.(
+        model, MOI.SingleVariable.(x), MOI.LessThan(0.0)
+    )
+    c = MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([-2.0, -1.0], x), 0.0),
+        MOI.LessThan(-1.0),
+    )
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
+    @test MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
+    clb_dual = MOI.get.(model, MOI.ConstraintDual(), clb)
+    c_dual = MOI.get(model, MOI.ConstraintDual(), c)
+    @show clb_dual, c_dual
+    @test clb_dual[1] < 1e-6
+    @test clb_dual[2] < 1e-6
+    @test c_dual[1] < 1e-6
+    @test clb_dual[1] ≈ 2 * c_dual atol = 1e-6
+    @test clb_dual[2] ≈ c_dual atol = 1e-6
+end
+
+function test_farkas_dual_max()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
+    x = MOI.add_variables(model, 2)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.SingleVariable}(),
+        MOI.SingleVariable(x[1]),
+    )
+    clb = MOI.add_constraint.(
+        model, MOI.SingleVariable.(x), MOI.GreaterThan(0.0)
+    )
+    c = MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([2.0, 1.0], x), 0.0),
+        MOI.LessThan(-1.0),
+    )
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
+    @test MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
+    clb_dual = MOI.get.(model, MOI.ConstraintDual(), clb)
+    c_dual = MOI.get(model, MOI.ConstraintDual(), c)
+    @show clb_dual, c_dual
+    @test clb_dual[1] > -1e-6
+    @test clb_dual[2] > -1e-6
+    @test c_dual[1] < 1e-6
+    @test clb_dual[1] ≈ -2 * c_dual atol = 1e-6
+    @test clb_dual[2] ≈ -c_dual atol = 1e-6
+end
+
+function test_farkas_dual_max_ii()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
+    x = MOI.add_variables(model, 2)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(-1.0, x[1])], 0.0),
+    )
+    clb = MOI.add_constraint.(
+        model, MOI.SingleVariable.(x), MOI.LessThan(0.0)
+    )
+    c = MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([-2.0, -1.0], x), 0.0),
+        MOI.LessThan(-1.0),
+    )
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
+    @test MOI.get(model, MOI.DualStatus()) == MOI.INFEASIBILITY_CERTIFICATE
+    clb_dual = MOI.get.(model, MOI.ConstraintDual(), clb)
+    c_dual = MOI.get(model, MOI.ConstraintDual(), c)
+    @show clb_dual, c_dual
+    @test clb_dual[1] < 1e-6
+    @test clb_dual[2] < 1e-6
+    # Confirmed bug in Gurobi <=9.1 and fixed in next release. When updating for new 
+    # release, confirm fixed and add a conditional check on `_GRB_VERSION`.
+    @test_broken c_dual[1] < 1e-6
+    @test_broken clb_dual[1] ≈ 2 * c_dual atol = 1e-6
+    @test_broken clb_dual[2] ≈ c_dual atol = 1e-6
 end
 
 end
