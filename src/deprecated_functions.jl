@@ -545,3 +545,6 @@ export upperbounds
 write_model(args...; kwargs...) = error(_DEPRECATED_ERROR_MESSAGE)
 export write_model
 
+GurobiSolver(args...; kwargs...) = error(_DEPRECATED_ERROR_MESSAGE)
+export GurobiSolver
+
