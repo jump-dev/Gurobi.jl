@@ -5,6 +5,7 @@
 mutable struct CallbackData
     model::Optimizer
     ptr::Ptr{Cvoid}
+    cb_where::Cint
 end
 Base.cconvert(::Type{Ptr{Cvoid}}, x::CallbackData) = x
 Base.unsafe_convert(::Type{Ptr{Cvoid}}, x::CallbackData) = x.ptr::Ptr{Cvoid}
@@ -26,7 +27,10 @@ function _gurobi_callback_wrapper(
 )
     user_data = unsafe_pointer_to_objref(p_user_data)::_CallbackUserData
     try
-        user_data.callback(CallbackData(user_data.model, cb_data), cb_where)
+        user_data.callback(
+            CallbackData(user_data.model, cb_data, cb_where),
+            cb_where,
+        )
     catch ex
         GRBterminate(p_model)
         if !(ex isa InterruptException)
@@ -152,6 +156,15 @@ function MOI.get(
     x::MOI.VariableIndex
 )
     return model.callback_variable_primal[_info(model, x).column]
+end
+
+function MOI.get(::Optimizer, attr::MOI.CallbackNodeStatus{CallbackData})
+    if attr.callback_data.cb_where == GRB_CB_MIPSOL
+        return MOI.CALLBACK_NODE_STATUS_INTEGER
+    elseif attr.callback_data.cb_where == GRB_CB_MIPNODE
+        return MOI.CALLBACK_NODE_STATUS_FRACTIONAL
+    end
+    return MOI.CALLBACK_NODE_STATUS_UNKNOWN
 end
 
 # ==============================================================================
