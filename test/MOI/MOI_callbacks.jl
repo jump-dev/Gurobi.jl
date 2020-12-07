@@ -59,6 +59,12 @@ function test_lazy_constraint_callback()
         lazy_called = true
         x_val = MOI.get(model, MOI.CallbackVariablePrimal(cb_data), x)
         y_val = MOI.get(model, MOI.CallbackVariablePrimal(cb_data), y)
+        status = MOI.get(model, MOI.CallbackNodeStatus(cb_data))::MOI.CallbackNodeStatusCode
+        if round.(Int, [x_val, y_val]) ≈ [x_val, y_val] atol=1e-6
+            @test status == MOI.CALLBACK_NODE_STATUS_INTEGER
+        else
+            @test status == MOI.CALLBACK_NODE_STATUS_FRACTIONAL
+        end
         @test MOI.supports(model, MOI.LazyConstraint(cb_data))
         if y_val - x_val > 1 + 1e-6
             @test MOI.submit(
@@ -226,6 +232,12 @@ function test_heuristic_callback()
     MOI.set(model, MOI.HeuristicCallback(), cb_data -> begin
         x_vals = MOI.get.(model, MOI.CallbackVariablePrimal(cb_data), x)
         @test MOI.supports(model, MOI.HeuristicSolution(cb_data))
+        status = MOI.get(model, MOI.CallbackNodeStatus(cb_data))::MOI.CallbackNodeStatusCode
+        if round.(Int, x_vals) ≈ x_vals atol=1e-6
+            @test status == MOI.CALLBACK_NODE_STATUS_INTEGER
+        else
+            @test status == MOI.CALLBACK_NODE_STATUS_FRACTIONAL
+        end
         if MOI.submit(
             model,
             MOI.HeuristicSolution(cb_data),
@@ -426,6 +438,18 @@ function test_CallbackFunction_callback_HeuristicSolution()
     @test solution_accepted
     @test solution_rejected
     @test Gurobi.GRB_CB_MIPNODE in cb_calls
+end
+
+function test_CallbackFunction_CallbackNodeStatus()
+    model, x, item_weights = callback_knapsack_model()
+    unknown_reached = false
+    MOI.set(model, Gurobi.CallbackFunction(), (cb_data, cb_where) -> begin
+        if MOI.get(model, MOI.CallbackNodeStatus(cb_data)) == MOI.CALLBACK_NODE_STATUS_UNKNOWN
+            unknown_reached = true
+        end
+    end)
+    MOI.optimize!(model)
+    @test unknown_reached
 end
 
 end  # module TestCallbacks
