@@ -1369,12 +1369,12 @@ function test_farkas_dual_max_ii()
     @test_broken c_dual[1] < 1e-6
     @test_broken clb_dual[1] ≈ 2 * c_dual atol = 1e-6
     @test_broken clb_dual[2] ≈ c_dual atol = 1e-6
-end
+# end
 
-function test_set_basis()
+function _build_basis_model()
     T = Float64
     model = Gurobi.Optimizer(GRB_ENV)
-    # MOI.set(model, MOI.Silent(), true)
+    MOI.set(model, MOI.Silent(), true)
     # Min -x
     # s.t. x + y <= 1
     # x, y >= 0
@@ -1404,7 +1404,10 @@ function test_set_basis()
     )
     MOI.set(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}}(), objf)
     MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    return model, vc1, vc2, c
+end
 
+function test_set_basis()
     # The following is an indirect, brittle way to test the desired behavior.
     # Gurobi appears to not allow you to query VBasis/CBasis attributes without
     # optimizing the problem
@@ -1414,17 +1417,23 @@ function test_set_basis()
     # suboptimal feasible basis. Ideally, we would remove the call to MOI.optimize!
     # and just verify that, after setting the basis, we can get the same basis
     # statuses back.
-    MOI.set(model, MOI.ConstraintBasisStatus(), c, MOI.NONBASIC)
-    MOI.set(model, MOI.ConstraintBasisStatus(), vc1, MOI.BASIC)
-    MOI.set(model, MOI.ConstraintBasisStatus(), vc2, MOI.NONBASIC)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.SimplexIterations()) == 0
+    let
+        model, vc1, vc2, c = _build_basis_model()
+        MOI.set(model, MOI.ConstraintBasisStatus(), vc1, MOI.BASIC)
+        MOI.set(model, MOI.ConstraintBasisStatus(), vc2, MOI.NONBASIC)
+        MOI.set(model, MOI.ConstraintBasisStatus(), c, MOI.NONBASIC)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.SimplexIterations()) == 0
+    end
 
-    MOI.set(model, MOI.ConstraintBasisStatus(), c, MOI.BASIC)
-    MOI.set(model, MOI.ConstraintBasisStatus(), vc1, MOI.NONBASIC)
-    MOI.set(model, MOI.ConstraintBasisStatus(), vc2, MOI.NONBASIC)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.SimplexIterations()) == 0
+    let
+        model, vc1, vc2, c = _build_basis_model()
+        MOI.set(model, MOI.ConstraintBasisStatus(), vc1, MOI.NONBASIC)
+        MOI.set(model, MOI.ConstraintBasisStatus(), vc2, MOI.NONBASIC)
+        MOI.set(model, MOI.ConstraintBasisStatus(), c, MOI.BASIC)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.SimplexIterations()) == 1
+    end
 end
 
 end
