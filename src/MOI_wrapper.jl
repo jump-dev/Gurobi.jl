@@ -3181,6 +3181,60 @@ function MOI.get(
     end
 end
 
+function MOI.set(
+    model::Optimizer,
+    ::MOI.ConstraintBasisStatus,
+    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},S},
+    bs::MOI.BasisStatusCode
+) where {S <: _SCALAR_SETS}
+    # _update_if_necessary(model)
+    row = _info(model, c).row
+    valueP::Cint =
+    (if bs == MOI.BASIC
+        Cint(-0)
+    elseif bs == MOI.NONBASIC
+        Cint(-1)
+    else
+        error("Unsupported constraint basis value $bs.")
+    end)
+    ret = GRBsetintattrelement(model, "CBasis", Cint(row - 1), valueP)
+    _check_ret(model, ret)
+    _require_update(model)
+    return
+end
+
+function MOI.set(
+    model::Optimizer,
+    ::MOI.ConstraintBasisStatus,
+    c::MOI.ConstraintIndex{MOI.SingleVariable,S},
+    bs::MOI.BasisStatusCode
+) where {S <: _SCALAR_SETS}
+    # _update_if_necessary(model)
+    valueP::Cint =
+    (if bs == MOI.BASIC
+        Cint(0)
+    elseif bs == MOI.NONBASIC_AT_LOWER
+        Cint(-1)
+    elseif bs == MOI.NONBASIC_AT_UPPER
+        Cint(-2)
+    elseif bs == MOI.SUPER_BASIC
+        Cint(-3)
+    else
+        @assert bs == MOI.NONBASIC
+        if S <: MOI.LessThan
+            Cint(-2)
+        elseif S <: MOI.GreaterThan
+            Cint(-1)
+        else
+            error("Do not know how to set variable basis status $bs with constraint set $set.")
+        end
+    end)
+    ret = GRBsetintattrelement(model, "VBasis", Cint(column(model, c) - 1), valueP)
+    _check_ret(model, ret)
+    _require_update(model)
+    return
+end
+
 function MOI.compute_conflict!(model::Optimizer)
     ret = GRBcomputeIIS(model)
     _check_ret(model, ret)
