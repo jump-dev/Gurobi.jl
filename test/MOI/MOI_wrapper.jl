@@ -1369,7 +1369,7 @@ function test_farkas_dual_max_ii()
     @test_broken c_dual[1] < 1e-6
     @test_broken clb_dual[1] ≈ 2 * c_dual atol = 1e-6
     @test_broken clb_dual[2] ≈ c_dual atol = 1e-6
-# end
+end
 
 function _build_basis_model()
     T = Float64
