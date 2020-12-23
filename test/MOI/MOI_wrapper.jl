@@ -1364,11 +1364,76 @@ function test_farkas_dual_max_ii()
     @show clb_dual, c_dual
     @test clb_dual[1] < 1e-6
     @test clb_dual[2] < 1e-6
-    # Confirmed bug in Gurobi <=9.1 and fixed in next release. When updating for new 
+    # Confirmed bug in Gurobi <=9.1 and fixed in next release. When updating for new
     # release, confirm fixed and add a conditional check on `_GRB_VERSION`.
     @test_broken c_dual[1] < 1e-6
     @test_broken clb_dual[1] ≈ 2 * c_dual atol = 1e-6
     @test_broken clb_dual[2] ≈ c_dual atol = 1e-6
+end
+
+function _build_basis_model()
+    T = Float64
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    # Min -x
+    # s.t. x + y <= 1
+    # x, y >= 0
+
+    x = MOI.add_variable(model)
+    y = MOI.add_variable(model)
+
+    cf = MOI.ScalarAffineFunction{T}(
+        MOI.ScalarAffineTerm{T}.([one(T), one(T)], [x, y]),
+        zero(T),
+    )
+    c = MOI.add_constraint(model, cf, MOI.LessThan(one(T)))
+
+    vc1 = MOI.add_constraint(
+        model,
+        MOI.SingleVariable(x),
+        MOI.GreaterThan(zero(T)),
+    )
+    vc2 = MOI.add_constraint(
+        model,
+        MOI.SingleVariable(y),
+        MOI.GreaterThan(zero(T)),
+    )
+    objf = MOI.ScalarAffineFunction{T}(
+        MOI.ScalarAffineTerm{T}.([-one(T), zero(T)], [x, y]),
+        zero(T),
+    )
+    MOI.set(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}}(), objf)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    return model, vc1, vc2, c
+end
+
+function test_set_basis()
+    # The following is an indirect, brittle way to test the desired behavior.
+    # Gurobi appears to not allow you to query VBasis/CBasis attributes without
+    # optimizing the problem
+    # (https://support.gurobi.com/hc/en-us/community/posts/360075729911-Getting-VBasis-CBasis-attributes-without-optimizing).
+    # The following just verifies that the problem is solved with 0 simplex iterations
+    # when we seed the optimal solution and 1 simplex iteration when we seed a
+    # suboptimal feasible basis. Ideally, we would remove the call to MOI.optimize!
+    # and just verify that, after setting the basis, we can get the same basis
+    # statuses back.
+    let
+        model, vc1, vc2, c = _build_basis_model()
+        MOI.set(model, MOI.ConstraintBasisStatus(), vc1, MOI.BASIC)
+        MOI.set(model, MOI.ConstraintBasisStatus(), vc2, MOI.NONBASIC)
+        MOI.set(model, MOI.ConstraintBasisStatus(), c, MOI.NONBASIC)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.SimplexIterations()) == 0
+    end
+
+    let
+        model, vc1, vc2, c = _build_basis_model()
+        MOI.set(model, MOI.ConstraintBasisStatus(), vc1, MOI.NONBASIC)
+        MOI.set(model, MOI.ConstraintBasisStatus(), vc2, MOI.NONBASIC)
+        MOI.set(model, MOI.ConstraintBasisStatus(), c, MOI.BASIC)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.SimplexIterations()) == 1
+    end
 end
 
 end
