@@ -163,6 +163,11 @@ function my_callback_function(cb_data, cb_where::Cint)
         con = @build_constraint(y + x <= 3)
         MOI.submit(model, MOI.LazyConstraint(cb_data), con)
     end
+    if rand() < 0.1
+        # You can terminate the callback as follows:
+        GRBterminate(backend(model))
+    end
+    return
 end
 # You _must_ set this parameter if using lazy constraints.
 MOI.set(model, MOI.RawParameter("LazyConstraints"), 1)
