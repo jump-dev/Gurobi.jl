@@ -2218,6 +2218,27 @@ function MOI.delete(
     return
 end
 
+function MOI.delete(
+    model::Optimizer,
+    cs::Vector{<:MOI.ConstraintIndex{MOI.VectorOfVariables, <:_SOS}}
+)
+    # The batch delete method is same as batch delete of `MOI.ScalarAffineFunction{Float64}, <:Any}`
+    _update_if_necessary(model)
+    rows_to_delete = sort!([Cint(_info(model, c).row - 1) for c in cs])
+    ret = GRBdelsos(model, length(rows_to_delete), rows_to_delete)
+    _check_ret(model, ret)
+    _require_update(model)
+    for (_, info) in model.sos_constraint_info
+        info.row -= searchsortedlast(rows_to_delete, info.row - 1)
+    end
+    cs_values = sort!(getfield.(cs, :value))
+    filter!(model.sos_constraint_info) do pair
+        isempty(searchsorted(cs_values, pair.first))
+    end
+    model.name_to_constraint_index = nothing
+    return
+end
+
 function MOI.get(
     model::Optimizer, ::MOI.ConstraintName,
     c::MOI.ConstraintIndex{MOI.VectorOfVariables, <:Any}
