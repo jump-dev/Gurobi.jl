@@ -527,6 +527,90 @@ function test_Add_and_delete_constraints()
     }()))
 end
 
+function test_Add_and_delete_sos_constraints()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    # SOS2 to model piecewise linear function   
+    xp1 = [1.0, 2.0, 3.0]
+    yp1 = [3.0, 2.0, 3.0]
+    λ = MOI.add_variables(model, length(xp1))
+    for v in λ
+        MOI.add_constraint(model, MOI.SingleVariable(v), MOI.LessThan(1.0))
+        MOI.add_constraint(model, MOI.SingleVariable(v), MOI.GreaterThan(0.0))
+    end
+    xp2 = [1.0, 2.0, 3.0, 4.0]
+    yp2 = [3.0, 3.0, 2.0, 4.0]
+    η = MOI.add_variables(model, length(xp2))
+    for v in η
+        MOI.add_constraint(model, MOI.SingleVariable(v), MOI.LessThan(1.0))
+        MOI.add_constraint(model, MOI.SingleVariable(v), MOI.GreaterThan(0.0))
+    end
+    x = MOI.add_variables(model, 2)
+    y = MOI.add_variables(model, 2)
+    SOS2_cons = MOI.add_constraints(
+        model,
+        MOI.VectorOfVariables.([λ, η]),
+        MOI.SOS2{Float64}.([ones(length(λ)), ones(length(η))])
+    )
+    MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(map(v -> MOI.ScalarAffineTerm(1.0, v), λ), 0.0),
+        MOI.EqualTo(1.0)
+    )
+    MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(map(v -> MOI.ScalarAffineTerm(1.0, v), η), 0.0),
+        MOI.EqualTo(1.0)
+    )
+    MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(-1.0, x[1]), map(i -> MOI.ScalarAffineTerm(xp1[i], λ[i]), 1:length(xp1))...], 0.0),
+        MOI.EqualTo(0.0)
+    )
+    MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(-1.0, y[1]), map(i -> MOI.ScalarAffineTerm(yp1[i], λ[i]), 1:length(xp1))...], 0.0),
+        MOI.EqualTo(0.0)
+    )
+    MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(-1.0, x[2]), map(i -> MOI.ScalarAffineTerm(xp2[i], η[i]), 1:length(xp2))...], 0.0),
+        MOI.EqualTo(0.0)
+    )
+    MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(-1.0, y[2]), map(i -> MOI.ScalarAffineTerm(yp2[i], η[i]), 1:length(xp2))...], 0.0),
+        MOI.EqualTo(0.0)
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, y[1]), MOI.ScalarAffineTerm(1.0, y[2])], 0.0),
+    )
+    @test MOI.get(model, MOI.NumberOfConstraints{
+        MOI.VectorOfVariables, MOI.SOS2{Float64}
+    }()) == 2
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.VariablePrimal(), x[1]) ≈ 2.0 atol=1e-6
+    @test MOI.get(model, MOI.VariablePrimal(), x[2]) ≈ 3.0 atol=1e-6
+    MOI.delete(model, SOS2_cons)
+    @test MOI.get(model, MOI.NumberOfConstraints{
+        MOI.VectorOfVariables, MOI.SOS2{Float64}
+    }()) == 0
+    SOS2_cons = MOI.add_constraints(
+        model,
+        MOI.VectorOfVariables.([λ, η]),
+        MOI.SOS2{Float64}.([ones(length(λ)), ones(length(η))])
+    )
+    @test MOI.get(model, MOI.NumberOfConstraints{
+        MOI.VectorOfVariables, MOI.SOS2{Float64}
+    }()) == 2
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.VariablePrimal(), x[1]) ≈ 2.0 atol=1e-6
+    @test MOI.get(model, MOI.VariablePrimal(), x[2]) ≈ 3.0 atol=1e-6
+end
+
 function test_Buffered_deletion_test()
     # Check if the VarHintVal of variables (could be any attribute that is not
     # cached, the most common as: the bounds, name, and the start, are all
