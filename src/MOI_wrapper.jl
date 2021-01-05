@@ -106,6 +106,9 @@ end
 Base.cconvert(::Type{Ptr{Cvoid}}, x::Env) = x
 Base.unsafe_convert(::Type{Ptr{Cvoid}}, env::Env) = env.ptr_env::Ptr{Cvoid}
 
+const _HASH = CleverDicts.key_to_index
+const _INVERSE_HASH = x -> CleverDicts.index_to_key(MOI.VariableIndex, x)
+
 mutable struct Optimizer <: MOI.AbstractOptimizer
     # The low-level Gurobi model.
     inner::Ptr{Cvoid}
@@ -135,7 +138,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     # A mapping from the MOI.VariableIndex to the Gurobi column. _VariableInfo
     # also stores some additional fields like what bounds have been added, the
     # variable type, and the names of SingleVariable-in-Set constraints.
-    variable_info::CleverDicts.CleverDict{MOI.VariableIndex, _VariableInfo}
+    variable_info::CleverDicts.CleverDict{MOI.VariableIndex, _VariableInfo, typeof(_HASH), typeof(_INVERSE_HASH)}
 
     # If you add variables to a model that had variables deleted AND has
     # not called `update_model!` since the deletion, then the newly created
@@ -231,7 +234,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
             model.params[string(name)] = value
         end
         model.silent = false
-        model.variable_info = CleverDicts.CleverDict{MOI.VariableIndex, _VariableInfo}()
+        model.variable_info = CleverDicts.CleverDict{MOI.VariableIndex, _VariableInfo}(_HASH, _INVERSE_HASH)
         model.next_column = 1
         model.last_constraint_index = 1
         model.columns_deleted_since_last_update = Int[]
