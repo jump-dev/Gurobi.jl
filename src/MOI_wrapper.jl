@@ -744,10 +744,6 @@ function MOI.add_constrained_variable(
     _require_update(model)
     ci = MOI.ConstraintIndex{MOI.SingleVariable, typeof(set)}(vi.value)
     return vi, ci
-    # This sets the bounds in the inner model and set the cache in _VariableInfo
-    # again (we could just set them there, but then _VariableInfo is in a
-    # invalid state that trigger some asserts, i.e., has bound but no cache).
-    MOI.set(model, MOI.ConstraintSet(), index, s)
 end
 
 function MOI.is_valid(model::Optimizer, v::MOI.VariableIndex)
