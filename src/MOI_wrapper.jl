@@ -138,7 +138,12 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     # A mapping from the MOI.VariableIndex to the Gurobi column. _VariableInfo
     # also stores some additional fields like what bounds have been added, the
     # variable type, and the names of SingleVariable-in-Set constraints.
-    variable_info::CleverDicts.CleverDict{MOI.VariableIndex, _VariableInfo, typeof(_HASH), typeof(_INVERSE_HASH)}
+    variable_info::CleverDicts.CleverDict{
+        MOI.VariableIndex,
+        _VariableInfo,
+        typeof(_HASH),
+        typeof(_INVERSE_HASH),
+    }
 
     # If you add variables to a model that had variables deleted AND has
     # not called `update_model!` since the deletion, then the newly created
