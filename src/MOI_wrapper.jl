@@ -239,7 +239,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
             model.params[string(name)] = value
         end
         model.silent = false
-        model.variable_info = CleverDicts.CleverDict{MOI.VariableIndex, _VariableInfo}(_HASH, _INVERSE_HASH)
+        model.variable_info =
+            CleverDicts.CleverDict{MOI.VariableIndex,_VariableInfo}(_HASH, _INVERSE_HASH)
         model.next_column = 1
         model.last_constraint_index = 1
         model.columns_deleted_since_last_update = Int[]
