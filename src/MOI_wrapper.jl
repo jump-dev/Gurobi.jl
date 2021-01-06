@@ -722,23 +722,27 @@ function MOI.add_constrained_variable(
     lb = -Inf
     ub = Inf
     if S <: MOI.LessThan{Float64}
-        info.bound = _LESS_THAN
         ub = set.upper
+        info.upper_bound_if_bounded = ub
+        info.bound = _LESS_THAN
     elseif S <: MOI.GreaterThan{Float64}
-        info.bound = _GREATER_THAN
         lb = set.lower
+        info.lower_bound_if_bounded = lb
+        info.bound = _GREATER_THAN
     elseif S <: MOI.EqualTo{Float64}
-        info.bound = _EQUAL_TO
         lb = set.value
         ub = set.value
+        info.lower_bound_if_bounded = lb
+        info.upper_bound_if_bounded = ub
+        info.bound = _EQUAL_TO
     else
         @assert S <: MOI.Interval{Float64}
-        info.bound = _INTERVAL
         lb = set.lower
         ub = set.upper
+        info.lower_bound_if_bounded = lb
+        info.upper_bound_if_bounded = ub
+        info.bound = _INTERVAL
     end
-    info.lower_bound_if_bounded = lb
-    info.upper_bound_if_bounded = ub
     ret = GRBaddvar(model, 0, C_NULL, C_NULL, 0.0, lb, ub, GRB_CONTINUOUS, "")
     _check_ret(model, ret)
     _require_update(model)
