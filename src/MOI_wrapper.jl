@@ -715,8 +715,12 @@ end
 # reset those bounds using the attributes interface. Instead, we just pass the
 # desired bounds directly to GRBaddvar.
 function MOI.add_constrained_variable(
-    model::Optimizer, set::S
-)::Tuple{MOI.VariableIndex,MOI.ConstraintIndex{MOI.SingleVariable, S}} where {S <: _SCALAR_SETS}
+    model::Optimizer,
+    set::S,
+)::Tuple{
+    MOI.VariableIndex,
+    MOI.ConstraintIndex{MOI.SingleVariable,S},
+} where {S<:_SCALAR_SETS}
     vi = CleverDicts.add_item(
         model.variable_info, _VariableInfo(MOI.VariableIndex(0), 0)
     )
