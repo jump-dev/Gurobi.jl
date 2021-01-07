@@ -709,9 +709,14 @@ function MOI.add_variables(model::Optimizer, N::Int)
     return indices
 end
 
+# We implement a specialized version here to avoid calling into Gurobi twice.
+# Using the standard implementation, we would first create a variable in Gurobi
+# with GRBaddvar that has bounds of (-Inf,+Inf), and then immediately after
+# reset those bounds using the attributes interface. Instead, we just pass the
+# desired bounds directly to GRBaddvar.
 function MOI.add_constrained_variable(
     model::Optimizer, set::S
-) where {S <: _SCALAR_SETS}
+)::Tuple{MOI.VariableIndex,MOI.ConstraintIndex{MOI.SingleVariable, S}} where {S <: _SCALAR_SETS}
     vi = CleverDicts.add_item(
         model.variable_info, _VariableInfo(MOI.VariableIndex(0), 0)
     )
