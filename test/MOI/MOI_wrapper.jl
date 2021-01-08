@@ -1520,6 +1520,18 @@ function test_set_basis()
     end
 end
 
+function test_add_constrained_variables()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    set = MOI.Interval{Float64}(-1.2, 3.4)
+    vi, ci = MOI.add_constrained_variable(model, set)
+    @test MOI.get(model, MOI.NumberOfVariables()) == 1
+    @test MOI.get(model, MOI.ListOfConstraints()) ==
+          [(MOI.SingleVariable, MOI.Interval{Float64})]
+    @test MOI.get(model, MOI.ConstraintFunction(), ci) == MOI.SingleVariable(vi)
+    @test MOI.get(model, MOI.ConstraintSet(), ci) == set
+end
+
 end
 
 runtests(TestMOIWrapper)

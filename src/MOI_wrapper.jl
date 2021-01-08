@@ -718,6 +718,56 @@ function MOI.add_variables(model::Optimizer, N::Int)
     return indices
 end
 
+# We implement a specialized version here to avoid calling into Gurobi twice.
+# Using the standard implementation, we would first create a variable in Gurobi
+# with GRBaddvar that has bounds of (-Inf,+Inf), and then immediately after
+# reset those bounds using the attributes interface. Instead, we just pass the
+# desired bounds directly to GRBaddvar.
+function MOI.add_constrained_variable(
+    model::Optimizer,
+    set::S,
+)::Tuple{
+    MOI.VariableIndex,
+    MOI.ConstraintIndex{MOI.SingleVariable,S},
+} where {S<:_SCALAR_SETS}
+    vi = CleverDicts.add_item(
+        model.variable_info, _VariableInfo(MOI.VariableIndex(0), 0)
+    )
+    info = _info(model, vi)
+    # Now, set `.index` and `.column`.
+    info.index = vi
+    info.column = _get_next_column(model)
+    lb = -Inf
+    ub = Inf
+    if S <: MOI.LessThan{Float64}
+        ub = set.upper
+        info.upper_bound_if_bounded = ub
+        info.bound = _LESS_THAN
+    elseif S <: MOI.GreaterThan{Float64}
+        lb = set.lower
+        info.lower_bound_if_bounded = lb
+        info.bound = _GREATER_THAN
+    elseif S <: MOI.EqualTo{Float64}
+        lb = set.value
+        ub = set.value
+        info.lower_bound_if_bounded = lb
+        info.upper_bound_if_bounded = ub
+        info.bound = _EQUAL_TO
+    else
+        @assert S <: MOI.Interval{Float64}
+        lb = set.lower
+        ub = set.upper
+        info.lower_bound_if_bounded = lb
+        info.upper_bound_if_bounded = ub
+        info.bound = _INTERVAL
+    end
+    ret = GRBaddvar(model, 0, C_NULL, C_NULL, 0.0, lb, ub, GRB_CONTINUOUS, "")
+    _check_ret(model, ret)
+    _require_update(model)
+    ci = MOI.ConstraintIndex{MOI.SingleVariable, typeof(set)}(vi.value)
+    return vi, ci
+end
+
 function MOI.is_valid(model::Optimizer, v::MOI.VariableIndex)
     return haskey(model.variable_info, v)
 end
