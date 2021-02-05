@@ -2533,32 +2533,21 @@ function _has_primal_ray(model::Optimizer)
     return ret == 0
 end
 
-function _get_dbl_attr_variable(
-    model::Optimizer, key::String, x::MOI.VariableIndex
+function MOI.get(
+    model::Optimizer, attr::MOI.VariablePrimal, x::MOI.VariableIndex
 )
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
+    key = model.has_unbounded_ray ? "UnbdRay" : "X"
+    if attr.N > 1
+        MOI.set(model, MOI.RawParameter("SolutionNumber"), attr.N - 1)
+        key = "Xn"
+    end
     col = Cint(column(model, x) - 1)
     valueP = Ref{Cdouble}()
     ret = GRBgetdblattrelement(model, key, col, valueP)
     _check_ret(model, ret)
     return valueP[]
-end
-
-function MOI.get(
-    model::Optimizer, attr::MOI.VariablePrimal, x::MOI.VariableIndex
-)
-    _throw_if_optimize_in_progress(model, attr)
-    if model.has_unbounded_ray
-        return _get_dbl_attr_variable(model, "UnbdRay", x)
-    end
-    result_count = MOI.get(model, MOI.ResultCount())
-    if !(1 <= attr.N <= result_count)
-        throw(MOI.ResultIndexBoundsError(attr, result_count))
-    elseif attr.N == 1
-        return _get_dbl_attr_variable(model, "X", x)
-    else
-        MOI.set(model, MOI.RawParameter("SolutionNumber"), attr.N - 1)
-        return _get_dbl_attr_variable(model, "Xn", x)
-    end
 end
 
 function MOI.get(
@@ -2777,21 +2766,15 @@ end
 
 function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
     _throw_if_optimize_in_progress(model, attr)
-    result_count = MOI.get(model, MOI.ResultCount())
-    if !(1 <= attr.result_index <= result_count)
-        throw(MOI.ResultIndexBoundsError(attr, result_count))
-    elseif attr.result_index == 1
-        valueP = Ref{Cdouble}()
-        ret = GRBgetdblattr(model, "ObjVal", valueP)
-        _check_ret(model, ret)
-        return valueP[]
-    else
+    MOI.check_result_index_bounds(model, attr)
+    if attr.result_index > 1
         MOI.set(model, MOI.RawParameter("SolutionNumber"), attr.result_index - 1)
-        valueP = Ref{Cdouble}()
-        ret = GRBgetdblattr(model, "PoolObjVal", valueP)
-        _check_ret(model, ret)
-        return valueP[]
     end
+    valueP = Ref{Cdouble}()
+    key = attr.result_index == 1 ? "ObjVal" : "PoolObjVal"
+    ret = GRBgetdblattr(model, key, valueP)
+    _check_ret(model, ret)
+    return valueP[]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.ObjectiveBound)
