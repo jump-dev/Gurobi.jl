@@ -530,7 +530,7 @@ end
 function test_Add_and_delete_sos_constraints()
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
-    # SOS2 to model piecewise linear function   
+    # SOS2 to model piecewise linear function
     xp1 = [1.0, 2.0, 3.0]
     yp1 = [3.0, 2.0, 3.0]
     λ = MOI.add_variables(model, length(xp1))
@@ -1530,6 +1530,58 @@ function test_add_constrained_variables()
           [(MOI.SingleVariable, MOI.Interval{Float64})]
     @test MOI.get(model, MOI.ConstraintFunction(), ci) == MOI.SingleVariable(vi)
     @test MOI.get(model, MOI.ConstraintSet(), ci) == set
+end
+
+function _is_binary(x; atol = 1e-6)
+    return isapprox(x, 0; atol = atol) || isapprox(x, 1; atol = atol)
+end
+
+function test_multiple_solutions()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.RawParameter("OutputFlag"), 0)
+    MOI.set(model, MOI.RawParameter("Cuts"), 0)
+    MOI.set(model, MOI.RawParameter("Presolve"), 0)
+    MOI.set(model, MOI.RawParameter("PreCrush"), 0)
+    MOI.set(model, MOI.RawParameter("Heuristics"), 0)
+    N = 30
+    x = MOI.add_variables(model, N)
+    MOI.add_constraints(model, MOI.SingleVariable.(x), MOI.ZeroOne())
+    MOI.set.(model, MOI.VariablePrimalStart(), x, 0.0)
+    Random.seed!(1)
+    item_weights, item_values = rand(N), rand(N)
+    MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(item_weights, x), 0.0),
+        MOI.LessThan(10.0)
+    )
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(item_values, x), 0.0)
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    MOI.optimize!(model)
+    RC = MOI.get(model, MOI.ResultCount())
+    @test RC > 1
+    for n in [0, RC + 1]
+        @test_throws(
+            MOI.ResultIndexBoundsError,
+            MOI.get(model, MOI.VariablePrimal(n), x),
+        )
+        @test_throws(
+            MOI.ResultIndexBoundsError,
+            MOI.get(model, MOI.ObjectiveValue(n)),
+        )
+    end
+    for n = 1:RC
+        xn = MOI.get(model, MOI.VariablePrimal(n), x)
+        @test all(_is_binary, xn)
+        @test isapprox(
+            MOI.get(model, MOI.ObjectiveValue(n)),
+            item_values' * xn,
+            atol=1e-6,
+        )
+    end
 end
 
 end

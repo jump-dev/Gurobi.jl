@@ -2533,10 +2533,16 @@ function _has_primal_ray(model::Optimizer)
     return ret == 0
 end
 
-function MOI.get(model::Optimizer, attr::MOI.VariablePrimal, x::MOI.VariableIndex)
+function MOI.get(
+    model::Optimizer, attr::MOI.VariablePrimal, x::MOI.VariableIndex
+)
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
     key = model.has_unbounded_ray ? "UnbdRay" : "X"
+    if attr.N > 1
+        MOI.set(model, MOI.RawParameter("SolutionNumber"), attr.N - 1)
+        key = "Xn"
+    end
     col = Cint(column(model, x) - 1)
     valueP = Ref{Cdouble}()
     ret = GRBgetdblattrelement(model, key, col, valueP)
@@ -2761,8 +2767,12 @@ end
 function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
+    if attr.result_index > 1
+        MOI.set(model, MOI.RawParameter("SolutionNumber"), attr.result_index - 1)
+    end
     valueP = Ref{Cdouble}()
-    ret = GRBgetdblattr(model, "ObjVal", valueP)
+    key = attr.result_index == 1 ? "ObjVal" : "PoolObjVal"
+    ret = GRBgetdblattr(model, key, valueP)
     _check_ret(model, ret)
     return valueP[]
 end
