@@ -1572,6 +1572,8 @@ function test_multiple_solutions()
             MOI.ResultIndexBoundsError,
             MOI.get(model, MOI.ObjectiveValue(n)),
         )
+        @test MOI.get(model, MOI.PrimalStatus(n)) == MOI.NO_SOLUTION
+        @test MOI.get(model, MOI.DualStatus(n)) == MOI.NO_SOLUTION
     end
     for n = 1:RC
         xn = MOI.get(model, MOI.VariablePrimal(n), x)
@@ -1581,6 +1583,8 @@ function test_multiple_solutions()
             item_values' * xn,
             atol=1e-6,
         )
+        @test MOI.get(model, MOI.PrimalStatus(n)) == MOI.FEASIBLE_POINT
+        @test MOI.get(model, MOI.DualStatus(n)) == MOI.NO_SOLUTION
     end
 end
 
