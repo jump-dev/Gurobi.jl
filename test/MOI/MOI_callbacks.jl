@@ -452,6 +452,21 @@ function test_CallbackFunction_CallbackNodeStatus()
     @test unknown_reached
 end
 
+function test_CallbackFunction_broadcast()
+    model, x, _ = callback_knapsack_model()
+    f(cb_data, x) = MOI.get(model, MOI.CallbackVariablePrimal(cb_data), x)
+    solutions = Vector{Float64}[]
+    MOI.set(model, Gurobi.CallbackFunction(), (cb_data, cb_where) -> begin
+        if cb_where == Gurobi.GRB_CB_MIPSOL
+            Gurobi.load_callback_variable_primal(cb_data, cb_where)
+            push!(solutions, f.(cb_data, x))
+        end
+    end)
+    MOI.optimize!(model)
+    @test length(solutions) > 0
+    @test length(solutions[1]) == length(x)
+end
+
 end  # module TestCallbacks
 
 runtests(TestCallbacks)
