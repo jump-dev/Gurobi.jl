@@ -1,7 +1,7 @@
 name = "Gurobi"
 uuid = "2e9cd046-0924-5485-92f1-d5272153d98b"
 repo = "https://github.com/jump-dev/Gurobi.jl"
-version = "0.9.9"
+version = "0.9.10"
 
 [deps]
 CEnum = "fa961155-64e5-5f13-b03f-caf6b980ea82"
