@@ -187,6 +187,23 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     name_to_constraint_index::Union{Nothing,
         Dict{String, Union{Nothing, MOI.ConstraintIndex}}}
 
+
+    # Gurobi does not have a configurable memory limit (different of time),
+    # but it does detect when it needs more memory than it is available,
+    # and it stops the optimization returning a specific error code.
+    # This is a different mechanism than Gurobi "Status" (that is used for
+    # reporting why an optimization finished) and, in fact, may be triggered in
+    # other cases than optimization (for example, when assembling the model).
+    # For convenience, and homogeinity with other solvers, when a call to
+    # `GRBoptimize` return an error that would be considered a
+    # `TerminationStatus` by MOI, we do not thrown an exception (like we do
+    # for errors) but instead we set the field below `fake_termination_status`
+    # to the error code. Any non-zero value in this field overrides the query
+    # to Gurobi "Status" and instead we return the appropriate
+    # `MOI.TerminationStatus`. Just before calling `GRBoptimize` we change
+    # this to zero again.
+    fake_termination_status::Cint
+
     # These two flags allow us to distinguish between FEASIBLE_POINT and
     # INFEASIBILITY_CERTIFICATE when querying VariablePrimal and ConstraintDual.
     has_unbounded_ray::Bool
@@ -248,6 +265,9 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         model.quadratic_constraint_info = Dict{Int, _ConstraintInfo}()
         model.sos_constraint_info = Dict{Int, _ConstraintInfo}()
         model.indicator_constraint_info = Dict{Int, _ConstraintInfo}()
+
+        model.fake_termination_status = Cint(0)
+
         model.callback_variable_primal = Float64[]
         MOI.empty!(model)
         finalizer(model) do m
@@ -275,6 +295,23 @@ function _check_ret(model::Optimizer, ret::Cint)
     if ret != 0
         msg = unsafe_string(GRBgetmerrormsg(model))
         throw(ErrorException("Gurobi Error $(ret): $(msg)"))
+    end
+    return
+end
+
+# If you add a new error code that, when returned by GRBoptimize,
+# should be treated as a TerminationStatus by MOI, to the global
+# below, then the rest of the code should pick up on this seamlessly.
+const _FAKE_TERMINATION_STATUS = Dict{Cint, Tuple{Any, String}}([
+    Cint(10001) => (MOI.MemoryLimit, "Available memory was exhausted."),
+])
+
+# Same as _check_ret, but deals with the `fake_termination_status` machinery.
+function _check_ret_GRBoptimize!(model, ret::Cint)
+    if haskey(_FAKE_TERMINATION_STATUS, ret)
+        model.fake_termination_status = ret
+    else
+        _check_ret(model, ret)
     end
     return
 end
@@ -346,6 +383,7 @@ function MOI.empty!(model::Optimizer)
     empty!(model.indicator_constraint_info)
     model.name_to_variable = nothing
     model.name_to_constraint_index = nothing
+    model.fake_termination_status = Cint(0)
     model.has_unbounded_ray = false
     model.has_infeasibility_cert = false
     empty!(model.callback_variable_primal)
@@ -371,6 +409,7 @@ function MOI.is_empty(model::Optimizer)
     !isempty(model.sos_constraint_info) && return false
     model.name_to_variable !== nothing && return false
     model.name_to_constraint_index !== nothing && return false
+    !iszero(model.fake_termination_status) && return false
     model.has_unbounded_ray && return false
     model.has_infeasibility_cert && return false
     !isempty(model.callback_variable_primal) && return false
@@ -401,6 +440,11 @@ function _update_if_necessary(model::Optimizer)
     if model.needs_update
         sort!(model.columns_deleted_since_last_update)
         for var_info in values(model.variable_info)
+            # The trick here is: searchsortedlast returns, in O(log n), the
+            # last index with a column smaller than var_info.column, over
+            # columns_deleted_since_last_update this is the same as the number
+            # of columns deleted before it, and how much its value need to be
+            # shifted.
             var_info.column -= searchsortedlast(
                  model.columns_deleted_since_last_update, var_info.column
             )
@@ -2403,8 +2447,13 @@ function MOI.optimize!(model::Optimizer)
     #
     # TODO(odow): Julia 1.5 exposes `Base.exit_on_sigint(::Bool)`.
     ccall(:jl_exit_on_sigint, Cvoid, (Cint,), false)
+    # Before calling GRBoptimize we clean the model from any fake
+    # termination status that exists for the MOI wrapper but it is
+    # not really supported by Gurobi. `_check_ret_GRBoptimize!`
+    # will set it again if it is the case.
+    model.fake_termination_status = Cint(0)
     ret = GRBoptimize(model)
-    _check_ret(model, ret)
+    _check_ret_GRBoptimize!(model, ret)
     if !isinteractive()
         ccall(:jl_exit_on_sigint, Cvoid, (Cint,), true)
     end
@@ -2448,6 +2497,9 @@ const _RAW_STATUS_STRINGS = [
 ]
 
 function _raw_status(model::Optimizer)
+    if !iszero(model.fake_termination_status)
+        return _FAKE_TERMINATION_STATUS[model.fake_termination_status]
+    end
     valueP = Ref{Cint}()
     ret = GRBgetintattr(model, "Status", valueP)
     _check_ret(model, ret)
