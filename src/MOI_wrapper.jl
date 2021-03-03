@@ -401,6 +401,11 @@ function _update_if_necessary(model::Optimizer)
     if model.needs_update
         sort!(model.columns_deleted_since_last_update)
         for var_info in values(model.variable_info)
+            # The trick here is: searchsortedlast returns, in O(log n), the
+            # last index with a column smaller than var_info.column, over
+            # columns_deleted_since_last_update this is the same as the number
+            # of columns deleted before it, and how much its value need to be
+            # shifted.
             var_info.column -= searchsortedlast(
                  model.columns_deleted_since_last_update, var_info.column
             )
