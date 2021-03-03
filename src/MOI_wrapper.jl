@@ -187,6 +187,20 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     name_to_constraint_index::Union{Nothing,
         Dict{String, Union{Nothing, MOI.ConstraintIndex}}}
 
+
+    # Gurobi does not have a configurable memory limit (different of time),
+    # but it does detect when it needs more memory than it is available,
+    # and it stops the optimization returning a specific error code.
+    # This is a different mechanism than Gurobi "Status" (that is used for
+    # reporting why an optimization finished) and, in fact, may be triggered in
+    # other cases than optimization (for example, when assembling the model).
+    # For convenience, and homogeinity with other solvers, we save the code
+    # returned by `GRBoptimize` in `ret_GRBoptimize`, and do not throw
+    # an exception case it should be interpreted as a termination status.
+    # Then, when/if the termination status is queried, we may override the
+    # result taking into account the `ret_GRBoptimize` field.
+    ret_GRBoptimize::Cint
+
     # These two flags allow us to distinguish between FEASIBLE_POINT and
     # INFEASIBILITY_CERTIFICATE when querying VariablePrimal and ConstraintDual.
     has_unbounded_ray::Bool
@@ -248,6 +262,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         model.quadratic_constraint_info = Dict{Int, _ConstraintInfo}()
         model.sos_constraint_info = Dict{Int, _ConstraintInfo}()
         model.indicator_constraint_info = Dict{Int, _ConstraintInfo}()
+
         model.callback_variable_primal = Float64[]
         MOI.empty!(model)
         finalizer(model) do m
@@ -275,6 +290,23 @@ function _check_ret(model::Optimizer, ret::Cint)
     if ret != 0
         msg = unsafe_string(GRBgetmerrormsg(model))
         throw(ErrorException("Gurobi Error $(ret): $(msg)"))
+    end
+    return
+end
+
+# If you add a new error code that, when returned by GRBoptimize,
+# should be treated as a TerminationStatus by MOI, to the global `Dict`
+# below, then the rest of the code should pick up on this seamlessly.
+const _ERROR_TO_STATUS = Dict{Cint, Tuple{MOI.TerminationStatusCode, String}}([
+    # Code => (TerminationStatus, RawStatusString)
+    GRB_ERROR_OUT_OF_MEMORY =>
+        (MOI.MEMORY_LIMIT, "Available memory was exhausted."),
+])
+
+# Same as _check_ret, but deals with the `model.ret_GRBoptimize` machinery.
+function _check_ret_GRBoptimize(model)
+    if !haskey(_ERROR_TO_STATUS, model.ret_GRBoptimize)
+        _check_ret(model, model.ret_GRBoptimize)
     end
     return
 end
@@ -346,6 +378,7 @@ function MOI.empty!(model::Optimizer)
     empty!(model.indicator_constraint_info)
     model.name_to_variable = nothing
     model.name_to_constraint_index = nothing
+    model.ret_GRBoptimize = Cint(0)
     model.has_unbounded_ray = false
     model.has_infeasibility_cert = false
     empty!(model.callback_variable_primal)
@@ -371,6 +404,7 @@ function MOI.is_empty(model::Optimizer)
     !isempty(model.sos_constraint_info) && return false
     model.name_to_variable !== nothing && return false
     model.name_to_constraint_index !== nothing && return false
+    !iszero(model.ret_GRBoptimize) && return false
     model.has_unbounded_ray && return false
     model.has_infeasibility_cert && return false
     !isempty(model.callback_variable_primal) && return false
@@ -2408,8 +2442,8 @@ function MOI.optimize!(model::Optimizer)
     #
     # TODO(odow): Julia 1.5 exposes `Base.exit_on_sigint(::Bool)`.
     ccall(:jl_exit_on_sigint, Cvoid, (Cint,), false)
-    ret = GRBoptimize(model)
-    _check_ret(model, ret)
+    model.ret_GRBoptimize = GRBoptimize(model)
+    _check_ret_GRBoptimize(model)
     if !isinteractive()
         ccall(:jl_exit_on_sigint, Cvoid, (Cint,), true)
     end
@@ -2453,6 +2487,9 @@ const _RAW_STATUS_STRINGS = [
 ]
 
 function _raw_status(model::Optimizer)
+    if haskey(_ERROR_TO_STATUS, model.ret_GRBoptimize)
+        return _ERROR_TO_STATUS[model.ret_GRBoptimize]
+    end
     valueP = Ref{Cint}()
     ret = GRBgetintattr(model, "Status", valueP)
     _check_ret(model, ret)
