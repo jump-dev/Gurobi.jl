@@ -302,8 +302,9 @@ end
 # If you add a new error code that, when returned by GRBoptimize,
 # should be treated as a TerminationStatus by MOI, to the global
 # below, then the rest of the code should pick up on this seamlessly.
-const _FAKE_TERMINATION_STATUS = Dict{Cint, Tuple{Any, String}}([
-    Cint(10001) => (MOI.MemoryLimit, "Available memory was exhausted."),
+const _FAKE_TERMINATION_STATUS =
+Dict{Cint, Tuple{MOI.TerminationStatusCode, String}}([
+    Cint(10001) => (MOI.MEMORY_LIMIT, "Available memory was exhausted."),
 ])
 
 # Same as _check_ret, but deals with the `fake_termination_status` machinery.
