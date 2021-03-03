@@ -298,8 +298,9 @@ end
 # should be treated as a TerminationStatus by MOI, to the global `Dict`
 # below, then the rest of the code should pick up on this seamlessly.
 const _ERROR_TO_STATUS = Dict{Cint, Tuple{MOI.TerminationStatusCode, String}}([
-    # TerminationStatus, RawStatusString
-    Cint(10001) => (MOI.MEMORY_LIMIT, "Available memory was exhausted."),
+    # Code => (TerminationStatus, RawStatusString)
+    GRB_ERROR_OUT_OF_MEMORY =>
+        (MOI.MEMORY_LIMIT, "Available memory was exhausted."),
 ])
 
 # Same as _check_ret, but deals with the `model.ret_GRBoptimize` machinery.
