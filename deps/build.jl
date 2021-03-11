@@ -13,8 +13,8 @@ function write_depsfile(path)
 end
 
 const ALIASES = [
-    "gurobi90",
     "gurobi91",
+    "gurobi90"
 ]
 
 paths_to_try = copy(ALIASES)
