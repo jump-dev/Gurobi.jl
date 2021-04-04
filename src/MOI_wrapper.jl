@@ -207,6 +207,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     has_infeasibility_cert::Bool
 
     # Callback fields.
+    enable_interrupts::Bool
     callback_variable_primal::Vector{Float64}
     has_generic_callback::Bool
     callback_state::_CallbackState
@@ -218,12 +219,20 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     conflict::Cint
 
     """
-        Optimizer(env::Union{Nothing, Env} = nothing)
+        Optimizer(
+            env::Union{Nothing,Env} = nothing;
+            enable_interrupts::Bool = true,
+        )
 
     Create a new Optimizer object.
 
     You can share Gurobi `Env`s between models by passing an instance of `Env`
     as the first argument.
+
+    In order to enable interrupts via `CTRL+C`, a no-op callback is added to the
+    model by default. In most cases, this has negligible effect on solution
+    times. However, you can disable it (at the cost of not being able to
+    interrupt a solve) by passing `enable_interrupts = false`.
 
     Set optimizer attributes using `MOI.RawParameter` or
     `JuMP.set_optimizer_atttribute`.
@@ -232,13 +241,18 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
 
         using JuMP, Gurobi
         const env = Gurobi.Env()
-        model = JuMP.Model(() -> Gurobi.Optimizer(env))
+        model = JuMP.Model(() -> Gurobi.Optimizer(env; enable_interrupts=false))
         set_optimizer_attribute(model, "OutputFlag", 0)
     """
-    function Optimizer(env::Union{Nothing, Env} = nothing; kwargs...)
+    function Optimizer(
+        env::Union{Nothing, Env} = nothing;
+        enable_interrupts::Bool = true,
+        kwargs...
+    )
         model = new()
         model.inner = C_NULL
         model.env = env === nothing ? Env() : env
+        model.enable_interrupts = enable_interrupts
         model.params = Dict{String, Any}()
         if length(kwargs) > 0
             @warn("""Passing optimizer attributes as keyword arguments to
@@ -2425,7 +2439,7 @@ function MOI.optimize!(model::Optimizer)
     if _check_moi_callback_validity(model)
         MOI.set(model, CallbackFunction(), _default_moi_callback(model))
         model.has_generic_callback = false
-    elseif !model.has_generic_callback
+    elseif model.enable_interrupts && !model.has_generic_callback
         # From the docstring of disable_sigint, "External functions that do not
         # call julia code or julia runtime automatically disable sigint during
         # their execution." We don't want this though! We want to be able to
