@@ -462,7 +462,7 @@ function test_Conflict_refiner_integer_constraint()
 
     MOI.optimize!(model)
     MOI.compute_conflict!(model)
-    @test MOI.get(model, Gurobi.ConflictStatus()) == 0 # CPLEX.CPX_STAT_CONFLICT_MINIMAL
+    @test MOI.get(model, Gurobi.ConflictStatus()) == 0
     @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.MAYBE_IN_CONFLICT
     @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) == MOI.IN_CONFLICT
 end
