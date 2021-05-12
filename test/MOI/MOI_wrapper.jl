@@ -467,8 +467,6 @@ function test_Conflict_refiner_integer_constraint()
     @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) == MOI.IN_CONFLICT
 end
 
-@test false
-
 function test_RawParameter()
     model = Gurobi.Optimizer(GRB_ENV)
     @test MOI.get(model, MOI.RawParameter("OutputFlag")) == 1
