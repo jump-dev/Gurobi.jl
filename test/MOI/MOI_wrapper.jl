@@ -302,6 +302,7 @@ function test_Conflict_refiner_bound_bound()
 
     # Once it's called, no problem.
     MOI.compute_conflict!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
     @test MOI.get(model, Gurobi.ConflictStatus()) == 0
     @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
     @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.IN_CONFLICT
@@ -322,6 +323,7 @@ function test_Conflict_refiner_bound_affine()
 
     # Once it's called, no problem.
     MOI.compute_conflict!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
     @test MOI.get(model, Gurobi.ConflictStatus()) == 0
     @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
     @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.IN_CONFLICT
@@ -342,6 +344,7 @@ function test_Conflict_refiner_invalid_interval()
 
     # Once it's called, no problem.
     MOI.compute_conflict!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
     @test MOI.get(model, Gurobi.ConflictStatus()) == 0
     @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
     @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.IN_CONFLICT
@@ -366,6 +369,7 @@ function test_Conflict_refiner_affine_affine()
 
     # Once it's called, no problem.
     MOI.compute_conflict!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
     @test MOI.get(model, Gurobi.ConflictStatus()) == 0
     @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
     @test MOI.get(model, MOI.ConstraintConflictStatus(), b1) == MOI.IN_CONFLICT
@@ -393,6 +397,7 @@ function test_Conflict_refiner_equalto()
 
     # Once it's called, no problem.
     MOI.compute_conflict!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
     @test MOI.get(model, Gurobi.ConflictStatus()) == 0
     @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
     @test MOI.get(model, MOI.ConstraintConflictStatus(), b1) == MOI.IN_CONFLICT
@@ -422,6 +427,7 @@ function test_Conflict_refiner_outside_conflict()
 
     # Once it's called, no problem.
     MOI.compute_conflict!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
     @test MOI.get(model, Gurobi.ConflictStatus()) == 0
     @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
     @test MOI.get(model, MOI.ConstraintConflictStatus(), b1) == MOI.IN_CONFLICT
