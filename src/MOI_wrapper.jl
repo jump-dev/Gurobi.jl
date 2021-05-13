@@ -3532,6 +3532,32 @@ function MOI.get(
     return p[] > 0 ? MOI.IN_CONFLICT : MOI.NOT_IN_CONFLICT
 end
 
+function MOI.get(
+    model::Optimizer,
+    ::MOI.ConstraintConflictStatus,
+    index::MOI.ConstraintIndex{
+        MOI.SingleVariable,
+        <:Union{MOI.Integer, MOI.ZeroOne}
+    },
+)
+    _ensure_conflict_computed(model)
+    if _is_feasible(model)
+        return MOI.NOT_IN_CONFLICT
+    end
+
+    # Gurobi doesn't give that information (only linear constraints and bounds, 
+    # i.e. about the linear relaxation), even though it will report a conflict.
+    # Even for binary variables (MOI.ZeroOne), no variable attribute is set by
+    # the IIS computation, including the bounds. 
+    # -> https://www.gurobi.com/documentation/9.1/refman/iislb.html
+    # Report that lack of information to the user.
+    if MOI.is_valid(model, index)
+        return MOI.MAYBE_IN_CONFLICT
+    else
+        throw(MOI.InvalidIndex(index))
+    end
+end
+
 ###
 ### Gurobi-specific attributes
 ###

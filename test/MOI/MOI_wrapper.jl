@@ -452,6 +452,21 @@ function test_Conflict_refiner_no_conflict()
     # @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) == MOI.NOT_IN_CONFLICT
 end
 
+function test_Conflict_refiner_integer_constraint()
+    # Root problem: missing method to get the status for an integrality 
+    # constraint.
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x, c1 = MOI.add_constrained_variable(model, MOI.ZeroOne())
+    c2 = MOI.add_constraint(model, MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0), MOI.GreaterThan(2.0))
+
+    MOI.optimize!(model)
+    MOI.compute_conflict!(model)
+    @test MOI.get(model, Gurobi.ConflictStatus()) == 0
+    @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.MAYBE_IN_CONFLICT
+    @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) == MOI.IN_CONFLICT
+end
+
 function test_RawParameter()
     model = Gurobi.Optimizer(GRB_ENV)
     @test MOI.get(model, MOI.RawParameter("OutputFlag")) == 1
