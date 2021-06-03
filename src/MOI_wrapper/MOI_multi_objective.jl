@@ -21,7 +21,7 @@ end
 function MOI.set(
     model::Optimizer,
     attr::MultiObjectiveFunction,
-    f::MOI.ScalarAffineFunction
+    f::MOI.ScalarAffineFunction,
 )
     num_vars = length(model.variable_info)
     obj = zeros(Float64, num_vars)
@@ -42,7 +42,7 @@ function MOI.set(
         f.constant,
         length(indices),
         indices,
-        coefficients
+        coefficients,
     )
     _check_ret(model, ret)
     _require_update(model)
@@ -54,7 +54,9 @@ struct MultiObjectivePriority <: MOI.AbstractModelAttribute
 end
 
 function MOI.set(
-    model::Gurobi.Optimizer, attr::MultiObjectivePriority, priority::Int
+    model::Gurobi.Optimizer,
+    attr::MultiObjectivePriority,
+    priority::Int,
 )
     env = GRBgetenv(model)
     ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
@@ -65,9 +67,7 @@ function MOI.set(
     return
 end
 
-function MOI.get(
-    model::Gurobi.Optimizer, attr::MultiObjectivePriority
-)
+function MOI.get(model::Gurobi.Optimizer, attr::MultiObjectivePriority)
     _update_if_necessary(model)
     env = GRBgetenv(model)
     ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
@@ -83,20 +83,20 @@ struct MultiObjectiveWeight <: MOI.AbstractModelAttribute
 end
 
 function MOI.set(
-    model::Gurobi.Optimizer, attr::MultiObjectiveWeight, weight::Float64
+    model::Gurobi.Optimizer,
+    attr::MultiObjectiveWeight,
+    weight::Float64,
 )
     env = GRBgetenv(model)
     ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
     _check_ret(env, ret)
-   ret = GRBsetdblattr(model, "ObjNWeight", weight)
+    ret = GRBsetdblattr(model, "ObjNWeight", weight)
     _check_ret(model, ret)
     _require_update(model)
     return
 end
 
-function MOI.get(
-    model::Gurobi.Optimizer, attr::MultiObjectiveWeight
-)
+function MOI.get(model::Gurobi.Optimizer, attr::MultiObjectiveWeight)
     _update_if_necessary(model)
     env = GRBgetenv(model)
     ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
@@ -111,9 +111,7 @@ struct MultiObjectiveValue <: MOI.AbstractModelAttribute
     index::Int
 end
 
-function MOI.get(
-    model::Gurobi.Optimizer, attr::MultiObjectiveValue
-)
+function MOI.get(model::Gurobi.Optimizer, attr::MultiObjectiveValue)
     env = GRBgetenv(model)
     ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
     _check_ret(env, ret)

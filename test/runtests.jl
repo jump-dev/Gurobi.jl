@@ -20,7 +20,7 @@ function runtests(mod)
                     getfield(mod, name)()
                 catch ex
                     if ex == ErrorException(
-                        "Gurobi Error 10009: Failed to obtain a valid license"
+                        "Gurobi Error 10009: Failed to obtain a valid license",
                     )
                         @warn(
                             "Skipping a test because there was an issue " *
