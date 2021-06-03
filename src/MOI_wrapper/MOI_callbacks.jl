@@ -24,7 +24,7 @@ function _gurobi_callback_wrapper(
     p_model::Ptr{Cvoid},
     cb_data::Ptr{Cvoid},
     cb_where::Cint,
-    p_user_data::Ptr{Cvoid}
+    p_user_data::Ptr{Cvoid},
 )
     user_data = unsafe_pointer_to_objref(p_user_data)::_CallbackUserData
     try
@@ -68,7 +68,7 @@ function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
             f(cb_data, cb_where)
             model.callback_state = _CB_NONE
             return
-        end
+        end,
     )
     ret = GRBsetcallbackfunc(model, grb_callback, user_data)
     _check_ret(model, ret)
@@ -113,7 +113,7 @@ function load_callback_variable_primal(cb_data::CallbackData, cb_where::Cint)
     else
         error(
             "`load_callback_variable_primal` can only be called at " *
-            "GRB_CB_MIPNODE or GRB_CB_MIPSOL."
+            "GRB_CB_MIPNODE or GRB_CB_MIPSOL.",
         )
     end
     return
@@ -154,7 +154,7 @@ end
 function MOI.get(
     model::Optimizer,
     ::MOI.CallbackVariablePrimal{CallbackData},
-    x::MOI.VariableIndex
+    x::MOI.VariableIndex,
 )
     return model.callback_variable_primal[_info(model, x).column]
 end
@@ -183,14 +183,22 @@ function MOI.submit(
     model::Optimizer,
     cb::MOI.LazyConstraint{CallbackData},
     f::MOI.ScalarAffineFunction{Float64},
-    s::Union{MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, MOI.EqualTo{Float64}}
+    s::Union{
+        MOI.LessThan{Float64},
+        MOI.GreaterThan{Float64},
+        MOI.EqualTo{Float64},
+    },
 )
     if model.callback_state == _CB_USER_CUT
         throw(MOI.InvalidCallbackUsage(MOI.UserCutCallback(), cb))
     elseif model.callback_state == _CB_HEURISTIC
         throw(MOI.InvalidCallbackUsage(MOI.HeuristicCallback(), cb))
     elseif !iszero(f.constant)
-        throw(MOI.ScalarFunctionConstantNotZero{Float64, typeof(f), typeof(s)}(f.constant))
+        throw(
+            MOI.ScalarFunctionConstantNotZero{Float64,typeof(f),typeof(s)}(
+                f.constant,
+            ),
+        )
     end
     indices, coefficients = _indices_and_coefficients(model, f)
     sense, rhs = _sense_and_rhs(s)
@@ -221,14 +229,22 @@ function MOI.submit(
     model::Optimizer,
     cb::MOI.UserCut{CallbackData},
     f::MOI.ScalarAffineFunction{Float64},
-    s::Union{MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, MOI.EqualTo{Float64}}
+    s::Union{
+        MOI.LessThan{Float64},
+        MOI.GreaterThan{Float64},
+        MOI.EqualTo{Float64},
+    },
 )
     if model.callback_state == _CB_LAZY
         throw(MOI.InvalidCallbackUsage(MOI.LazyConstraintCallback(), cb))
     elseif model.callback_state == _CB_HEURISTIC
         throw(MOI.InvalidCallbackUsage(MOI.HeuristicCallback(), cb))
     elseif !iszero(f.constant)
-        throw(MOI.ScalarFunctionConstantNotZero{Float64, typeof(f), typeof(s)}(f.constant))
+        throw(
+            MOI.ScalarFunctionConstantNotZero{Float64,typeof(f),typeof(s)}(
+                f.constant,
+            ),
+        )
     end
     indices, coefficients = _indices_and_coefficients(model, f)
     sense, rhs = _sense_and_rhs(s)
@@ -259,7 +275,7 @@ function MOI.submit(
     model::Optimizer,
     cb::MOI.HeuristicSolution{CallbackData},
     variables::Vector{MOI.VariableIndex},
-    values::MOI.Vector{Float64}
+    values::MOI.Vector{Float64},
 )
     if model.callback_state == _CB_LAZY
         throw(MOI.InvalidCallbackUsage(MOI.LazyConstraintCallback(), cb))
@@ -273,6 +289,7 @@ function MOI.submit(
     objP = Ref{Cdouble}()
     ret = GRBcbsolution(cb.callback_data, solution, objP)
     _check_ret(model, ret)
-    return objP[] < GRB_INFINITY ? MOI.HEURISTIC_SOLUTION_ACCEPTED : MOI.HEURISTIC_SOLUTION_REJECTED
+    return objP[] < GRB_INFINITY ? MOI.HEURISTIC_SOLUTION_ACCEPTED :
+           MOI.HEURISTIC_SOLUTION_REJECTED
 end
 MOI.supports(::Optimizer, ::MOI.HeuristicSolution{CallbackData}) = true
