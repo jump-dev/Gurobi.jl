@@ -6,6 +6,10 @@ if isfile(DEPS_FILE)
     rm(DEPS_FILE)
 end
 
+if Int === Int32
+    error("Gurobi.jl does not support 32-bit Julia. Please install a 64-bit Julia.")
+end
+
 function write_depsfile(path)
     open(DEPS_FILE, "w") do io
         println(io, "const libgurobi = \"$(escape_string(path))\"")
