@@ -100,11 +100,6 @@ mutable struct Env
     function Env()
         a = Ref{Ptr{Cvoid}}()
         ret = GRBloadenv(a, C_NULL)
-        if ret == 10009
-            error("Gurobi Error 10009: Failed to obtain a valid license")
-        elseif ret != 0
-            error("Gurobi Error $(ret): failed to create environment")
-        end
         env = new(a[], false, 0)
         finalizer(env) do e
             e.finalize_called = true
@@ -114,6 +109,8 @@ mutable struct Env
                 e.ptr_env = C_NULL
             end
         end
+        # Even if the loadenv fails, the pointer is still valid.
+        _check_ret(env, ret)
         return env
     end
 end
