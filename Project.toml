@@ -10,7 +10,7 @@ MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 
 [compat]
 CEnum = "0.3, 0.4"
-MathOptInterface = "~0.9.19"
+MathOptInterface = "~0.10"
 julia = "1"
 
 [extras]

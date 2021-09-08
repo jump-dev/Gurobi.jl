@@ -1,6 +1,19 @@
 module TestCallbacks
 
-using Gurobi, Test, Random
+using Gurobi
+using Random
+using Test
+
+function runtests()
+    for name in names(@__MODULE__; all = true)
+        if startswith("$(name)", "test_")
+            @testset "$(name)" begin
+                getfield(@__MODULE__, name)()
+            end
+        end
+    end
+    return
+end
 
 const MOI = Gurobi.MOI
 
@@ -8,10 +21,10 @@ const GRB_ENV = isdefined(Main, :GRB_ENV) ? Main.GRB_ENV : Gurobi.Env()
 
 function callback_simple_model()
     model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.RawParameter("OutputFlag"), 0)
-    MOI.set(model, MOI.RawParameter("Cuts"), 0)
-    MOI.set(model, MOI.RawParameter("Presolve"), 0)
-    MOI.set(model, MOI.RawParameter("Heuristics"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("OutputFlag"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Cuts"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Presolve"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Heuristics"), 0)
     MOI.Utilities.loadfromstring!(
         model,
         """
@@ -30,14 +43,14 @@ end
 
 function callback_knapsack_model()
     model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.RawParameter("OutputFlag"), 0)
-    MOI.set(model, MOI.RawParameter("Cuts"), 0)
-    MOI.set(model, MOI.RawParameter("Presolve"), 0)
-    MOI.set(model, MOI.RawParameter("PreCrush"), 0)
-    MOI.set(model, MOI.RawParameter("Heuristics"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("OutputFlag"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Cuts"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Presolve"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("PreCrush"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Heuristics"), 0)
     N = 30
     x = MOI.add_variables(model, N)
-    MOI.add_constraints(model, MOI.SingleVariable.(x), MOI.ZeroOne())
+    MOI.add_constraints(model, x, MOI.ZeroOne())
     MOI.set.(model, MOI.VariablePrimalStart(), x, 0.0)
     Random.seed!(1)
     item_weights, item_values = rand(N), rand(N)
@@ -392,7 +405,7 @@ function test_CallbackFunction_callback_LazyConstraint()
             end
         end
     end
-    MOI.set(model, MOI.RawParameter("LazyConstraints"), 1)
+    MOI.set(model, MOI.RawOptimizerAttribute("LazyConstraints"), 1)
     MOI.set(model, Gurobi.CallbackFunction(), callback_function)
     MOI.optimize!(model)
     @test MOI.get(model, MOI.VariablePrimal(), x) == 1
@@ -538,4 +551,4 @@ end
 
 end  # module TestCallbacks
 
-runtests(TestCallbacks)
+TestCallbacks.runtests()
