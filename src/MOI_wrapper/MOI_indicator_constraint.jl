@@ -1,9 +1,6 @@
 function _info(
     model::Optimizer,
-    c::MOI.ConstraintIndex{
-        MOI.VectorAffineFunction{Float64},
-        <:MOI.IndicatorSet,
-    },
+    c::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64},<:MOI.Indicator},
 )
     if haskey(model.indicator_constraint_info, c.value)
         return model.indicator_constraint_info[c.value]
@@ -14,7 +11,7 @@ end
 function MOI.supports_constraint(
     ::Optimizer,
     ::Type{MOI.VectorAffineFunction{Float64}},
-    ::Type{<:MOI.IndicatorSet{A,S}},
+    ::Type{<:MOI.Indicator{A,S}},
 ) where {A,S<:_SUPPORTED_SCALAR_SETS}
     return true
 end
@@ -22,7 +19,7 @@ end
 function MOI.is_valid(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64},S},
-) where {S<:MOI.IndicatorSet}
+) where {S<:MOI.Indicator}
     info = get(model.indicator_constraint_info, c.value, nothing)
     if info === nothing
         return false
@@ -33,7 +30,7 @@ end
 function MOI.get(
     model::Optimizer,
     ::MOI.ConstraintSet,
-    c::MOI.ConstraintIndex{<:MOI.VectorAffineFunction,<:MOI.IndicatorSet},
+    c::MOI.ConstraintIndex{<:MOI.VectorAffineFunction,<:MOI.Indicator},
 )
     MOI.throw_if_not_valid(model, c)
     return _info(model, c).set
@@ -42,7 +39,7 @@ end
 function MOI.get(
     model::Optimizer,
     ::MOI.ConstraintFunction,
-    c::MOI.ConstraintIndex{<:MOI.VectorAffineFunction,<:MOI.IndicatorSet},
+    c::MOI.ConstraintIndex{<:MOI.VectorAffineFunction,<:MOI.Indicator},
 )
     MOI.throw_if_not_valid(model, c)
     _update_if_necessary(model)
@@ -89,7 +86,7 @@ end
 function MOI.add_constraint(
     model::Optimizer,
     func::MOI.VectorAffineFunction{Float64},
-    s::MOI.IndicatorSet{A,S},
+    s::MOI.Indicator{A,S},
 ) where {A,S<:_SUPPORTED_SCALAR_SETS}
     if !iszero(func.constants[1])
         error(
@@ -112,10 +109,10 @@ function MOI.add_constraint(
                     "be 1.0. Got $(term.coefficient).",
                 )
             end
-            binvar = Cint(column(model, term.variable_index) - 1)
+            binvar = Cint(column(model, term.variable) - 1)
         else
             @assert row == 2
-            vars[i] = Cint(column(model, term.variable_index) - 1)
+            vars[i] = Cint(column(model, term.variable) - 1)
             vals[i] = term.coefficient
             i += 1
         end
@@ -146,7 +143,7 @@ end
 function MOI.get(
     model::Optimizer,
     ::MOI.ListOfConstraintIndices{<:MOI.VectorAffineFunction,S},
-) where {S<:MOI.IndicatorSet}
+) where {S<:MOI.Indicator}
     indices = MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64},S}[
         MOI.ConstraintIndex{MOI.VectorAffineFunction{Float64},S}(key) for
         (key, info) in model.indicator_constraint_info if isa(info.set, S)
@@ -157,14 +154,14 @@ end
 function MOI.get(
     model::Optimizer,
     ::MOI.NumberOfConstraints{MOI.VectorAffineFunction{Float64},S},
-) where {S<:MOI.IndicatorSet}
+) where {S<:MOI.Indicator}
     return count(x -> isa(x.set, S), values(model.indicator_constraint_info))
 end
 
 function MOI.get(
     model::Optimizer,
     ::MOI.ConstraintName,
-    c::MOI.ConstraintIndex{<:MOI.VectorAffineFunction,<:MOI.IndicatorSet},
+    c::MOI.ConstraintIndex{<:MOI.VectorAffineFunction,<:MOI.Indicator},
 )
     MOI.throw_if_not_valid(model, c)
     return _info(model, c).name
@@ -175,7 +172,7 @@ function MOI.set(
     ::MOI.ConstraintName,
     c::MOI.ConstraintIndex{<:MOI.VectorAffineFunction,S},
     name::String,
-) where {S<:MOI.IndicatorSet}
+) where {S<:MOI.Indicator}
     MOI.throw_if_not_valid(model, c)
     _update_if_necessary(model)
     info = _info(model, c)
@@ -190,7 +187,7 @@ end
 
 function MOI.delete(
     model::Optimizer,
-    c::MOI.ConstraintIndex{<:MOI.VectorAffineFunction,<:MOI.IndicatorSet},
+    c::MOI.ConstraintIndex{<:MOI.VectorAffineFunction,<:MOI.Indicator},
 )
     MOI.throw_if_not_valid(model, c)
     row = _info(model, c).row

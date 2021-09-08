@@ -26,7 +26,7 @@ function MOI.set(
     num_vars = length(model.variable_info)
     obj = zeros(Float64, num_vars)
     for term in f.terms
-        column = _info(model, term.variable_index).column
+        column = _info(model, term.variable).column
         obj[column] += term.coefficient
     end
     indices, coefficients = _indices_and_coefficients(model, f)

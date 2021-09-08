@@ -5,230 +5,92 @@ using Random
 using Test
 
 const MOI = Gurobi.MOI
-const MOIT = MOI.Test
+
+function runtests()
+    for name in names(@__MODULE__; all = true)
+        if !startswith("$(name)", "test_")
+            continue
+        end
+        @testset "$(name)" begin
+            if startswith("$(name)", "test_MULTI_ENV")
+                try
+                    getfield(@__MODULE__, name)()
+                catch ex
+                    if ex == ErrorException(
+                        "Gurobi Error 10009: Failed to obtain a valid license",
+                    )
+                        @warn(
+                            "Skipping a test because there was an issue " *
+                            "creating multiple licenses. This is probably " *
+                            "because you have a limited license."
+                        )
+                    else
+                        rethrow(ex)
+                    end
+                end
+            else
+                getfield(@__MODULE__, name)()
+            end
+        end
+    end
+    return
+end
 
 const GRB_ENV = isdefined(Main, :GRB_ENV) ? Main.GRB_ENV : Gurobi.Env()
 
-const OPTIMIZER = MOI.Bridges.full_bridge_optimizer(
-    begin
-        model = Gurobi.Optimizer(GRB_ENV)
-        MOI.set(model, MOI.Silent(), true)
-        # We set `DualReductions = 0` so that we never return
-        # `INFEASIBLE_OR_UNBOUNDED`.
-        MOI.set(model, MOI.RawParameter("DualReductions"), 0)
-        MOI.set(model, MOI.RawParameter("QCPDual"), 1)
-        MOI.set(model, MOI.RawParameter("InfUnbdInfo"), 1)
-        MOI.set(model, MOI.RawParameter("NonConvex"), 2)
-        model
-    end,
-    Float64,
-)
-const CONFIG = MOIT.TestConfig()
-
-function test_basic_constraint_tests()
-    MOIT.basic_constraint_tests(
-        OPTIMIZER,
-        CONFIG;
-        exclude = [
-            (MOI.VectorOfVariables, MOI.SecondOrderCone),
-            (MOI.VectorOfVariables, MOI.RotatedSecondOrderCone),
-            (MOI.VectorOfVariables, MOI.GeometricMeanCone),
-            (MOI.VectorAffineFunction{Float64}, MOI.SecondOrderCone),
-            (MOI.VectorAffineFunction{Float64}, MOI.RotatedSecondOrderCone),
-            (MOI.VectorAffineFunction{Float64}, MOI.GeometricMeanCone),
-            (MOI.VectorQuadraticFunction{Float64}, MOI.SecondOrderCone),
-            (MOI.VectorQuadraticFunction{Float64}, MOI.RotatedSecondOrderCone),
-            (MOI.VectorQuadraticFunction{Float64}, MOI.GeometricMeanCone),
-        ],
-    )
-    # TODO(odow): bugs deleting SOC variables. See also the
-    # `delete_soc_variables` test.
-    return MOIT.basic_constraint_tests(
-        OPTIMIZER,
-        CONFIG;
-        include = [
-            (MOI.VectorOfVariables, MOI.SecondOrderCone),
-            (MOI.VectorOfVariables, MOI.RotatedSecondOrderCone),
-            (MOI.VectorOfVariables, MOI.GeometricMeanCone),
-            (MOI.VectorAffineFunction{Float64}, MOI.SecondOrderCone),
-            (MOI.VectorAffineFunction{Float64}, MOI.RotatedSecondOrderCone),
-            (MOI.VectorAffineFunction{Float64}, MOI.GeometricMeanCone),
-            (MOI.VectorQuadraticFunction{Float64}, MOI.SecondOrderCone),
-            (MOI.VectorQuadraticFunction{Float64}, MOI.RotatedSecondOrderCone),
-            (MOI.VectorQuadraticFunction{Float64}, MOI.GeometricMeanCone),
-        ],
-        delete = false,
-    )
-end
-
-function test_unittest()
-    return MOIT.unittest(
-        OPTIMIZER,
-        MOIT.TestConfig(atol = 1e-6),
-        [
-            # TODO(odow): bug! We can't delete a vector of variables if one is in
-            # a second order cone.
-            "delete_soc_variables",
-        ],
-    )
-end
-
-function test_modificationtest()
-    return MOIT.modificationtest(OPTIMIZER, CONFIG)
-end
-
-function test_contlineartest()
-    return MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis = true))
-end
-
-function test_contquadratictest()
-    return MOIT.contquadratictest(
-        OPTIMIZER,
-        MOIT.TestConfig(atol = 1e-3, rtol = 1e-3),
-    )
-end
-
-function test_conictest()
-    MOIT.lintest(OPTIMIZER, CONFIG)
-    MOIT.soctest(
-        OPTIMIZER,
-        MOIT.TestConfig(duals = false, atol = 1e-3),
-        ["soc3"],
-    )
-    MOIT.soc3test(
-        OPTIMIZER,
-        MOIT.TestConfig(
-            duals = false,
-            infeas_certificates = false,
-            atol = 1e-3,
-        ),
-    )
-    MOIT.rsoctest(OPTIMIZER, MOIT.TestConfig(duals = false, atol = 5e-3))
-    return MOIT.geomeantest(
-        OPTIMIZER,
-        MOIT.TestConfig(duals = false, atol = 1e-3),
-    )
-end
-
-function test_intlinear()
-    return MOIT.intlineartest(OPTIMIZER, CONFIG)
-end
-
-function test_solvername()
-    @test MOI.get(OPTIMIZER, MOI.SolverName()) == "Gurobi"
-end
-
-function test_default_objective_test()
-    return MOIT.default_objective_test(OPTIMIZER)
-end
-
-function test_default_status_test()
-    return MOIT.default_status_test(OPTIMIZER)
-end
-
-function test_nametest()
-    return MOIT.nametest(OPTIMIZER)
-end
-
-function test_validtest()
-    return MOIT.validtest(OPTIMIZER)
-end
-
-function test_emptytest()
-    return MOIT.emptytest(OPTIMIZER)
-end
-
-function test_orderedindicestest()
-    return MOIT.orderedindicestest(OPTIMIZER)
-end
-
-function test_copytest()
-    return MOIT.copytest(
-        OPTIMIZER,
-        MOI.Bridges.full_bridge_optimizer(Gurobi.Optimizer(GRB_ENV), Float64),
-    )
-end
-
-function test_scalar_function_constant_not_zero()
-    return MOIT.scalar_function_constant_not_zero(OPTIMIZER)
-end
-
-function test_start_values_test()
-    model = Gurobi.Optimizer(GRB_ENV)
+function test_runtests()
+    model =
+        MOI.Bridges.full_bridge_optimizer(Gurobi.Optimizer(GRB_ENV), Float64)
     MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variables(model, 2)
-    @test MOI.supports(model, MOI.VariablePrimalStart(), MOI.VariableIndex)
-    @test MOI.get(model, MOI.VariablePrimalStart(), x[1]) === nothing
-    @test MOI.get(model, MOI.VariablePrimalStart(), x[2]) === nothing
-    Gurobi._update_if_necessary(model)
-    p = Ref{Cdouble}()
-    Gurobi.GRBgetdblattrelement(model.inner, "Start", Cint(0), p)
-    @test p[] == Gurobi.GRB_UNDEFINED
-    MOI.set(model, MOI.VariablePrimalStart(), x[1], 1.0)
-    MOI.set(model, MOI.VariablePrimalStart(), x[2], nothing)
-    @test MOI.get(model, MOI.VariablePrimalStart(), x[1]) == 1.0
-    @test MOI.get(model, MOI.VariablePrimalStart(), x[2]) === nothing
-    Gurobi._update_if_necessary(model)
-    Gurobi.GRBgetdblattrelement(model.inner, "Start", Cint(1), p)
-    @test p[] == Gurobi.GRB_UNDEFINED
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.ObjectiveValue()) == 0.0
-    # We don't support ConstraintDualStart or ConstraintPrimalStart yet.
-    # @test_broken MOIT.start_values_test(Gurobi.Optimizer(GRB_ENV), OPTIMIZER)
-end
-
-function test_supports_constrainttest()
-    # supports_constrainttest needs VectorOfVariables-in-Zeros,
-    # MOIT.supports_constrainttest(Gurobi.Optimizer(GRB_ENV), Float64, Float32)
-    # but supports_constrainttest is broken via bridges:
-    MOI.empty!(OPTIMIZER)
-    MOI.add_variable(OPTIMIZER)
-    @test MOI.supports_constraint(
-        OPTIMIZER,
-        MOI.SingleVariable,
-        MOI.EqualTo{Float64},
+    # We set `DualReductions = 0` so that we never return
+    # `INFEASIBLE_OR_UNBOUNDED`.
+    MOI.set(model, MOI.RawOptimizerAttribute("DualReductions"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("QCPDual"), 1)
+    MOI.set(model, MOI.RawOptimizerAttribute("InfUnbdInfo"), 1)
+    MOI.set(model, MOI.RawOptimizerAttribute("NonConvex"), 2)
+    MOI.Test.runtests(
+        model,
+        MOI.Test.Config(atol = 1e-3, rtol = 1e-3),
+        exclude = String[
+            # TODO(odow): investigate errors
+            "test_objective_set_via_modify",
+            "test_model_ListOfConstraintAttributesSet",
+            "test_solve_conflict_feasible",
+            # TODO(odow): fixed in MOI 0.10.1
+            "test_solve_SOS2_add_and_delete",
+            "test_objective_get_ObjectiveFunction_ScalarAffineFunction",
+            # SecondOrderCone does not return dual solutions. Tested below.
+            "_SecondOrderCone_",
+            "test_constraint_PrimalStart_DualStart_SecondOrderCone",
+            "_RotatedSecondOrderCone_",
+            "_GeometricMeanCone_",
+        ],
     )
-    @test MOI.supports_constraint(
-        OPTIMIZER,
-        MOI.ScalarAffineFunction{Float64},
-        MOI.EqualTo{Float64},
+    MOI.Test.runtests(
+        model,
+        MOI.Test.Config(
+            # Some of these conic ones have very low accuracy.
+            atol = 2e-3,
+            rtol = 1e-3,
+            exclude = Any[MOI.ConstraintDual, MOI.DualObjectiveValue],
+        ),
+        include = String[
+            "_SecondOrderCone_",
+            "test_constraint_PrimalStart_DualStart_SecondOrderCone",
+            "_RotatedSecondOrderCone_",
+            "_GeometricMeanCone_",
+        ],
+        exclude = String[
+            # TODO(odow): fixed in MOI 0.10.1
+            "test_conic_SecondOrderCone_negative_initial_bound",
+            "test_conic_SecondOrderCone_negative_post_bound",
+            "test_conic_SecondOrderCone_negative_post_bound_ii",
+            "test_conic_SecondOrderCone_no_initial_bound",
+            "test_conic_SecondOrderCone_nonnegative_initial_bound",
+            "test_conic_SecondOrderCone_nonnegative_post_bound",
+        ],
     )
-    # This test is broken for some reason:
-    @test_broken !MOI.supports_constraint(
-        OPTIMIZER,
-        MOI.ScalarAffineFunction{Int},
-        MOI.EqualTo{Float64},
-    )
-    @test !MOI.supports_constraint(
-        OPTIMIZER,
-        MOI.ScalarAffineFunction{Int},
-        MOI.EqualTo{Int},
-    )
-    @test !MOI.supports_constraint(
-        OPTIMIZER,
-        MOI.SingleVariable,
-        MOI.EqualTo{Int},
-    )
-    @test MOI.supports_constraint(OPTIMIZER, MOI.VectorOfVariables, MOI.Zeros)
-    @test !MOI.supports_constraint(
-        OPTIMIZER,
-        MOI.VectorOfVariables,
-        MOI.EqualTo{Float64},
-    )
-    @test !MOI.supports_constraint(OPTIMIZER, MOI.SingleVariable, MOI.Zeros)
-    @test !MOI.supports_constraint(
-        OPTIMIZER,
-        MOI.VectorOfVariables,
-        MOIT.UnknownVectorSet,
-    )
-end
-
-function test_set_lower_bound_twice()
-    return MOIT.set_lower_bound_twice(OPTIMIZER, Float64)
-end
-
-function test_set_upper_bound_twice()
-    return MOIT.set_upper_bound_twice(OPTIMIZER, Float64)
+    return
 end
 
 function test_User_limit_handling_issue_140()
@@ -242,13 +104,13 @@ function test_User_limit_handling_issue_140()
     # flaky or system-dependent time limits.
     m = Gurobi.Optimizer(GRB_ENV)
     MOI.set(m, MOI.Silent(), true)
-    MOI.set(m, MOI.RawParameter("SolutionLimit"), 1)
-    MOI.set(m, MOI.RawParameter("Heuristics"), 0)
-    MOI.set(m, MOI.RawParameter("Presolve"), 0)
+    MOI.set(m, MOI.RawOptimizerAttribute("SolutionLimit"), 1)
+    MOI.set(m, MOI.RawOptimizerAttribute("Heuristics"), 0)
+    MOI.set(m, MOI.RawOptimizerAttribute("Presolve"), 0)
     N = 100
     x = MOI.add_variables(m, N)
     for xi in x
-        MOI.add_constraint(m, MOI.SingleVariable(xi), MOI.ZeroOne())
+        MOI.add_constraint(m, xi, MOI.ZeroOne())
         MOI.set(m, MOI.VariablePrimalStart(), xi, 0.0)
     end
     # Given a collection of items with individual weights and values,
@@ -274,6 +136,7 @@ function test_User_limit_handling_issue_140()
     @test MOI.get(m, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
     # But we have no dual status:
     @test MOI.get(m, MOI.DualStatus()) == MOI.NO_SOLUTION
+    return
 end
 
 function test_Constant_objective_issue_111()
@@ -303,6 +166,7 @@ function test_Constant_objective_issue_111()
     ).constant == 3.0
     Gurobi.GRBgetdblattr(m.inner, "ObjCon", p)
     @test p[] == 3.0
+    return
 end
 
 function test_user_provided_env()
@@ -313,6 +177,7 @@ function test_user_provided_env()
     # Check that finalizer doesn't touch GRB_ENV when manually provided.
     finalize(model_1)
     @test GRB_ENV.ptr_env != C_NULL
+    return
 end
 
 function test_MULTI_ENV()
@@ -328,6 +193,7 @@ function test_MULTI_ENV_automatic_env()
     # Check that env is finalized with model when not supplied manually.
     finalize(model_1)
     @test model_1.env.ptr_env == C_NULL
+    return
 end
 
 function test_user_provided_env_empty()
@@ -337,6 +203,7 @@ function test_user_provided_env_empty()
     MOI.empty!(model)
     @test model.env === GRB_ENV
     @test GRB_ENV.ptr_env != C_NULL
+    return
 end
 
 function test_MULTI_ENV_automatic_env_empty()
@@ -345,6 +212,7 @@ function test_MULTI_ENV_automatic_env_empty()
     MOI.empty!(model)
     @test model.env === env
     @test env.ptr_env != C_NULL
+    return
 end
 
 function test_MULTI_ENV_manual_finalize()
@@ -354,275 +222,13 @@ function test_MULTI_ENV_manual_finalize()
     @test env.finalize_called
     finalize(model)
     @test env.ptr_env == C_NULL
-end
-
-function test_Conflict_refiner_bound_bound()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variable(model)
-    c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(2.0))
-    c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(1.0))
-
-    # Getting the results before the conflict refiner has been called must return an error.
-    @test MOI.get(model, Gurobi.ConflictStatus()) == -1
-    @test MOI.get(model, MOI.ConflictStatus()) ==
-          MOI.COMPUTE_CONFLICT_NOT_CALLED
-    @test_throws ErrorException MOI.get(
-        model,
-        MOI.ConstraintConflictStatus(),
-        c1,
-    )
-
-    # Once it's called, no problem.
-    MOI.compute_conflict!(model)
-    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
-    @test MOI.get(model, Gurobi.ConflictStatus()) == 0
-    @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) == MOI.IN_CONFLICT
-end
-
-function test_Conflict_refiner_bound_affine()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variable(model)
-    c1 = MOI.add_constraint(
-        model,
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0),
-        MOI.GreaterThan(2.0),
-    )
-    c2 = MOI.add_constraint(
-        model,
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0),
-        MOI.LessThan(1.0),
-    )
-
-    # Getting the results before the conflict refiner has been called must return an error.
-    @test MOI.get(model, Gurobi.ConflictStatus()) == -1
-    @test MOI.get(model, MOI.ConflictStatus()) ==
-          MOI.COMPUTE_CONFLICT_NOT_CALLED
-    @test_throws ErrorException MOI.get(
-        model,
-        MOI.ConstraintConflictStatus(),
-        c1,
-    )
-
-    # Once it's called, no problem.
-    MOI.compute_conflict!(model)
-    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
-    @test MOI.get(model, Gurobi.ConflictStatus()) == 0
-    @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) == MOI.IN_CONFLICT
-end
-
-function test_Conflict_refiner_invalid_interval()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variable(model)
-    c1 =
-        MOI.add_constraint(model, MOI.SingleVariable(x), MOI.Interval(1.0, 0.0))
-    # Getting the results before the conflict refiner has been called must return an error.
-    @test MOI.get(model, Gurobi.ConflictStatus()) == -1
-    @test MOI.get(model, MOI.ConflictStatus()) ==
-          MOI.COMPUTE_CONFLICT_NOT_CALLED
-    @test_throws ErrorException MOI.get(
-        model,
-        MOI.ConstraintConflictStatus(),
-        c1,
-    )
-
-    # Once it's called, no problem.
-    MOI.compute_conflict!(model)
-    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
-    @test MOI.get(model, Gurobi.ConflictStatus()) == 0
-    @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.IN_CONFLICT
-end
-
-function test_Conflict_refiner_affine_affine()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variable(model)
-    y = MOI.add_variable(model)
-    b1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(0.0))
-    b2 = MOI.add_constraint(model, MOI.SingleVariable(y), MOI.GreaterThan(0.0))
-    cf1 =
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0, 1.0], [x, y]), 0.0)
-    c1 = MOI.add_constraint(model, cf1, MOI.LessThan(-1.0))
-    cf2 = MOI.ScalarAffineFunction(
-        MOI.ScalarAffineTerm.([1.0, -1.0], [x, y]),
-        0.0,
-    )
-    c2 = MOI.add_constraint(model, cf2, MOI.GreaterThan(1.0))
-
-    # Getting the results before the conflict refiner has been called must return an error.
-    @test MOI.get(model, Gurobi.ConflictStatus()) == -1
-    @test MOI.get(model, MOI.ConflictStatus()) ==
-          MOI.COMPUTE_CONFLICT_NOT_CALLED
-    @test_throws ErrorException MOI.get(
-        model,
-        MOI.ConstraintConflictStatus(),
-        c1,
-    )
-
-    # Once it's called, no problem.
-    MOI.compute_conflict!(model)
-    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
-    @test MOI.get(model, Gurobi.ConflictStatus()) == 0
-    @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), b1) == MOI.IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), b2) == MOI.IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) ==
-          MOI.NOT_IN_CONFLICT
-end
-
-function test_Conflict_refiner_equalto()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variable(model)
-    y = MOI.add_variable(model)
-    b1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(0.0))
-    b2 = MOI.add_constraint(model, MOI.SingleVariable(y), MOI.GreaterThan(0.0))
-    cf1 =
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0, 1.0], [x, y]), 0.0)
-    c1 = MOI.add_constraint(model, cf1, MOI.EqualTo(-1.0))
-    cf2 = MOI.ScalarAffineFunction(
-        MOI.ScalarAffineTerm.([1.0, -1.0], [x, y]),
-        0.0,
-    )
-    c2 = MOI.add_constraint(model, cf2, MOI.GreaterThan(1.0))
-
-    # Getting the results before the conflict refiner has been called must return an error.
-    @test MOI.get(model, Gurobi.ConflictStatus()) == -1
-    @test MOI.get(model, MOI.ConflictStatus()) ==
-          MOI.COMPUTE_CONFLICT_NOT_CALLED
-    @test_throws ErrorException MOI.get(
-        model,
-        MOI.ConstraintConflictStatus(),
-        c1,
-    )
-
-    # Once it's called, no problem.
-    MOI.compute_conflict!(model)
-    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
-    @test MOI.get(model, Gurobi.ConflictStatus()) == 0
-    @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), b1) == MOI.IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), b2) == MOI.IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) ==
-          MOI.NOT_IN_CONFLICT
-end
-
-function test_Conflict_refiner_outside_conflict()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variable(model)
-    y = MOI.add_variable(model)
-    z = MOI.add_variable(model)
-    b1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(0.0))
-    b2 = MOI.add_constraint(model, MOI.SingleVariable(y), MOI.GreaterThan(0.0))
-    b3 = MOI.add_constraint(model, MOI.SingleVariable(z), MOI.GreaterThan(0.0))
-    cf1 =
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0, 1.0], [x, y]), 0.0)
-    c1 = MOI.add_constraint(model, cf1, MOI.LessThan(-1.0))
-    cf2 = MOI.ScalarAffineFunction(
-        MOI.ScalarAffineTerm.([1.0, -1.0, 1.0], [x, y, z]),
-        0.0,
-    )
-    c2 = MOI.add_constraint(model, cf2, MOI.GreaterThan(1.0))
-
-    # Getting the results before the conflict refiner has been called must return an error.
-    @test MOI.get(model, Gurobi.ConflictStatus()) == -1
-    @test MOI.get(model, MOI.ConflictStatus()) ==
-          MOI.COMPUTE_CONFLICT_NOT_CALLED
-    @test_throws ErrorException MOI.get(
-        model,
-        MOI.ConstraintConflictStatus(),
-        c1,
-    )
-
-    # Once it's called, no problem.
-    MOI.compute_conflict!(model)
-    @test MOI.get(model, MOI.TerminationStatus()) == MOI.INFEASIBLE
-    @test MOI.get(model, Gurobi.ConflictStatus()) == 0
-    @test MOI.get(model, MOI.ConflictStatus()) == MOI.CONFLICT_FOUND
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), b1) == MOI.IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), b2) == MOI.IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), b3) ==
-          MOI.NOT_IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) ==
-          MOI.NOT_IN_CONFLICT
-end
-
-function test_Conflict_refiner_no_conflict()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variable(model)
-    c1 = MOI.add_constraint(
-        model,
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0),
-        MOI.GreaterThan(1.0),
-    )
-    c2 = MOI.add_constraint(
-        model,
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0),
-        MOI.LessThan(2.0),
-    )
-
-    # Getting the results before the conflict refiner has been called must return an error.
-    @test MOI.get(model, Gurobi.ConflictStatus()) == -1
-    @test MOI.get(model, MOI.ConflictStatus()) ==
-          MOI.COMPUTE_CONFLICT_NOT_CALLED
-    @test_throws ErrorException MOI.get(
-        model,
-        MOI.ConstraintConflictStatus(),
-        c1,
-    )
-
-    # TODO(odow): bypass Gurobi's IIS checker when underlying model is
-    # feasible.
-    # @test_throws Gurobi.GurobiError MOI.compute_conflict!(model)
-    # @test MOI.get(model, Gurobi.ConflictStatus()) == Gurobi.IIS_NOT_INFEASIBLE
-    # @test MOI.get(model, MOI.ConflictStatus()) == MOI.NO_CONFLICT_EXISTS
-    # @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) == MOI.NOT_IN_CONFLICT
-    # @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) == MOI.NOT_IN_CONFLICT
-end
-
-function test_Conflict_refiner_integer_constraint()
-    # Root problem: missing method to get the status for an integrality 
-    # constraint.
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x, c1 = MOI.add_constrained_variable(model, MOI.ZeroOne())
-    c2 = MOI.add_constraint(
-        model,
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.([1.0], [x]), 0.0),
-        MOI.GreaterThan(2.0),
-    )
-
-    MOI.optimize!(model)
-    MOI.compute_conflict!(model)
-    @test MOI.get(model, Gurobi.ConflictStatus()) == 0
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) ==
-          MOI.MAYBE_IN_CONFLICT
-    @test MOI.get(model, MOI.ConstraintConflictStatus(), c2) == MOI.IN_CONFLICT
-end
-
-function test_RawParameter()
-    model = Gurobi.Optimizer(GRB_ENV)
-    @test MOI.get(model, MOI.RawParameter("OutputFlag")) == 1
-    MOI.set(model, MOI.RawParameter("OutputFlag"), 0)
-    @test MOI.get(model, MOI.RawParameter("OutputFlag")) == 0
+    return
 end
 
 function test_QCPDual_1()
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
-    MOI.set(model, MOI.RawParameter("QCPDual"), 1)
+    MOI.set(model, MOI.RawOptimizerAttribute("QCPDual"), 1)
     MOI.Utilities.loadfromstring!(
         model,
         """
@@ -631,9 +237,9 @@ minobjective: 1.0 * x + 1.0 * y + 1.0 * z
 c1: x + y == 2.0
 c2: x + y + z >= 0.0
 c3: 1.0 * x * x + -1.0 * y * y + -1.0 * z * z >= 0.0
-c4: x >= 0.0
-c5: y >= 0.0
-c6: z >= 0.0
+x >= 0.0
+y >= 0.0
+z >= 0.0
 """,
     )
     MOI.optimize!(model)
@@ -646,6 +252,7 @@ c6: z >= 0.0
     @test MOI.get(model, MOI.ConstraintDual(), c1) ≈ 1.0 atol = 1e-6
     @test MOI.get(model, MOI.ConstraintDual(), c2) ≈ 0.0 atol = 1e-6
     @test MOI.get(model, MOI.ConstraintDual(), c3) ≈ 0.0 atol = 1e-6
+    return
 end
 
 function test_QCPDual_default()
@@ -659,9 +266,9 @@ minobjective: 1.0 * x + 1.0 * y + 1.0 * z
 c1: x + y == 2.0
 c2: x + y + z >= 0.0
 c3: 1.0 * x * x + -1.0 * y * y + -1.0 * z * z >= 0.0
-c4: x >= 0.0
-c5: y >= 0.0
-c6: z >= 0.0
+x >= 0.0
+y >= 0.0
+z >= 0.0
 """,
     )
     MOI.optimize!(model)
@@ -674,155 +281,7 @@ c6: z >= 0.0
     @test_throws ErrorException MOI.get(model, MOI.ConstraintDual(), c1)
     @test_throws ErrorException MOI.get(model, MOI.ConstraintDual(), c2)
     @test_throws ErrorException MOI.get(model, MOI.ConstraintDual(), c3)
-end
-
-function test_Add_and_delete_constraints()
-    model = Gurobi.Optimizer(GRB_ENV)
-    x = MOI.add_variables(model, 2)
-    cs = MOI.add_constraints(
-        model,
-        [
-            MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, x[i])], 0.0) for i in 1:2
-        ],
-        MOI.EqualTo.([0.0, 0.0]),
-    )
-    @test MOI.get(
-        model,
-        MOI.NumberOfConstraints{
-            MOI.ScalarAffineFunction{Float64},
-            MOI.EqualTo{Float64},
-        }(),
-    ) == 2
-    MOI.delete(model, cs)
-    @test iszero(
-        MOI.get(
-            model,
-            MOI.NumberOfConstraints{
-                MOI.ScalarAffineFunction{Float64},
-                MOI.EqualTo{Float64},
-            }(),
-        ),
-    )
-end
-
-function test_Add_and_delete_sos_constraints()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    # SOS2 to model piecewise linear function
-    xp1 = [1.0, 2.0, 3.0]
-    yp1 = [3.0, 2.0, 3.0]
-    λ = MOI.add_variables(model, length(xp1))
-    for v in λ
-        MOI.add_constraint(model, MOI.SingleVariable(v), MOI.LessThan(1.0))
-        MOI.add_constraint(model, MOI.SingleVariable(v), MOI.GreaterThan(0.0))
-    end
-    xp2 = [1.0, 2.0, 3.0, 4.0]
-    yp2 = [3.0, 3.0, 2.0, 4.0]
-    η = MOI.add_variables(model, length(xp2))
-    for v in η
-        MOI.add_constraint(model, MOI.SingleVariable(v), MOI.LessThan(1.0))
-        MOI.add_constraint(model, MOI.SingleVariable(v), MOI.GreaterThan(0.0))
-    end
-    x = MOI.add_variables(model, 2)
-    y = MOI.add_variables(model, 2)
-    SOS2_cons = MOI.add_constraints(
-        model,
-        MOI.VectorOfVariables.([λ, η]),
-        MOI.SOS2{Float64}.([ones(length(λ)), ones(length(η))]),
-    )
-    MOI.add_constraint(
-        model,
-        MOI.ScalarAffineFunction(
-            map(v -> MOI.ScalarAffineTerm(1.0, v), λ),
-            0.0,
-        ),
-        MOI.EqualTo(1.0),
-    )
-    MOI.add_constraint(
-        model,
-        MOI.ScalarAffineFunction(
-            map(v -> MOI.ScalarAffineTerm(1.0, v), η),
-            0.0,
-        ),
-        MOI.EqualTo(1.0),
-    )
-    MOI.add_constraint(
-        model,
-        MOI.ScalarAffineFunction(
-            [
-                MOI.ScalarAffineTerm(-1.0, x[1]),
-                map(i -> MOI.ScalarAffineTerm(xp1[i], λ[i]), 1:length(xp1))...,
-            ],
-            0.0,
-        ),
-        MOI.EqualTo(0.0),
-    )
-    MOI.add_constraint(
-        model,
-        MOI.ScalarAffineFunction(
-            [
-                MOI.ScalarAffineTerm(-1.0, y[1]),
-                map(i -> MOI.ScalarAffineTerm(yp1[i], λ[i]), 1:length(xp1))...,
-            ],
-            0.0,
-        ),
-        MOI.EqualTo(0.0),
-    )
-    MOI.add_constraint(
-        model,
-        MOI.ScalarAffineFunction(
-            [
-                MOI.ScalarAffineTerm(-1.0, x[2]),
-                map(i -> MOI.ScalarAffineTerm(xp2[i], η[i]), 1:length(xp2))...,
-            ],
-            0.0,
-        ),
-        MOI.EqualTo(0.0),
-    )
-    MOI.add_constraint(
-        model,
-        MOI.ScalarAffineFunction(
-            [
-                MOI.ScalarAffineTerm(-1.0, y[2]),
-                map(i -> MOI.ScalarAffineTerm(yp2[i], η[i]), 1:length(xp2))...,
-            ],
-            0.0,
-        ),
-        MOI.EqualTo(0.0),
-    )
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
-        MOI.ScalarAffineFunction(
-            [MOI.ScalarAffineTerm(1.0, y[1]), MOI.ScalarAffineTerm(1.0, y[2])],
-            0.0,
-        ),
-    )
-    @test MOI.get(
-        model,
-        MOI.NumberOfConstraints{MOI.VectorOfVariables,MOI.SOS2{Float64}}(),
-    ) == 2
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), x[1]) ≈ 2.0 atol = 1e-6
-    @test MOI.get(model, MOI.VariablePrimal(), x[2]) ≈ 3.0 atol = 1e-6
-    MOI.delete(model, SOS2_cons)
-    @test MOI.get(
-        model,
-        MOI.NumberOfConstraints{MOI.VectorOfVariables,MOI.SOS2{Float64}}(),
-    ) == 0
-    SOS2_cons = MOI.add_constraints(
-        model,
-        MOI.VectorOfVariables.([λ, η]),
-        MOI.SOS2{Float64}.([ones(length(λ)), ones(length(η))]),
-    )
-    @test MOI.get(
-        model,
-        MOI.NumberOfConstraints{MOI.VectorOfVariables,MOI.SOS2{Float64}}(),
-    ) == 2
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), x[1]) ≈ 2.0 atol = 1e-6
-    @test MOI.get(model, MOI.VariablePrimal(), x[2]) ≈ 3.0 atol = 1e-6
+    return
 end
 
 function test_Buffered_deletion_test()
@@ -860,55 +319,7 @@ function test_Buffered_deletion_test()
     @test vars_obj[2] == MOI.get(model, obj_attr, vars[2])
     @test MOI.is_valid(model, fourth_var)
     @test fourth_var_obj == MOI.get(model, obj_attr, fourth_var)
-end
-
-function test_extra_name_Variables()
-    model = Gurobi.Optimizer(GRB_ENV)
-    x = MOI.add_variables(model, 3)
-    MOI.set(model, MOI.VariableName(), x[1], "x1")
-    @test MOI.get(model, MOI.VariableIndex, "x1") == x[1]
-    MOI.set(model, MOI.VariableName(), x[1], "x2")
-    @test MOI.get(model, MOI.VariableIndex, "x1") === nothing
-    @test MOI.get(model, MOI.VariableIndex, "x2") == x[1]
-    MOI.set(model, MOI.VariableName(), x[2], "x1")
-    @test MOI.get(model, MOI.VariableIndex, "x1") == x[2]
-    MOI.set(model, MOI.VariableName(), x[3], "xα")
-    @test MOI.get(model, MOI.VariableIndex, "xα") == x[3]
-    MOI.set(model, MOI.VariableName(), x[1], "x1")
-    @test_throws ErrorException MOI.get(model, MOI.VariableIndex, "x1")
-end
-
-function test_extra_name_Variable_bounds()
-    model = Gurobi.Optimizer(GRB_ENV)
-    x = MOI.add_variable(model)
-    c1 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(0.0))
-    c2 = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(1.0))
-    MOI.set(model, MOI.ConstraintName(), c1, "c1")
-    @test MOI.get(model, MOI.ConstraintIndex, "c1") == c1
-    MOI.set(model, MOI.ConstraintName(), c1, "c2")
-    @test MOI.get(model, MOI.ConstraintIndex, "c1") === nothing
-    @test MOI.get(model, MOI.ConstraintIndex, "c2") == c1
-    MOI.set(model, MOI.ConstraintName(), c2, "c1")
-    @test MOI.get(model, MOI.ConstraintIndex, "c1") == c2
-    MOI.set(model, MOI.ConstraintName(), c1, "c1")
-    @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "c1")
-end
-
-function test_extra_name_Affine_constraints()
-    model = Gurobi.Optimizer(GRB_ENV)
-    x = MOI.add_variable(model)
-    f = MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, x)], 0.0)
-    c1 = MOI.add_constraint(model, f, MOI.GreaterThan(0.0))
-    c2 = MOI.add_constraint(model, f, MOI.LessThan(1.0))
-    MOI.set(model, MOI.ConstraintName(), c1, "c1")
-    @test MOI.get(model, MOI.ConstraintIndex, "c1") == c1
-    MOI.set(model, MOI.ConstraintName(), c1, "c2")
-    @test MOI.get(model, MOI.ConstraintIndex, "c1") === nothing
-    @test MOI.get(model, MOI.ConstraintIndex, "c2") == c1
-    MOI.set(model, MOI.ConstraintName(), c2, "c1")
-    @test MOI.get(model, MOI.ConstraintIndex, "c1") == c2
-    MOI.set(model, MOI.ConstraintName(), c1, "c1")
-    @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "c1")
+    return
 end
 
 function test_ConstraintAttribute()
@@ -918,13 +329,12 @@ function test_ConstraintAttribute()
         """
 variables: x
 minobjective: x
-c1: x >= 0.0
-c2: 2x >= 1.0
-c3: x in Integer()
+x >= 0.0
+c: 2x >= 1.0
+x in Integer()
 """,
     )
-    c2 = MOI.get(model, MOI.ConstraintIndex, "c2")
-    c3 = MOI.get(model, MOI.ConstraintIndex, "c3")
+    c2 = MOI.get(model, MOI.ConstraintIndex, "c")
     # Linear constraints are supported - one test for each different type.
     # Integer attribute
     MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c2, 2)
@@ -938,12 +348,6 @@ c3: x in Integer()
     # String attribute
     MOI.set(model, Gurobi.ConstraintAttribute("ConstrName"), c2, "c4")
     @test MOI.get(model, Gurobi.ConstraintAttribute("ConstrName"), c2) == "c4"
-    # Things that should fail follow.
-    # Non-linear constraints are not supported.
-    @test_throws(
-        MOI.SetAttributeNotAllowed(Gurobi.ConstraintAttribute("Lazy")),
-        MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c3, 1)
-    )
     # Getting/setting a non-existing attribute.
     attr = Gurobi.ConstraintAttribute("Non-existing")
     err = ErrorException("Gurobi Error 10004: Unknown attribute 'Non-existing'")
@@ -956,6 +360,7 @@ c3: x in Integer()
         ),
         MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c2, 1.5)
     )
+    return
 end
 
 function test_VariableAttribute()
@@ -997,6 +402,7 @@ c3: x in Integer()
         ),
         MOI.set(model, Gurobi.VariableAttribute("BranchPriority"), x, 1.5)
     )
+    return
 end
 
 function test_ModelAttribute()
@@ -1034,371 +440,7 @@ c3: x in Integer()
         ),
         MOI.set(model, Gurobi.ModelAttribute("NumStart"), 4.0)
     )
-end
-
-function test_soc_no_initial_bound()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    t = MOI.add_variable(model)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraints(
-        model,
-        MOI.SingleVariable.(x),
-        MOI.GreaterThan.(3.0:4.0),
-    )
-    c_soc = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([t; x]),
-        MOI.SecondOrderCone(3),
-    )
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.SingleVariable}(),
-        MOI.SingleVariable(t),
-    )
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
-    MOI.delete(model, c_soc)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.TerminationStatus()) == MOI.DUAL_INFEASIBLE
-end
-
-function test_soc_nonnegative_initial_bound()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    t = MOI.add_variable(model)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraint(model, MOI.SingleVariable(t), MOI.GreaterThan(1.0))
-    MOI.add_constraints(
-        model,
-        MOI.SingleVariable.(x),
-        MOI.GreaterThan.(3.0:4.0),
-    )
-    c_soc = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([t; x]),
-        MOI.SecondOrderCone(3),
-    )
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.SingleVariable}(),
-        MOI.SingleVariable(t),
-    )
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
-    MOI.delete(model, c_soc)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 1.0
-end
-
-function test_soc_negative_initial_bound()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    t = MOI.add_variable(model)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraint(model, MOI.SingleVariable(t), MOI.GreaterThan(-1.0))
-    MOI.add_constraints(
-        model,
-        MOI.SingleVariable.(x),
-        MOI.GreaterThan.(3.0:4.0),
-    )
-    c_soc = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([t; x]),
-        MOI.SecondOrderCone(3),
-    )
-    MOI.optimize!(model)
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.SingleVariable}(),
-        MOI.SingleVariable(t),
-    )
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
-    MOI.delete(model, c_soc)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == -1.0
-end
-
-function test_soc_nonnegative_post_bound()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    t = MOI.add_variable(model)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraints(
-        model,
-        MOI.SingleVariable.(x),
-        MOI.GreaterThan.(3.0:4.0),
-    )
-    MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([t; x]),
-        MOI.SecondOrderCone(3),
-    )
-    c_lb =
-        MOI.add_constraint(model, MOI.SingleVariable(t), MOI.GreaterThan(6.0))
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.SingleVariable}(),
-        MOI.SingleVariable(t),
-    )
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 6.0
-    MOI.delete(model, c_lb)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
-end
-
-function test_soc_negative_post_bound()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    t = MOI.add_variable(model)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraints(
-        model,
-        MOI.SingleVariable.(x),
-        MOI.GreaterThan.(3.0:4.0),
-    )
-    c_soc = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([t; x]),
-        MOI.SecondOrderCone(3),
-    )
-    MOI.add_constraint(model, MOI.SingleVariable(t), MOI.GreaterThan(-6.0))
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.SingleVariable}(),
-        MOI.SingleVariable(t),
-    )
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
-    MOI.delete(model, c_soc)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == -6.0
-end
-
-function test_soc_negative_post_bound_ii()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    t = MOI.add_variable(model)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraints(
-        model,
-        MOI.SingleVariable.(x),
-        MOI.GreaterThan.(3.0:4.0),
-    )
-    c_soc = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([t; x]),
-        MOI.SecondOrderCone(3),
-    )
-    c_lb =
-        MOI.add_constraint(model, MOI.SingleVariable(t), MOI.GreaterThan(-6.0))
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.SingleVariable}(),
-        MOI.SingleVariable(t),
-    )
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
-    MOI.delete(model, c_lb)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
-    MOI.delete(model, c_soc)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.TerminationStatus()) == MOI.DUAL_INFEASIBLE
-end
-
-function test_soc_negative_post_bound_iii()
-    # This test was added because add_constraint and add_constraints had
-    # different implementations and add_constraints failed where
-    # add_constraint succeeded.
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    t = MOI.add_variable(model)
-    x = MOI.add_variables(model, 2)
-    c_soc = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([t; x]),
-        MOI.SecondOrderCone(3),
-    )
-    c_lbs = MOI.add_constraints(
-        model,
-        MOI.SingleVariable.([t; x]),
-        MOI.GreaterThan.([-6.0, 3.0, 4.0]),
-    )
-    c_lb = first(c_lbs)
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.SingleVariable}(),
-        MOI.SingleVariable(t),
-    )
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
-    MOI.delete(model, c_lb)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 5.0
-    MOI.delete(model, c_soc)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.TerminationStatus()) == MOI.DUAL_INFEASIBLE
-end
-
-function test_2_soc()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    t = MOI.add_variable(model)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraint(model, MOI.SingleVariable(t), MOI.GreaterThan(-1.0))
-    MOI.add_constraints(
-        model,
-        MOI.SingleVariable.(x),
-        MOI.GreaterThan.([4.0, 3.0]),
-    )
-    c_soc_1 = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([t, x[1]]),
-        MOI.SecondOrderCone(2),
-    )
-    c_soc_2 = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([t, x[2]]),
-        MOI.SecondOrderCone(2),
-    )
-    MOI.optimize!(model)
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.SingleVariable}(),
-        MOI.SingleVariable(t),
-    )
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 4.0
-    MOI.delete(model, c_soc_1)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == 3.0
-    MOI.delete(model, c_soc_2)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.VariablePrimal(), t) == -1.0
-end
-
-function test_Duplicate_names_Variables()
-    model = Gurobi.Optimizer(GRB_ENV)
-    (x, y, z) = MOI.add_variables(model, 3)
-    MOI.set(model, MOI.VariableName(), x, "x")
-    MOI.set(model, MOI.VariableName(), y, "x")
-    MOI.set(model, MOI.VariableName(), z, "z")
-    @test MOI.get(model, MOI.VariableIndex, "z") == z
-    @test_throws ErrorException MOI.get(model, MOI.VariableIndex, "x")
-    MOI.set(model, MOI.VariableName(), y, "y")
-    @test MOI.get(model, MOI.VariableIndex, "x") == x
-    @test MOI.get(model, MOI.VariableIndex, "y") == y
-    MOI.set(model, MOI.VariableName(), z, "x")
-    @test_throws ErrorException MOI.get(model, MOI.VariableIndex, "x")
-    MOI.delete(model, x)
-    @test MOI.get(model, MOI.VariableIndex, "x") == z
-end
-
-function test_Duplicate_names_SingleVariable()
-    model = Gurobi.Optimizer(GRB_ENV)
-    x = MOI.add_variables(model, 3)
-    c = MOI.add_constraints(model, MOI.SingleVariable.(x), MOI.GreaterThan(0.0))
-    MOI.set(model, MOI.ConstraintName(), c[1], "x")
-    MOI.set(model, MOI.ConstraintName(), c[2], "x")
-    MOI.set(model, MOI.ConstraintName(), c[3], "z")
-    @test MOI.get(model, MOI.ConstraintIndex, "z") == c[3]
-    @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "x")
-    MOI.set(model, MOI.ConstraintName(), c[2], "y")
-    @test MOI.get(model, MOI.ConstraintIndex, "x") == c[1]
-    @test MOI.get(model, MOI.ConstraintIndex, "y") == c[2]
-    MOI.set(model, MOI.ConstraintName(), c[3], "x")
-    @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "x")
-    MOI.delete(model, c[1])
-    @test MOI.get(model, MOI.ConstraintIndex, "x") == c[3]
-    MOI.set(model, MOI.ConstraintName(), c[2], "x")
-    @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "x")
-    MOI.delete(model, x[3])
-    @test MOI.get(model, MOI.ConstraintIndex, "x") == c[2]
-end
-
-function test_Duplicate_names_ScalarAffineFunction()
-    model = Gurobi.Optimizer(GRB_ENV)
-    x = MOI.add_variables(model, 3)
-    fs = [
-        MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, xi)], 0.0) for
-        xi in x
-    ]
-    c = MOI.add_constraints(model, fs, MOI.GreaterThan(0.0))
-    MOI.set(model, MOI.ConstraintName(), c[1], "x")
-    MOI.set(model, MOI.ConstraintName(), c[2], "x")
-    MOI.set(model, MOI.ConstraintName(), c[3], "z")
-    @test MOI.get(model, MOI.ConstraintIndex, "z") == c[3]
-    @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "x")
-    MOI.set(model, MOI.ConstraintName(), c[2], "y")
-    @test MOI.get(model, MOI.ConstraintIndex, "x") == c[1]
-    @test MOI.get(model, MOI.ConstraintIndex, "y") == c[2]
-    MOI.set(model, MOI.ConstraintName(), c[3], "x")
-    @test_throws ErrorException MOI.get(model, MOI.ConstraintIndex, "x")
-    MOI.delete(model, c[1])
-    @test MOI.get(model, MOI.ConstraintIndex, "x") == c[3]
-end
-
-function test_Duals_with_equal_bounds_250()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variable(model)
-    xl = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(1.0))
-    xu = MOI.add_constraint(model, MOI.SingleVariable(x), MOI.LessThan(1.0))
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.SingleVariable}(),
-        MOI.SingleVariable(x),
-    )
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.ConstraintDual(), xl) == 1.0
-    @test MOI.get(model, MOI.ConstraintDual(), xu) == 0.0
-end
-
-function test_Objective_functions()
-    model = Gurobi.Optimizer(GRB_ENV)
-    x = MOI.add_variable(model)
-    @test MOI.get(model, MOI.ObjectiveSense()) == MOI.FEASIBILITY_SENSE
-    @test MOI.get(model, MOI.ListOfModelAttributesSet()) ==
-          Any[MOI.ObjectiveSense()]
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.SingleVariable}(),
-        MOI.SingleVariable(x),
-    )
-    @test MOI.get(model, MOI.ListOfModelAttributesSet()) ==
-          Any[MOI.ObjectiveSense(), MOI.ObjectiveFunction{MOI.SingleVariable}()]
-    MOI.set(model, MOI.ObjectiveSense(), MOI.FEASIBILITY_SENSE)
-    @test MOI.get(model, MOI.ListOfModelAttributesSet()) ==
-          Any[MOI.ObjectiveSense()]
-end
-
-function test_FEASIBILITY_SENSE_zeros_objective()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variable(model)
-    MOI.add_constraint(model, MOI.SingleVariable(x), MOI.GreaterThan(1.0))
-    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.SingleVariable}(),
-        MOI.SingleVariable(x),
-    )
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.ObjectiveValue()) == 1.0
-    MOI.set(model, MOI.ObjectiveSense(), MOI.FEASIBILITY_SENSE)
-    MOI.optimize!(model)
-    @test MOI.get(model, MOI.ObjectiveValue()) == 0.0
+    return
 end
 
 function test_Attributes()
@@ -1417,12 +459,11 @@ function test_GRBterminate()
     MOI.set(
         model,
         Gurobi.CallbackFunction(),
-        (cb_data, cb_where) -> begin
-            GRBterminate(model)
-        end,
+        (cb_data, cb_where) -> GRBterminate(model),
     )
     MOI.optimize!(model)
     @test MOI.get(model, MOI.TerminationStatus()) == MOI.INTERRUPTED
+    return
 end
 
 """
@@ -1443,14 +484,10 @@ function test_InterruptException()
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variable(model)
-    MOI.add_constraint(model, MOI.SingleVariable(x), MOI.Integer())
+    MOI.add_constraint(model, x, MOI.Integer())
     MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    MOI.set(
-        model,
-        MOI.ObjectiveFunction{MOI.SingleVariable}(),
-        MOI.SingleVariable(x),
-    )
-    MOI.set(model, MOI.RawParameter("LazyConstraints"), 1)
+    MOI.set(model, MOI.ObjectiveFunction{MOI.VariableIndex}(), x)
+    MOI.set(model, MOI.RawOptimizerAttribute("LazyConstraints"), 1)
     interrupt_thrown = false
     i = 0.0
     MOI.set(
@@ -1478,108 +515,7 @@ function test_InterruptException()
     )
     MOI.optimize!(model)
     @test MOI.get(model, MOI.TerminationStatus()) == MOI.INTERRUPTED
-end
-
-function test_indicator_name()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
-    f = MOI.VectorAffineFunction(
-        [
-            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x[1])),
-            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
-        ],
-        [0.0, 0.0],
-    )
-    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
-    c = MOI.add_constraint(model, f, s)
-    MOI.set(model, MOI.ConstraintName(), c, "my_indicator")
-    @test MOI.get(model, MOI.ConstraintName(), c) == "my_indicator"
-end
-
-function test_indicator_on_one()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
-    f = MOI.VectorAffineFunction(
-        [
-            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x[1])),
-            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
-        ],
-        [0.0, 0.0],
-    )
-    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
-    c = MOI.add_constraint(model, f, s)
-    @test MOI.get(model, MOI.ConstraintSet(), c) == s
-    @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c), f)
-end
-
-function test_indicator_on_zero()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
-    f = MOI.VectorAffineFunction(
-        [
-            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x[1])),
-            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
-        ],
-        [0.0, 0.0],
-    )
-    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ZERO}(MOI.GreaterThan(1.0))
-    c = MOI.add_constraint(model, f, s)
-    @test MOI.get(model, MOI.ConstraintSet(), c) == s
-    @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c), f)
-end
-
-function test_indicator_nonconstant_x()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
-    f = MOI.VectorAffineFunction(
-        [
-            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(-1.0, x[1])),
-            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
-        ],
-        [0.0, 0.0],
-    )
-    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
-    @test_throws ErrorException MOI.add_constraint(model, f, s)
-end
-
-function test_indicator_too_many_indicators()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
-    f = MOI.VectorAffineFunction(
-        [
-            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(-1.0, x[1])),
-            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(2.0, x[2])),
-        ],
-        [0.0, 0.0],
-    )
-    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
-    @test_throws ErrorException MOI.add_constraint(model, f, s)
-end
-
-function test_indicator_nonconstant()
-    model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.Silent(), true)
-    x = MOI.add_variables(model, 2)
-    MOI.add_constraint(model, MOI.SingleVariable(x[1]), MOI.ZeroOne())
-    f = MOI.VectorAffineFunction(
-        [
-            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x[1])),
-            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(2.0, x[2])),
-        ],
-        [1.0, 0.0],
-    )
-    s = MOI.IndicatorSet{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
-    @test_throws ErrorException MOI.add_constraint(model, f, s)
+    return
 end
 
 function _build_basis_model()
@@ -1599,23 +535,15 @@ function _build_basis_model()
     )
     c = MOI.add_constraint(model, cf, MOI.LessThan(one(T)))
 
-    vc1 = MOI.add_constraint(
-        model,
-        MOI.SingleVariable(x),
-        MOI.GreaterThan(zero(T)),
-    )
-    vc2 = MOI.add_constraint(
-        model,
-        MOI.SingleVariable(y),
-        MOI.GreaterThan(zero(T)),
-    )
+    vc1 = MOI.add_constraint(model, x, MOI.GreaterThan(zero(T)))
+    vc2 = MOI.add_constraint(model, y, MOI.GreaterThan(zero(T)))
     objf = MOI.ScalarAffineFunction{T}(
         MOI.ScalarAffineTerm{T}.([-one(T), zero(T)], [x, y]),
         zero(T),
     )
     MOI.set(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}}(), objf)
     MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    return model, vc1, vc2, c
+    return model, x, y, c
 end
 
 function test_set_basis()
@@ -1629,22 +557,22 @@ function test_set_basis()
     # and just verify that, after setting the basis, we can get the same basis
     # statuses back.
     let
-        model, vc1, vc2, c = _build_basis_model()
-        MOI.set(model, MOI.ConstraintBasisStatus(), vc1, MOI.BASIC)
-        MOI.set(model, MOI.ConstraintBasisStatus(), vc2, MOI.NONBASIC)
+        model, x, y, c = _build_basis_model()
+        MOI.set(model, MOI.VariableBasisStatus(), x, MOI.BASIC)
+        MOI.set(model, MOI.VariableBasisStatus(), y, MOI.NONBASIC_AT_LOWER)
         MOI.set(model, MOI.ConstraintBasisStatus(), c, MOI.NONBASIC)
         MOI.optimize!(model)
         @test MOI.get(model, MOI.SimplexIterations()) == 0
     end
-
     let
-        model, vc1, vc2, c = _build_basis_model()
-        MOI.set(model, MOI.ConstraintBasisStatus(), vc1, MOI.NONBASIC)
-        MOI.set(model, MOI.ConstraintBasisStatus(), vc2, MOI.NONBASIC)
+        model, x, y, c = _build_basis_model()
+        MOI.set(model, MOI.VariableBasisStatus(), x, MOI.NONBASIC_AT_LOWER)
+        MOI.set(model, MOI.VariableBasisStatus(), y, MOI.NONBASIC_AT_LOWER)
         MOI.set(model, MOI.ConstraintBasisStatus(), c, MOI.BASIC)
         MOI.optimize!(model)
         @test MOI.get(model, MOI.SimplexIterations()) == 1
     end
+    return
 end
 
 function test_add_constrained_variables()
@@ -1653,10 +581,11 @@ function test_add_constrained_variables()
     set = MOI.Interval{Float64}(-1.2, 3.4)
     vi, ci = MOI.add_constrained_variable(model, set)
     @test MOI.get(model, MOI.NumberOfVariables()) == 1
-    @test MOI.get(model, MOI.ListOfConstraints()) ==
-          [(MOI.SingleVariable, MOI.Interval{Float64})]
-    @test MOI.get(model, MOI.ConstraintFunction(), ci) == MOI.SingleVariable(vi)
+    @test MOI.get(model, MOI.ListOfConstraintTypesPresent()) ==
+          [(MOI.VariableIndex, MOI.Interval{Float64})]
+    @test MOI.get(model, MOI.ConstraintFunction(), ci) == vi
     @test MOI.get(model, MOI.ConstraintSet(), ci) == set
+    return
 end
 
 function _is_binary(x; atol = 1e-6)
@@ -1665,14 +594,14 @@ end
 
 function test_multiple_solutions()
     model = Gurobi.Optimizer(GRB_ENV)
-    MOI.set(model, MOI.RawParameter("OutputFlag"), 0)
-    MOI.set(model, MOI.RawParameter("Cuts"), 0)
-    MOI.set(model, MOI.RawParameter("Presolve"), 0)
-    MOI.set(model, MOI.RawParameter("PreCrush"), 0)
-    MOI.set(model, MOI.RawParameter("Heuristics"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("OutputFlag"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Cuts"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Presolve"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("PreCrush"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Heuristics"), 0)
     N = 30
     x = MOI.add_variables(model, N)
-    MOI.add_constraints(model, MOI.SingleVariable.(x), MOI.ZeroOne())
+    MOI.add_constraints(model, x, MOI.ZeroOne())
     MOI.set.(model, MOI.VariablePrimalStart(), x, 0.0)
     Random.seed!(1)
     item_weights, item_values = rand(N), rand(N)
@@ -1713,8 +642,9 @@ function test_multiple_solutions()
         @test MOI.get(model, MOI.PrimalStatus(n)) == MOI.FEASIBLE_POINT
         @test MOI.get(model, MOI.DualStatus(n)) == MOI.NO_SOLUTION
     end
+    return
 end
 
 end
 
-runtests(TestMOIWrapper)
+TestMOIWrapper.runtests()
