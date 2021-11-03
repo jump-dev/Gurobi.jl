@@ -119,6 +119,32 @@ function test_lazy_constraint_callback()
     @test MOI.get(model, MOI.VariablePrimal(), y) == 2
 end
 
+function test_lazy_constraint_callback_fractional()
+    # callback_simple_model() is not large enough to see MIPNODE callbacks.
+    model, x, item_weights = callback_knapsack_model()
+    lazy_called_integer = false
+    lazy_called_fractional = false
+    MOI.set(
+        model,
+        MOI.LazyConstraintCallback(),
+        cb_data -> begin
+            status = MOI.get(
+                model,
+                MOI.CallbackNodeStatus(cb_data),
+            )::MOI.CallbackNodeStatusCode
+            if status == MOI.CALLBACK_NODE_STATUS_INTEGER
+                lazy_called_integer = true
+            elseif status == MOI.CALLBACK_NODE_STATUS_FRACTIONAL
+                lazy_called_fractional = true
+            end
+        end,
+    )
+    @test MOI.supports(model, MOI.LazyConstraintCallback())
+    MOI.optimize!(model)
+    @test lazy_called_integer
+    @test lazy_called_fractional
+end
+
 function test_lazy_constraint_callback_OptimizeInProgress()
     model, x, y = callback_simple_model()
     MOI.set(

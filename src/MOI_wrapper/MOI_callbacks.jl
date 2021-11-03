@@ -146,6 +146,10 @@ function _default_moi_callback(model::Optimizer)
                 model.callback_state = _CB_HEURISTIC
                 model.heuristic_callback(cb_data)
             end
+            if model.lazy_callback !== nothing
+                model.callback_state = _CB_LAZY
+                model.lazy_callback(cb_data)
+            end
         end
         model.callback_state = _CB_NONE
     end
