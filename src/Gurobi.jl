@@ -1,5 +1,7 @@
 module Gurobi
 
+import Pkg
+
 const _DEPS_FILE = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
 
 if isfile(_DEPS_FILE)
@@ -7,9 +9,8 @@ if isfile(_DEPS_FILE)
 elseif Sys.islinux()
     # If there is no _DEPS_FILE and we're on linux, use the Artifact
     # installation.
-    import Pkg.Artifacts
     const libgurobi = joinpath(
-        Artifacts.artifact"gurobi912linux64",
+        Pkg.Artifacts.artifact"gurobi912linux64",
         "gurobi912/linux64/lib/libgurobi91.so",
     )
 else
