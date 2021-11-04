@@ -26,6 +26,12 @@ jobs:
             ${{ runner.os }}-test-${{ env.cache-name }}-
             ${{ runner.os }}-test-
             ${{ runner.os }}-
+      - shell: bash
+        env:
+          WLSLICENSE: ${{ secrets.WLSLICENSE }}
+        run: |
+          mkdir -p /opt/gurobi
+          echo "$WLSLICENSE" > /opt/gurobi/gurobi.lic
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
