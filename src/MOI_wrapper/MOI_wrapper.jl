@@ -490,6 +490,10 @@ function _update_if_necessary(model::Optimizer)
 end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Gurobi"
+            
+function MOI.get(::Optimizer, ::MOI.SolverVersion)
+    return string(_GUROBI_VERSION)
+end
 
 function MOI.supports(
     ::Optimizer,
