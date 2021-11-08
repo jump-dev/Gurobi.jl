@@ -25,9 +25,10 @@ The C API can be accessed via `Gurobi.GRBxx` functions, where the names and
 arguments are identical to the C API. See the [Gurobi documentation](https://www.gurobi.com/documentation/9.0/refman/c_api_details.html)
 for details.
 
-*The Gurobi wrapper for Julia is community driven and not officially supported
-by Gurobi. If you are a commercial customer interested in official support for
-Julia from Gurobi, let them know!*
+*Note: This wrapper is maintained by the JuMP community and is not officially
+supported by Gurobi. However, we thank Gurobi for providing us with a license
+to test Gurobi.jl on GitHub. If you are a commercial customer interested in
+official support for Gurobi in Julia, let them know!.*
 
 ## Installation
 
