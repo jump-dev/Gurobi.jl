@@ -491,6 +491,8 @@ end
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Gurobi"
 
+MOI.get(::Optimizer, ::MOI.SolverVersion) = string(_GUROBI_VERSION)
+
 function MOI.supports(
     ::Optimizer,
     ::MOI.ObjectiveFunction{F},

@@ -160,7 +160,8 @@ if haskey(ENV, "GUROBI_JL_SKIP_LIB_CHECK")
     # Skip!
 elseif get(ENV, "JULIA_REGISTRYCI_AUTOMERGE", "false") == "true"
     write_depsfile("julia_registryci_automerge")
-elseif !found
+elseif !found && !Sys.islinux()
+    # If islinux, we don't need a local install because we can use the Artifact.
     diagnose_gurobi_install()
     error("""
     Unable to locate Gurobi installation. If the advice above did not help,
