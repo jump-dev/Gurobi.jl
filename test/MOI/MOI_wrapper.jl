@@ -56,8 +56,6 @@ function test_runtests()
             "test_objective_set_via_modify",
             "test_model_ListOfConstraintAttributesSet",
             "test_solve_conflict_feasible",
-            # TODO(odow): fixed in MOI 0.10.1
-            "test_solve_SOS2_add_and_delete",
             "test_objective_get_ObjectiveFunction_ScalarAffineFunction",
             # SecondOrderCone does not return dual solutions. Tested below.
             "_SecondOrderCone_",
