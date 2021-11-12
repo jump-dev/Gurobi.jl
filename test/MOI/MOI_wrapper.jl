@@ -53,6 +53,8 @@ function test_runtests()
         MOI.Test.Config(atol = 1e-3, rtol = 1e-3),
         exclude = String[
             # TODO(odow): investigate errors
+            # Gurobi Error 10015: Cannot compute IIS on a feasible model
+            # https://www.gurobi.com/documentation/9.5/refman/error_codes.html
             "test_solve_conflict_feasible",
             # SecondOrderCone does not return dual solutions. Tested below.
             "_SecondOrderCone_",
