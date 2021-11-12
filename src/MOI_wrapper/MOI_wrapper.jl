@@ -142,10 +142,9 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     # An enum to remember what objective is currently stored in the model.
     objective_type::_ObjectiveType
 
-    # A flag to keep track of MOI.FEASIBILITY_SENSE, since Gurobi only stores
-    # MIN_SENSE or MAX_SENSE. This allows us to differentiate between MIN_SENSE
-    # and FEASIBILITY_SENSE.
-    is_feasibility::Bool
+    # track whether objective function is set and the state of objective sense
+    is_objective_set::Bool
+    objective_sense::Union{Nothing,MOI.OptimizationSense}
 
     # A mapping from the MOI.VariableIndex to the Gurobi column. _VariableInfo
     # also stores some additional fields like what bounds have been added, the
@@ -401,7 +400,8 @@ function MOI.empty!(model::Optimizer)
     end
     model.needs_update = false
     model.objective_type = _SCALAR_AFFINE
-    model.is_feasibility = true
+    model.is_objective_set = false
+    model.objective_sense = nothing
     empty!(model.variable_info)
     model.next_column = 1
     empty!(model.columns_deleted_since_last_update)
@@ -428,7 +428,8 @@ end
 function MOI.is_empty(model::Optimizer)
     model.needs_update && return false
     model.objective_type != _SCALAR_AFFINE && return false
-    model.is_feasibility == false && return false
+    model.is_objective_set == true && return false
+    model.objective_sense !== nothing && return false
     !isempty(model.variable_info) && return false
     !isone(model.next_column) && return false
     !isempty(model.columns_deleted_since_last_update) && return false
@@ -661,7 +662,13 @@ function MOI.get(model::Optimizer, ::MOI.ListOfVariableAttributesSet)
 end
 
 function MOI.get(model::Optimizer, ::MOI.ListOfModelAttributesSet)
-    attributes = Any[MOI.ObjectiveSense()]
+    if MOI.is_empty(model)
+        return Any[]
+    end
+    attributes = Any[]
+    if model.objective_sense !== nothing
+        push!(attributes, MOI.ObjectiveSense())
+    end
     typ = MOI.get(model, MOI.ObjectiveFunctionType())
     if typ !== nothing
         push!(attributes, MOI.ObjectiveFunction{typ}())
@@ -1010,34 +1017,25 @@ function MOI.set(
     if sense == MOI.MIN_SENSE
         ret = GRBsetintattr(model, "ModelSense", 1)
         _check_ret(model, ret)
-        model.is_feasibility = false
     elseif sense == MOI.MAX_SENSE
         ret = GRBsetintattr(model, "ModelSense", -1)
         _check_ret(model, ret)
-        model.is_feasibility = false
     else
         @assert sense == MOI.FEASIBILITY_SENSE
         _zero_objective(model)
         ret = GRBsetintattr(model, "ModelSense", 1)
         _check_ret(model, ret)
-        model.is_feasibility = true
     end
+    model.objective_sense = sense
     _require_update(model)
     return
 end
 
 function MOI.get(model::Optimizer, ::MOI.ObjectiveSense)
-    _update_if_necessary(model)
-    sense = Ref{Cint}()
-    ret = GRBgetintattr(model, "ModelSense", sense)
-    _check_ret(model, ret)
-    if model.is_feasibility
-        return MOI.FEASIBILITY_SENSE
-    elseif sense[] == -1
-        return MOI.MAX_SENSE
+    if model.objective_sense !== nothing
+        return model.objective_sense
     else
-        @assert sense[] == 1
-        return MOI.MIN_SENSE
+        return MOI.FEASIBILITY_SENSE
     end
 end
 
@@ -1052,6 +1050,7 @@ function MOI.set(
         convert(MOI.ScalarAffineFunction{Float64}, f),
     )
     model.objective_type = _SINGLE_VARIABLE
+    model.is_objective_set = true
     return
 end
 
@@ -1087,7 +1086,9 @@ function MOI.set(
     ret = GRBsetdblattr(model, "ObjCon", f.constant)
     _check_ret(model, ret)
     _require_update(model)
-    return model.objective_type = _SCALAR_AFFINE
+    model.objective_type = _SCALAR_AFFINE
+    model.is_objective_set = true
+    return
 end
 
 function MOI.get(
@@ -1140,6 +1141,7 @@ function MOI.set(
     _check_ret(model, ret)
     _require_update(model)
     model.objective_type = _SCALAR_QUADRATIC
+    model.is_objective_set = true
     return
 end
 
@@ -3409,7 +3411,7 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraintTypesPresent)
 end
 
 function MOI.get(model::Optimizer, ::MOI.ObjectiveFunctionType)
-    if model.is_feasibility
+    if !model.is_objective_set
         return nothing
     elseif model.objective_type == _SINGLE_VARIABLE
         return MOI.VariableIndex
@@ -3450,6 +3452,7 @@ function MOI.modify(
         chg.new_coefficient,
     )
     _check_ret(model, ret)
+    model.is_objective_set = true
     _require_update(model)
     return
 end
