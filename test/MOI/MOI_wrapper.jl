@@ -53,7 +53,6 @@ function test_runtests()
         MOI.Test.Config(atol = 1e-3, rtol = 1e-3),
         exclude = String[
             # TODO(odow): investigate errors
-            "test_model_ListOfConstraintAttributesSet",
             "test_solve_conflict_feasible",
             "test_objective_get_ObjectiveFunction_ScalarAffineFunction",
             # SecondOrderCone does not return dual solutions. Tested below.
