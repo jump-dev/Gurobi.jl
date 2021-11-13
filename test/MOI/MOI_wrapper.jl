@@ -77,15 +77,6 @@ function test_runtests()
             "_RotatedSecondOrderCone_",
             "_GeometricMeanCone_",
         ],
-        exclude = String[
-            # TODO(odow): fixed in MOI 0.10.1
-            "test_conic_SecondOrderCone_negative_initial_bound",
-            "test_conic_SecondOrderCone_negative_post_bound",
-            "test_conic_SecondOrderCone_negative_post_bound_ii",
-            "test_conic_SecondOrderCone_no_initial_bound",
-            "test_conic_SecondOrderCone_nonnegative_initial_bound",
-            "test_conic_SecondOrderCone_nonnegative_post_bound",
-        ],
     )
     return
 end
