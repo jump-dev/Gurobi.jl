@@ -669,9 +669,9 @@ function MOI.get(model::Optimizer, ::MOI.ListOfModelAttributesSet)
     if model.objective_sense !== nothing
         push!(attributes, MOI.ObjectiveSense())
     end
-    typ = MOI.get(model, MOI.ObjectiveFunctionType())
-    if typ !== nothing
-        push!(attributes, MOI.ObjectiveFunction{typ}())
+    if model.is_objective_set
+        F = MOI.get(model, MOI.ObjectiveFunctionType())
+        push!(attributes, MOI.ObjectiveFunction{F}())
     end
     if MOI.get(model, MOI.Name()) != ""
         push!(attributes, MOI.Name())
