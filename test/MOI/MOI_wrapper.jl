@@ -53,10 +53,9 @@ function test_runtests()
         MOI.Test.Config(atol = 1e-3, rtol = 1e-3),
         exclude = String[
             # TODO(odow): investigate errors
-            "test_objective_set_via_modify",
-            "test_model_ListOfConstraintAttributesSet",
+            # Gurobi Error 10015: Cannot compute IIS on a feasible model
+            # https://www.gurobi.com/documentation/9.5/refman/error_codes.html
             "test_solve_conflict_feasible",
-            "test_objective_get_ObjectiveFunction_ScalarAffineFunction",
             # SecondOrderCone does not return dual solutions. Tested below.
             "_SecondOrderCone_",
             "test_constraint_PrimalStart_DualStart_SecondOrderCone",
