@@ -679,10 +679,16 @@ function MOI.get(model::Optimizer, ::MOI.ListOfModelAttributesSet)
     return attributes
 end
 
-function MOI.get(model::Optimizer, ::MOI.ListOfConstraintAttributesSet{F, S}) where {S, F}
+function MOI.get(
+    model::Optimizer,
+    ::MOI.ListOfConstraintAttributesSet{F,S},
+) where {S,F}
     ret = MOI.AbstractConstraintAttribute[]
-    constraint_indices = MOI.get(model, MOI.ListOfConstraintIndices{F, S}())
-    found_name = any(!isempty(MOI.get(model, MOI.ConstraintName(), index)) for index in constraint_indices)
+    constraint_indices = MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
+    found_name = any(
+        !isempty(MOI.get(model, MOI.ConstraintName(), index)) for
+        index in constraint_indices
+    )
     if found_name
         push!(ret, MOI.ConstraintName())
     end
