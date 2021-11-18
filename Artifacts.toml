@@ -1,7 +1,7 @@
 [gurobi912linux64]
-git-tree-sha1 = "6b65d6a3f5bd9057ae37e58d0a23562f5b05304a"
+git-tree-sha1 = "2018f307db151c4a08b09e6106ae34957ee72599"
 os = "linux"
 
     [[gurobi912linux64.download]]
-    url = "https://packages.gurobi.com/9.1/gurobi9.1.2_linux64.tar.gz"
-    sha256 = "7f60bd675f79476bb2b32cd632aa1d470f8246f2b033b7652d8de86f6e7e429b"
+    url = "https://packages.gurobi.com/9.5/gurobi9.5.0_linux64.tar.gz"
+    sha256 = "bb542e5a5d1685f6e364eaf05ea6c5572485ffc37a2245169cf3cb40288bc29e"
