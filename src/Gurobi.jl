@@ -10,7 +10,7 @@ elseif Sys.islinux()
     # If there is no _DEPS_FILE and we're on linux, use the Artifact
     # installation.
     const libgurobi = joinpath(
-        Pkg.Artifacts.artifact"gurobi950linux64",
+        Pkg.Artifacts.artifact"gurobi912linux64",
         "gurobi950/linux64/lib/libgurobi95.so",
     )
 else
