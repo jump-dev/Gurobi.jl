@@ -11,7 +11,7 @@ elseif Sys.islinux()
     # installation.
     const libgurobi = joinpath(
         Pkg.Artifacts.artifact"gurobi912linux64",
-        "gurobi950/linux64/lib/libgurobi95.so",
+        "gurobi912/linux64/lib/libgurobi91.so",
     )
 else
     error("""
