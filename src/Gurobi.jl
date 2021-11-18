@@ -10,8 +10,8 @@ elseif Sys.islinux()
     # If there is no _DEPS_FILE and we're on linux, use the Artifact
     # installation.
     const libgurobi = joinpath(
-        Pkg.Artifacts.artifact"gurobi912linux64",
-        "gurobi912/linux64/lib/libgurobi91.so",
+        Pkg.Artifacts.artifact"gurobi950linux64",
+        "gurobi950/linux64/lib/libgurobi95.so",
     )
 else
     error("""
@@ -23,7 +23,7 @@ end
 using CEnum
 
 const _GUROBI_VERSION = if libgurobi == "julia_registryci_automerge"
-    VersionNumber(9, 1, 0)
+    VersionNumber(9, 5, 0)
 else
     let
         majorP, minorP, technicalP = Ref{Cint}(), Ref{Cint}(), Ref{Cint}()
@@ -49,10 +49,14 @@ elseif _is_patch(_GUROBI_VERSION, v"9.1")
     include("gen91/ctypes.jl")
     include("gen91/libgrb_common.jl")
     include("gen91/libgrb_api.jl")
+elseif _is_patch(_GUROBI_VERSION, v"9.5")
+	include("gen95/ctypes.jl")
+    include("gen95/libgrb_common.jl")
+    include("gen95/libgrb_api.jl")	
 else
     error("""
     You have installed version $_GUROBI_VERSION of Gurobi, which is not
-    supported by Gurobi.jl. We require Gurobi version 9.0 or 9.1.
+    supported by Gurobi.jl. We require Gurobi version 9.0 or 9.1 or 9.5. 
 
     After installing a supported version of Gurobi, run:
 
