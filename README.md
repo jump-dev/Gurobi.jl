@@ -32,7 +32,7 @@ official support for Gurobi in Julia, let them know!.*
 
 ## Installation
 
-**Minimum version requirement:** Gurobi.jl requires Gurobi version 9.0 or 9.1.
+**Minimum version requirement:** Gurobi.jl requires Gurobi version 9.0 or 9.1 or 9.5.
 
 First, obtain a license of Gurobi and install Gurobi solver, following the
 instructions on [Gurobi's website](http://www.gurobi.com). Then, set the
@@ -40,15 +40,15 @@ instructions on [Gurobi's website](http://www.gurobi.com). Then, set the
 the `Pkg.build("Gurobi")`. For example:
 ```julia
 # On Windows, this might be
-ENV["GUROBI_HOME"] = "C:\\Program Files\\gurobi910\\win64"
+ENV["GUROBI_HOME"] = "C:\\Program Files\\gurobi950\\win64"
 # ... or perhaps ...
-ENV["GUROBI_HOME"] = "C:\\gurobi910\\win64"
+ENV["GUROBI_HOME"] = "C:\\gurobi950\\win64"
 import Pkg
 Pkg.add("Gurobi")
 Pkg.build("Gurobi")
 
 # On Mac, this might be
-ENV["GUROBI_HOME"] = "/Library/gurobi910/mac64"
+ENV["GUROBI_HOME"] = "/Library/gurobi950/mac64"
 import Pkg
 Pkg.add("Gurobi")
 Pkg.build("Gurobi")
