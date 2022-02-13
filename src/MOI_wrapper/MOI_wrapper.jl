@@ -2678,6 +2678,7 @@ function MOI.optimize!(model::Optimizer)
     _update_if_necessary(model)
 
     # Initialize callbacks if necessary.
+    has_null_callback = false
     if _check_moi_callback_validity(model)
         MOI.set(model, CallbackFunction(), _default_moi_callback(model))
         model.has_generic_callback = false
@@ -2690,6 +2691,7 @@ function MOI.optimize!(model::Optimizer)
         # https://github.com/JuliaLang/julia/issues/2622 --- set a null
         # callback.
         MOI.set(model, CallbackFunction(), (x, y) -> nothing)
+        has_null_callback = true
     end
 
     # Catch [CTRL+C], even when Julia is run from a script not in interactive
@@ -2711,6 +2713,11 @@ function MOI.optimize!(model::Optimizer)
     model.has_unbounded_ray =
         MOI.get(model, MOI.PrimalStatus()) == MOI.INFEASIBILITY_CERTIFICATE
 
+    if has_null_callback
+        # See https://github.com/jump-dev/Gurobi.jl/issues/395 - avoid error
+        # from _check_moi_callback_validity upon next optimize! call.
+        model.has_generic_callback = false
+    end
     return
 end
 
