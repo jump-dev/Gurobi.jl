@@ -82,11 +82,9 @@ function test_lazy_constraint_callback()
                 model,
                 MOI.CallbackNodeStatus(cb_data),
             )::MOI.CallbackNodeStatusCode
-            if round.(Int, [x_val, y_val]) ≈ [x_val, y_val]
-                atol = 1e-6
-                @test status == MOI.CALLBACK_NODE_STATUS_INTEGER
-            else
-                @test status == MOI.CALLBACK_NODE_STATUS_FRACTIONAL
+            int_sol = round.(Int, [x_val, y_val])
+            if status == MOI.CALLBACK_NODE_STATUS_INTEGER
+                @test isapprox(int_sol, [x_val, y_val], atol = 1e-6)
             end
             @test MOI.supports(model, MOI.LazyConstraint(cb_data))
             if y_val - x_val > 1 + 1e-6
@@ -298,11 +296,9 @@ function test_heuristic_callback()
                 model,
                 MOI.CallbackNodeStatus(cb_data),
             )::MOI.CallbackNodeStatusCode
-            if round.(Int, x_vals) ≈ x_vals
-                atol = 1e-6
-                @test status == MOI.CALLBACK_NODE_STATUS_INTEGER
-            else
-                @test status == MOI.CALLBACK_NODE_STATUS_FRACTIONAL
+            int_sol = round.(Int, x_vals)
+            if status == MOI.CALLBACK_NODE_STATUS_INTEGER
+                @test isapprox(int_sol, x_vals, atol = 1e-6)
             end
             if MOI.submit(
                 model,
