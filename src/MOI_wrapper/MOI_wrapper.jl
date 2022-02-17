@@ -620,10 +620,12 @@ function MOI.get(model::Optimizer, raw::MOI.RawOptimizerAttribute)
         return a[]
     else
         @assert param_type == 3
-        valueP = Ref{Ptr{Cchar}}()
+        valueP = Vector{Cchar}(undef, GRB_MAX_STRLEN)
         ret = GRBgetstrparam(env, param, valueP)
         _check_ret(env, ret)
-        return unsafe_string(valueP[])
+        GC.@preserve valueP begin
+            return unsafe_string(pointer(valueP))
+        end
     end
 end
 
