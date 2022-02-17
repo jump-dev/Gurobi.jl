@@ -5,7 +5,7 @@ using Test
 # re-use an existing environment in the module, or name the test function
 # `test_MULTI_ENV_xxx` to trap the specific Gurobi error indicating that an
 # environment could not be created.
-const GRB_ENV = Gurobi.Env()
+const GRB_ENV = Gurobi.Env(output_flag=0)
 
 @testset "MathOptInterface Tests" begin
     for file in readdir("MOI")
