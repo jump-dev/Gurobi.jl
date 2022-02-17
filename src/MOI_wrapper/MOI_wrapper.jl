@@ -121,6 +121,34 @@ Base.unsafe_convert(::Type{Ptr{Cvoid}}, env::Env) = env.ptr_env::Ptr{Cvoid}
 const _HASH = CleverDicts.key_to_index
 const _INVERSE_HASH = x -> CleverDicts.index_to_key(MOI.VariableIndex, x)
 
+"""
+    Optimizer(
+        env::Union{Nothing,Env} = nothing;
+        enable_interrupts::Bool = true,
+    )
+
+Create a new Optimizer object.
+
+You can share Gurobi `Env`s between models by passing an instance of `Env`
+as the first argument.
+
+In order to enable interrupts via `CTRL+C`, a no-op callback is added to the
+model by default. In most cases, this has negligible effect on solution
+times. However, you can disable it (at the cost of not being able to
+interrupt a solve) by passing `enable_interrupts = false`.
+
+Set optimizer attributes using `MOI.RawOptimizerAttribute` or
+`JuMP.set_optimizer_atttribute`.
+
+## Example
+
+```julia
+using JuMP, Gurobi
+const env = Gurobi.Env()
+model = JuMP.Model(() -> Gurobi.Optimizer(env; enable_interrupts=false))
+set_optimizer_attribute(model, "OutputFlag", 0)
+```
+"""
 mutable struct Optimizer <: MOI.AbstractOptimizer
     # The low-level Gurobi model.
     inner::Ptr{Cvoid}
@@ -232,54 +260,15 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
 
     conflict::Cint
 
-    """
-        Optimizer(
-            env::Union{Nothing,Env} = nothing;
-            enable_interrupts::Bool = true,
-        )
-
-    Create a new Optimizer object.
-
-    You can share Gurobi `Env`s between models by passing an instance of `Env`
-    as the first argument.
-
-    In order to enable interrupts via `CTRL+C`, a no-op callback is added to the
-    model by default. In most cases, this has negligible effect on solution
-    times. However, you can disable it (at the cost of not being able to
-    interrupt a solve) by passing `enable_interrupts = false`.
-
-    Set optimizer attributes using `MOI.RawOptimizerAttribute` or
-    `JuMP.set_optimizer_atttribute`.
-
-    ## Example
-
-        using JuMP, Gurobi
-        const env = Gurobi.Env()
-        model = JuMP.Model(() -> Gurobi.Optimizer(env; enable_interrupts=false))
-        set_optimizer_attribute(model, "OutputFlag", 0)
-    """
     function Optimizer(
         env::Union{Nothing,Env} = nothing;
         enable_interrupts::Bool = true,
-        kwargs...,
     )
         model = new()
         model.inner = C_NULL
         model.env = env === nothing ? Env() : env
         model.enable_interrupts = enable_interrupts
         model.params = Dict{String,Any}()
-        if length(kwargs) > 0
-            @warn("""Passing optimizer attributes as keyword arguments to
-            Gurobi.Optimizer is deprecated. Use
-                MOI.set(model, MOI.RawOptimizerAttribute("key"), value)
-            or
-                JuMP.set_optimizer_attribute(model, "key", value)
-            instead.
-            """)
-        end
-        for (name, value) in kwargs
-            model.params[string(name)] = value
-        end
         model.silent = false
         model.variable_info =
             CleverDicts.CleverDict{MOI.VariableIndex,_VariableInfo}(
@@ -293,7 +282,6 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         model.quadratic_constraint_info = Dict{Int,_ConstraintInfo}()
         model.sos_constraint_info = Dict{Int,_ConstraintInfo}()
         model.indicator_constraint_info = Dict{Int,_ConstraintInfo}()
-
         model.callback_variable_primal = Float64[]
         MOI.empty!(model)
         finalizer(model) do m

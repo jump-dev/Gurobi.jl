@@ -12,9 +12,3 @@ const GRB_ENV = Gurobi.Env()
         include(joinpath("MOI", file))
     end
 end
-
-@testset "Deprecated functions" begin
-    err = ErrorException(Gurobi._DEPRECATED_ERROR_MESSAGE)
-    @test_throws err get_status()
-    @test_throws err Gurobi.get_status_code()
-end
