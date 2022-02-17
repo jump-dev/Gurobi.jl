@@ -11,7 +11,7 @@ elseif Sys.islinux()
     # installation.
     const libgurobi = joinpath(
         Pkg.Artifacts.artifact"gurobilinux64",
-        "gurobi950/linux64/lib/libgurobi95.so",
+        "gurobi951/linux64/lib/libgurobi95.so",
     )
 else
     error("""
@@ -23,7 +23,7 @@ end
 using CEnum
 
 const _GUROBI_VERSION = if libgurobi == "julia_registryci_automerge"
-    VersionNumber(9, 5, 0)
+    VersionNumber(9, 5, 1)
 else
     let
         majorP, minorP, technicalP = Ref{Cint}(), Ref{Cint}(), Ref{Cint}()
