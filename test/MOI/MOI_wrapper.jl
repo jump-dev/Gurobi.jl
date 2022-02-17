@@ -636,6 +636,16 @@ function test_multiple_solutions()
     return
 end
 
+function test_log_file()
+    model = Gurobi.Optimizer()
+    @test MOI.get(model, MOI.RawOptimizerAttribute("LogFile")) == ""
+    MOI.set(model, MOI.RawOptimizerAttribute("LogFile"), "test.log")
+    @test MOI.get(model, MOI.RawOptimizerAttribute("LogFile")) == "test.log"
+    MOI.set(model, MOI.RawOptimizerAttribute("LogFile"), "")
+    rm("test.log")
+    return
+end
+
 end
 
 TestMOIWrapper.runtests()

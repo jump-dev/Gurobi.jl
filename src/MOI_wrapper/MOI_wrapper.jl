@@ -608,10 +608,12 @@ function MOI.get(model::Optimizer, raw::MOI.RawOptimizerAttribute)
         return a[]
     else
         @assert param_type == 3
-        valueP = Ref{Ptr{Cchar}}()
+        valueP = Vector{Cchar}(undef, GRB_MAX_STRLEN)
         ret = GRBgetstrparam(env, param, valueP)
         _check_ret(env, ret)
-        return unsafe_string(valueP[])
+        GC.@preserve valueP begin
+            return unsafe_string(pointer(valueP))
+        end
     end
 end
 
@@ -2480,10 +2482,13 @@ function MOI.set(
 ) where {S}
     info = _info(model, c)
     info.name = name
-    _update_if_necessary(model)
-    ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
-    _check_ret(model, ret)
-    _require_update(model)
+    # Don't set QCName because it requires an update. This is expensive if you
+    # are adding lots of quadratic constraints in a sequence due to Gurobi's
+    # updating semantics.
+    # _update_if_needed(model)
+    # ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
+    # _check_ret(model, ret)
+    # _require_update(model)
     model.name_to_constraint_index = nothing
     return
 end
@@ -3166,7 +3171,7 @@ function MOI.get(model::Optimizer, attr::MOI.NodeCount)
     valueP = Ref{Cdouble}()
     ret = GRBgetdblattr(model, "NodeCount", valueP)
     _check_ret(model, ret)
-    return valueP[]
+    return round(Int64, valueP[])
 end
 
 function MOI.get(model::Optimizer, attr::MOI.RelativeGap)

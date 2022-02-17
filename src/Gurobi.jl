@@ -2,13 +2,15 @@ module Gurobi
 
 import Pkg
 
-const _DEPS_FILE = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
+# deps.jl file is always built via `Pkg.build`, even if we didn't find a local
+# install and we want to use the artifact instead. This is so Gurobi.jl will be
+# recompiled if we update the file. See issue #438 for more details.
+include(joinpath(dirname(@__FILE__), "..", "deps", "deps.jl"))
 
-if isfile(_DEPS_FILE)
-    include(_DEPS_FILE)
+if isdefined(@__MODULE__, :libgurobi)
+    # deps.jl must define a local installation.
 elseif Sys.islinux()
-    # If there is no _DEPS_FILE and we're on linux, use the Artifact
-    # installation.
+    # Let's use the artifact instead.
     const libgurobi = joinpath(
         Pkg.Artifacts.artifact"gurobilinux64",
         "gurobi951/linux64/lib/libgurobi95.so",
