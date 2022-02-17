@@ -392,11 +392,11 @@ function MOI.empty!(model::Optimizer)
     model.env.attached_models += 1
     _check_ret(model, ret)
     # Reset the parameters in this new environment
-    for (name, value) in model.params
-        MOI.set(model, MOI.RawOptimizerAttribute(name), value)
-    end
     if model.silent
         MOI.set(model, MOI.Silent(), true)
+    end
+    for (name, value) in model.params
+        MOI.set(model, MOI.RawOptimizerAttribute(name), value)
     end
     model.needs_update = false
     model.objective_type = _SCALAR_AFFINE
