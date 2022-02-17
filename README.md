@@ -1,15 +1,3 @@
-**Gurobi.jl underwent a major rewrite between versions 0.8.1 and 0.9.0. Users of
-JuMP should see no breaking changes, but if you used the lower-level C API
-(e.g., for callbacks), you will need to update your code accordingly. For a full
-description of the changes, read [this discourse post](https://discourse.julialang.org/t/ann-upcoming-breaking-changes-to-cplex-jl-and-gurobi-jl/47814).**
-
-**To revert to the old API, use:**
-```julia
-import Pkg
-Pkg.add(Pkg.PackageSpec(name = "Gurobi", version = v"0.8"))
-```
-**Then restart Julia for the change to take effect.**
-
 # Gurobi.jl
 
 [![Build Status](https://github.com/jump-dev/Gurobi.jl/workflows/CI/badge.svg?branch=master)](https://github.com/jump-dev/Gurobi.jl/actions?query=workflow%3ACI)

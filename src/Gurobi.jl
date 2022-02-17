@@ -20,8 +20,6 @@ else
     """)
 end
 
-using CEnum
-
 const _GUROBI_VERSION = if libgurobi == "julia_registryci_automerge"
     VersionNumber(9, 5, 1)
 else
@@ -42,21 +40,18 @@ function _is_patch(x::VersionNumber, reference::VersionNumber)
 end
 
 if _is_patch(_GUROBI_VERSION, v"9.0")
-    include("gen90/ctypes.jl")
     include("gen90/libgrb_common.jl")
     include("gen90/libgrb_api.jl")
 elseif _is_patch(_GUROBI_VERSION, v"9.1")
-    include("gen91/ctypes.jl")
     include("gen91/libgrb_common.jl")
     include("gen91/libgrb_api.jl")
 elseif _is_patch(_GUROBI_VERSION, v"9.5")
-    include("gen95/ctypes.jl")
     include("gen95/libgrb_common.jl")
-    include("gen95/libgrb_api.jl")	
+    include("gen95/libgrb_api.jl")
 else
     error("""
     You have installed version $_GUROBI_VERSION of Gurobi, which is not
-    supported by Gurobi.jl. We require Gurobi version 9.0 or 9.1 or 9.5. 
+    supported by Gurobi.jl. We require Gurobi version 9.0 or 9.1 or 9.5.
 
     After installing a supported version of Gurobi, run:
 
@@ -82,13 +77,8 @@ include("MOI_wrapper/MOI_indicator_constraint.jl")
 # Gurobi exports all `GRBXXX` symbols. If you don't want all of these symbols in
 # your environment, then use `import Gurobi` instead of `using Gurobi`.
 
-for sym in names(@__MODULE__, all=true)
-    sym_string = string(sym)
-    if startswith(sym_string, "GRB")
-        @eval export $sym
-    end
+for sym in filter(s -> startswith("$s", "GRB"), names(@__MODULE__, all = true))
+    @eval export $sym
 end
-
-include("deprecated_functions.jl")
 
 end
