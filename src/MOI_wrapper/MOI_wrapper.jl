@@ -2494,10 +2494,13 @@ function MOI.set(
 ) where {S}
     info = _info(model, c)
     info.name = name
-    _update_if_necessary(model)
-    ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
-    _check_ret(model, ret)
-    _require_update(model)
+    # Don't set QCName because it requires an update. This is expensive if you
+    # are adding lots of quadratic constraints in a sequence due to Gurobi's
+    # updating semantics.
+    # _update_if_needed(model)
+    # ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
+    # _check_ret(model, ret)
+    # _require_update(model)
     model.name_to_constraint_index = nothing
     return
 end
