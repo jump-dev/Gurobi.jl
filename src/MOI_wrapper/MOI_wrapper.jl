@@ -3178,7 +3178,7 @@ function MOI.get(model::Optimizer, attr::MOI.NodeCount)
     valueP = Ref{Cdouble}()
     ret = GRBgetdblattr(model, "NodeCount", valueP)
     _check_ret(model, ret)
-    return valueP[]
+    return round(Int64, valueP[])
 end
 
 function MOI.get(model::Optimizer, attr::MOI.RelativeGap)
