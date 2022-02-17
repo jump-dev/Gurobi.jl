@@ -2492,7 +2492,6 @@ function MOI.set(
 ) where {S}
     info = _info(model, c)
     info.name = name
-    _update_if_necessary(model)
     ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
     _check_ret(model, ret)
     _require_update(model)
