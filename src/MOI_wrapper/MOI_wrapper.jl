@@ -97,10 +97,14 @@ mutable struct Env
     finalize_called::Bool
     attached_models::Int
 
-    function Env()
+    function Env(; output_flag::Int = 1)
         a = Ref{Ptr{Cvoid}}()
-        ret = GRBloadenv(a, C_NULL)
+        ret = GRBemptyenv(a)
         env = new(a[], false, 0)
+        _check_ret(env, ret)
+        ret = GRBsetintparam(env.ptr_env, GRB_INT_PAR_OUTPUTFLAG, output_flag)
+        _check_ret(env, ret)
+        ret = GRBstartenv(env.ptr_env)
         finalizer(env) do e
             e.finalize_called = true
             if e.attached_models == 0
@@ -380,11 +384,11 @@ function MOI.empty!(model::Optimizer)
     model.env.attached_models += 1
     _check_ret(model, ret)
     # Reset the parameters in this new environment
-    for (name, value) in model.params
-        MOI.set(model, MOI.RawOptimizerAttribute(name), value)
-    end
     if model.silent
         MOI.set(model, MOI.Silent(), true)
+    end
+    for (name, value) in model.params
+        MOI.set(model, MOI.RawOptimizerAttribute(name), value)
     end
     model.needs_update = false
     model.objective_type = _SCALAR_AFFINE
