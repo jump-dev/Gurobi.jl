@@ -162,7 +162,7 @@ function my_callback_function(cb_data, cb_where::Cint)
     return
 end
 # You _must_ set this parameter if using lazy constraints.
-MOI.set(model, MOI.RawParameter("LazyConstraints"), 1)
+MOI.set(model, MOI.RawOptimizerAttribute("LazyConstraints"), 1)
 MOI.set(model, Gurobi.CallbackFunction(), my_callback_function)
 optimize!(model)
 @test termination_status(model) == MOI.OPTIMAL
