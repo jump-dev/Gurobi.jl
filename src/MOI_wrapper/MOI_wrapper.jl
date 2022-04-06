@@ -97,13 +97,20 @@ mutable struct Env
     finalize_called::Bool
     attached_models::Int
 
-    function Env(; output_flag::Int = 1)
+    function Env(;
+        output_flag::Int = 1,
+        memory_limit::Union{Nothing,Real} = nothing,
+    )
         a = Ref{Ptr{Cvoid}}()
         ret = GRBemptyenv(a)
         env = new(a[], false, 0)
         _check_ret(env, ret)
         ret = GRBsetintparam(env.ptr_env, GRB_INT_PAR_OUTPUTFLAG, output_flag)
         _check_ret(env, ret)
+        if _GUROBI_VERSION >= v"9.5.0" && memory_limit !== nothing
+            ret = GRBsetdblparam(env, GRB_DBL_PAR_MEMLIMIT, memory_limit)
+            _check_ret(env, ret)
+        end
         ret = GRBstartenv(env.ptr_env)
         finalizer(env) do e
             e.finalize_called = true
