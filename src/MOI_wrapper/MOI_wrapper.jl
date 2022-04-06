@@ -104,7 +104,7 @@ mutable struct Env
         _check_ret(env, ret)
         ret = GRBsetintparam(env.ptr_env, GRB_INT_PAR_OUTPUTFLAG, output_flag)
         _check_ret(env, ret)
-        if _GUROBI_VERSION >= v"9.5.0"
+        if _GUROBI_VERSION >= v"9.5.0" && memory_limit !== nothing
             ret = GRBsetdblparam(env, GRB_DBL_PAR_MEMLIMIT, memory_limit)
             _check_ret(env, ret)
         end
