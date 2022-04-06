@@ -97,7 +97,10 @@ mutable struct Env
     finalize_called::Bool
     attached_models::Int
 
-    function Env(; output_flag::Int = 1, memory_limit::Number = 1.0e100)
+    function Env(;
+        output_flag::Int = 1,
+        memory_limit::Union{Nothing,Real} = nothing,
+    )
         a = Ref{Ptr{Cvoid}}()
         ret = GRBemptyenv(a)
         env = new(a[], false, 0)
