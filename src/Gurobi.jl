@@ -28,7 +28,9 @@ else
     """)
 end
 
-const _GUROBI_VERSION = if libgurobi == "julia_registryci_automerge"
+const _GUROBI_VERSION = if libgurobi == "__skipped_installation__"
+    # The deps file is fake, with the intention to make Gurobi.jl loadable but
+    # not usable.
     VersionNumber(9, 5, 1)
 else
     let
