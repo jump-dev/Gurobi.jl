@@ -3464,27 +3464,24 @@ end
 function MOI.modify(
     model::Optimizer,
     cis::Vector{MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},S}},
-    chgs::Vector{MOI.ScalarCoefficientChange{Float64}},
+    changes::Vector{MOI.ScalarCoefficientChange{Float64}},
 ) where {S}
     nels = length(cis)
-    @assert nels == length(chgs)
-
-    rows = Vector{Int}(undef, nels)
-    cols = Vector{Int}(undef, nels)
-    coefs = Vector{Float64}(undef, nels)
-
+    @assert nels == length(changes)
+    rows = Vector{Cint}(undef, nels)
+    cols = Vector{Cint}(undef, nels)
+    coefs = Vector{Double}(undef, nels)
     for i in 1:nels
-        rows[i] = _info(model, c).row - 1
-        cols[i] = column(model, chgs[i].variable) - 1
-        coefs[i] = chgs[i].new_coefficient
+        rows[i] = Cint(_info(model, c).row - 1)
+        cols[i] = Cint(column(model, changes[i].variable) - 1)
+        coefs[i] = changes[i].new_coefficient
     end
-
     ret = GRBchgcoeffs(
         model,
         nels,
-        Ref{Cint}.(rows),
-        Ref{Cint}.(cols),
-        Ref{Cdouble}.(coefs),
+        rows,
+        cols,
+        coefs,
     )
     _check_ret(model, ret)
     _require_update(model)
@@ -3511,23 +3508,20 @@ end
 function MOI.modify(
     model::Optimizer,
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
-    chgs::Vector{MOI.ScalarCoefficientChange{Float64}},
+    changes::Vector{MOI.ScalarCoefficientChange{Float64}},
 )
-    nels = length(chgs)
-    
-    cols = Vector{Int}(undef, nels)
-    coefs = Vector{Float64}(undef, nels)
-
+    nels = length(changes)
+    cols = Vector{Cint}(undef, nels)
+    coefs = Vector{Double}(undef, nels)
     for i in 1:nels
-        cols[i] = column(model, chgs[i].variable) - 1
-        coefs[i] = chgs[i].new_coefficient
+        cols[i] = Cint(column(model, changes[i].variable) - 1)
+        coefs[i] = changes[i].new_coefficient
     end
-
     ret = GRBsetdblattrlist(
         model,
         "Obj",
         nels,
-        Cint.(cols),
+        cols,
         coefs,
     )
     _check_ret(model, ret)
