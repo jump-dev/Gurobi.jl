@@ -3476,13 +3476,7 @@ function MOI.modify(
         cols[i] = Cint(column(model, changes[i].variable) - 1)
         coefs[i] = changes[i].new_coefficient
     end
-    ret = GRBchgcoeffs(
-        model,
-        nels,
-        rows,
-        cols,
-        coefs,
-    )
+    ret = GRBchgcoeffs(model, nels, rows, cols, coefs)
     _check_ret(model, ret)
     _require_update(model)
     return
@@ -3517,13 +3511,7 @@ function MOI.modify(
         cols[i] = Cint(column(model, changes[i].variable) - 1)
         coefs[i] = changes[i].new_coefficient
     end
-    ret = GRBsetdblattrlist(
-        model,
-        "Obj",
-        nels,
-        cols,
-        coefs,
-    )
+    ret = GRBsetdblattrlist(model, "Obj", nels, cols, coefs)
     _check_ret(model, ret)
     model.is_objective_set = true
     _require_update(model)
