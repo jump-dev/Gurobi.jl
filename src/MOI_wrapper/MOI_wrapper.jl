@@ -3470,7 +3470,7 @@ function MOI.modify(
     @assert nels == length(changes)
     rows = Vector{Cint}(undef, nels)
     cols = Vector{Cint}(undef, nels)
-    coefs = Vector{Double}(undef, nels)
+    coefs = Vector{Cdouble}(undef, nels)
     for i in 1:nels
         rows[i] = Cint(_info(model, c).row - 1)
         cols[i] = Cint(column(model, changes[i].variable) - 1)
@@ -3506,7 +3506,7 @@ function MOI.modify(
 )
     nels = length(changes)
     cols = Vector{Cint}(undef, nels)
-    coefs = Vector{Double}(undef, nels)
+    coefs = Vector{Cdouble}(undef, nels)
     for i in 1:nels
         cols[i] = Cint(column(model, changes[i].variable) - 1)
         coefs[i] = changes[i].new_coefficient
