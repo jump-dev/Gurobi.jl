@@ -51,14 +51,6 @@ mutable struct _VariableInfo
     type::Char
     start::Union{Float64,Nothing}
     name::String
-    # Storage for constraint names associated with variables because Gurobi
-    # can only store names for variables and proper constraints.
-    # We can perform an optimization and only store three strings for the
-    # constraint names because, at most, there can be three VariableIndex
-    # constraints, e.g., LessThan, GreaterThan, and Integer.
-    lessthan_name::String
-    greaterthan_interval_or_equalto_name::String
-    type_constraint_name::String
     # Storage for the lower bound if the variable is the `t` variable in a
     # second order cone. Theoretically, if both `lower_bound_if_bounded` and
     # `lower_bound_if_soc` are non-NaN, then they have the same value,
@@ -76,9 +68,6 @@ mutable struct _VariableInfo
             NaN,
             GRB_CONTINUOUS,
             nothing,
-            "",
-            "",
-            "",
             "",
             NaN,
             0,
@@ -575,9 +564,9 @@ MOI.supports(::Optimizer, ::MOI.VariableName, ::Type{MOI.VariableIndex}) = true
 function MOI.supports(
     ::Optimizer,
     ::MOI.ConstraintName,
-    ::Type{<:MOI.ConstraintIndex},
-)
-    return true
+    ::Type{MOI.ConstraintIndex{F,S}},
+) where {F,S}
+    return F != MOI.VariableIndex
 end
 
 MOI.supports(::Optimizer, ::MOI.Name) = true
@@ -690,16 +679,16 @@ function MOI.get(
     model::Optimizer,
     ::MOI.ListOfConstraintAttributesSet{F,S},
 ) where {S,F}
-    ret = MOI.AbstractConstraintAttribute[]
-    constraint_indices = MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
-    found_name = any(
-        !isempty(MOI.get(model, MOI.ConstraintName(), index)) for
-        index in constraint_indices
-    )
-    if found_name
-        push!(ret, MOI.ConstraintName())
+    if F == MOI.VariableIndex
+        # Does not support ConstraintName
+        return MOI.AbstractConstraintAttribute[]
     end
-    return ret
+    for index in MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
+        if !isempty(MOI.get(model, MOI.ConstraintName(), index))
+            return MOI.AbstractConstraintAttribute[MOI.ConstraintName()]
+        end
+    end
+    return MOI.AbstractConstraintAttribute[]
 end
 
 function _indices_and_coefficients(
@@ -1483,7 +1472,6 @@ function MOI.delete(
         info.bound = _NONE
     end
     info.upper_bound_if_bounded = NaN
-    info.lessthan_name = ""
     model.name_to_constraint_index = nothing
     return
 end
@@ -1595,7 +1583,6 @@ function MOI.delete(
         info.bound = _NONE
     end
     info.lower_bound_if_bounded = NaN
-    info.greaterthan_interval_or_equalto_name = ""
     model.name_to_constraint_index = nothing
     return
 end
@@ -1612,7 +1599,6 @@ function MOI.delete(
     _require_update(model)
     info.bound = _NONE
     info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
-    info.greaterthan_interval_or_equalto_name = ""
     model.name_to_constraint_index = nothing
     return
 end
@@ -1629,7 +1615,6 @@ function MOI.delete(
     _require_update(model)
     info.bound = _NONE
     info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
-    info.greaterthan_interval_or_equalto_name = ""
     model.name_to_constraint_index = nothing
     return
 end
@@ -1778,7 +1763,6 @@ function MOI.delete(
     _check_ret(model, ret)
     _require_update(model)
     info.type = GRB_CONTINUOUS
-    info.type_constraint_name = ""
     model.name_to_constraint_index = nothing
     return
 end
@@ -1817,7 +1801,6 @@ function MOI.delete(
     _check_ret(model, ret)
     _require_update(model)
     info.type = GRB_CONTINUOUS
-    info.type_constraint_name = ""
     model.name_to_constraint_index = nothing
     return
 end
@@ -1866,7 +1849,6 @@ function MOI.delete(
     _check_ret(model, ret)
     _require_update(model)
     info.type = GRB_CONTINUOUS
-    info.type_constraint_name = ""
     model.name_to_constraint_index = nothing
     return
 end
@@ -1920,7 +1902,6 @@ function MOI.delete(
     _check_ret(model, ret)
     _require_update(model)
     info.type = GRB_CONTINUOUS
-    info.type_constraint_name = ""
     model.name_to_constraint_index = nothing
     return
 end
@@ -1937,57 +1918,6 @@ function MOI.get(
     upper = Ref{Cdouble}()
     ret = GRBgetdblattrelement(model, "UB", Cint(info.column - 1), upper)
     return MOI.Semiinteger(lower, upper[])
-end
-
-function MOI.get(
-    model::Optimizer,
-    ::MOI.ConstraintName,
-    c::MOI.ConstraintIndex{MOI.VariableIndex,S},
-) where {S}
-    MOI.throw_if_not_valid(model, c)
-    info = _info(model, c)
-    if S <: MOI.LessThan
-        return info.lessthan_name
-    elseif S <: Union{MOI.GreaterThan,MOI.Interval,MOI.EqualTo}
-        return info.greaterthan_interval_or_equalto_name
-    else
-        @assert S <: Union{
-            MOI.ZeroOne,
-            MOI.Integer,
-            MOI.Semiinteger,
-            MOI.Semicontinuous,
-        }
-        return info.type_constraint_name
-    end
-end
-
-function MOI.set(
-    model::Optimizer,
-    ::MOI.ConstraintName,
-    c::MOI.ConstraintIndex{MOI.VariableIndex,S},
-    name::String,
-) where {S}
-    MOI.throw_if_not_valid(model, c)
-    info = _info(model, c)
-    old_name = ""
-    if S <: MOI.LessThan
-        old_name = info.lessthan_name
-        info.lessthan_name = name
-    elseif S <: Union{MOI.GreaterThan,MOI.Interval,MOI.EqualTo}
-        old_name = info.greaterthan_interval_or_equalto_name
-        info.greaterthan_interval_or_equalto_name = name
-    else
-        @assert S <: Union{
-            MOI.ZeroOne,
-            MOI.Integer,
-            MOI.Semiinteger,
-            MOI.Semicontinuous,
-        }
-        info.type_constraint_name
-        info.type_constraint_name = name
-    end
-    model.name_to_constraint_index = nothing
-    return
 end
 
 ###
@@ -2280,7 +2210,6 @@ function _rebuild_name_to_constraint_index(model::Optimizer)
         model.sos_constraint_info,
         MOI.VectorOfVariables,
     )
-    _rebuild_name_to_constraint_index_variables(model)
     return
 end
 
@@ -2293,39 +2222,6 @@ function _rebuild_name_to_constraint_index_util(model::Optimizer, dict, F)
         else
             model.name_to_constraint_index[info.name] =
                 MOI.ConstraintIndex{F,typeof(info.set)}(index)
-        end
-    end
-    return
-end
-
-function _rebuild_name_to_constraint_index_variables(model::Optimizer)
-    for (key, info) in model.variable_info
-        for S in (
-            MOI.LessThan{Float64},
-            MOI.GreaterThan{Float64},
-            MOI.EqualTo{Float64},
-            MOI.Interval{Float64},
-            MOI.ZeroOne,
-            MOI.Integer,
-            MOI.Semicontinuous{Float64},
-            MOI.Semiinteger{Float64},
-        )
-            constraint_name = ""
-            if info.bound in _bound_enums(S)
-                constraint_name =
-                    S == MOI.LessThan{Float64} ? info.lessthan_name :
-                    info.greaterthan_interval_or_equalto_name
-            elseif info.type in _type_enums(S)
-                constraint_name = info.type_constraint_name
-            end
-            if constraint_name == ""
-                continue
-            elseif haskey(model.name_to_constraint_index, constraint_name)
-                model.name_to_constraint_index[constraint_name] = nothing
-            else
-                model.name_to_constraint_index[constraint_name] =
-                    MOI.ConstraintIndex{MOI.VariableIndex,S}(key.value)
-            end
         end
     end
     return
