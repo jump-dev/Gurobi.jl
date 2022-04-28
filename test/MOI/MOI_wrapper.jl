@@ -663,7 +663,11 @@ function test_multiple_modifications()
     ci1 = MOI.add_constraint(model, saf, MOI.LessThan(1.0))
     ci2 = MOI.add_constraint(model, saf, MOI.LessThan(2.0))
 
-    MOI.set(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), saf)
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        saf,
+    )
 
     fc1 = MOI.get(model, MOI.ConstraintFunction(), ci1)
     @test MOI.coefficient.(fc1.terms) == [1.0, 1.0, 1.0]
@@ -698,7 +702,10 @@ function test_multiple_modifications()
         changes_obj,
     )
 
-    obj = MOI.get(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
+    obj = MOI.get(
+        model,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+    )
     @test MOI.coefficient.(obj.terms) == [4.0, 10.0, 2.0]
 end
 
