@@ -3365,6 +3365,27 @@ end
 
 function MOI.modify(
     model::Optimizer,
+    cis::Vector{MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},S}},
+    changes::Vector{MOI.ScalarCoefficientChange{Float64}},
+) where {S}
+    nels = length(cis)
+    @assert nels == length(changes)
+    rows = Vector{Cint}(undef, nels)
+    cols = Vector{Cint}(undef, nels)
+    coefs = Vector{Cdouble}(undef, nels)
+    for i in 1:nels
+        rows[i] = Cint(_info(model, cis[i]).row - 1)
+        cols[i] = Cint(column(model, changes[i].variable) - 1)
+        coefs[i] = changes[i].new_coefficient
+    end
+    ret = GRBchgcoeffs(model, nels, rows, cols, coefs)
+    _check_ret(model, ret)
+    _require_update(model)
+    return
+end
+
+function MOI.modify(
+    model::Optimizer,
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
     chg::MOI.ScalarCoefficientChange{Float64},
 )
@@ -3374,6 +3395,25 @@ function MOI.modify(
         Cint(column(model, chg.variable) - 1),
         chg.new_coefficient,
     )
+    _check_ret(model, ret)
+    model.is_objective_set = true
+    _require_update(model)
+    return
+end
+
+function MOI.modify(
+    model::Optimizer,
+    ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
+    changes::Vector{MOI.ScalarCoefficientChange{Float64}},
+)
+    nels = length(changes)
+    cols = Vector{Cint}(undef, nels)
+    coefs = Vector{Cdouble}(undef, nels)
+    for i in 1:nels
+        cols[i] = Cint(column(model, changes[i].variable) - 1)
+        coefs[i] = changes[i].new_coefficient
+    end
+    ret = GRBsetdblattrlist(model, "Obj", nels, cols, coefs)
     _check_ret(model, ret)
     model.is_objective_set = true
     _require_update(model)
