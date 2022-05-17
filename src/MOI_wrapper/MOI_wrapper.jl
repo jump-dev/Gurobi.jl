@@ -156,7 +156,11 @@ function Env(
     ret = GRBsetstrparam(env.ptr_env, GRB_STR_PAR_COMPUTESERVER, server_address)
     _check_ret(env, ret)
     if server_password !== nothing
-        ret = GRBsetstrparam(env.ptr_env, GRB_STR_PAR_SERVERPASSWORD, server_password)
+        ret = GRBsetstrparam(
+            env.ptr_env,
+            GRB_STR_PAR_SERVERPASSWORD,
+            server_password,
+        )
         _check_ret(env, ret)
     end
     if started
