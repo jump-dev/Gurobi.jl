@@ -125,34 +125,37 @@ mutable struct Env
 end
 
 """
-    createRemoteEnv(
+    Env(
         server_address::String,
-        server_password::Union{String,Nothing}=nothing;
-        started::Bool = true
+        server_password::Union{String,Nothing} = nothing;
+        started::Bool = true,
     )
 
 Create a new remote Gurobi environment object.
 
-You can specify server_address in the format "address:port" and optionally
+Specify `server_address` in the format `"address:port"` and optionally provide
 the server password.
 
-The extra kw argument started delays starting the environment if set to false.
+The extra keyword argument `started` delays starting the environment if set to false.
 Gurobi defaults to connecting to the server when the environment is started.
 
 ## Example
 
 ```julia
 using JuMP, Gurobi
-const env = Gurobi.createRemoteEnv("localhost:61000")
+const env = Gurobi.Env("localhost:61000")
 model = JuMP.Model(() -> Gurobi.Optimizer(env))
 ```
 """
-function createRemoteEnv(server_address::String, server_password::Union{String,Nothing}=nothing; started::Bool = true)
-
-    env = Env(started=false)
+function Env(
+    server_address::String,
+    server_password::Union{String,Nothing} = nothing;
+    started::Bool = true,
+)
+    env = Env(; started = false)
     ret = GRBsetstrparam(env.ptr_env, GRB_STR_PAR_COMPUTESERVER, server_address)
     _check_ret(env, ret)
-    if !isnothing(server_password)
+    if server_password !== nothing
         ret = GRBsetstrparam(env.ptr_env, GRB_STR_PAR_SERVERPASSWORD, server_password)
         _check_ret(env, ret)
     end
