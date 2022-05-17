@@ -92,8 +92,6 @@ mutable struct Env
     finalize_called::Bool
     attached_models::Int
 
-    #Inner constructor
-    #Allows to build unstarted environment through the kw started
     function Env(;
         output_flag::Int = 1,
         memory_limit::Union{Nothing,Real} = nothing,
