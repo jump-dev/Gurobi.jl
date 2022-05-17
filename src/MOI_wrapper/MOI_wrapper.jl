@@ -92,9 +92,12 @@ mutable struct Env
     finalize_called::Bool
     attached_models::Int
 
+    #Inner constructor
+    #Allows to build unstarted environment through the kw started
     function Env(;
         output_flag::Int = 1,
         memory_limit::Union{Nothing,Real} = nothing,
+        started::Bool = true,
     )
         a = Ref{Ptr{Cvoid}}()
         ret = GRBemptyenv(a)
@@ -106,7 +109,9 @@ mutable struct Env
             ret = GRBsetdblparam(env, GRB_DBL_PAR_MEMLIMIT, memory_limit)
             _check_ret(env, ret)
         end
-        ret = GRBstartenv(env.ptr_env)
+        if started
+            ret = GRBstartenv(env.ptr_env)
+        end
         finalizer(env) do e
             e.finalize_called = true
             if e.attached_models == 0
@@ -119,6 +124,45 @@ mutable struct Env
         _check_ret(env, ret)
         return env
     end
+end
+
+"""
+    createRemoteEnv(
+        server_address::String,
+        server_password::Union{String,Nothing}=nothing;
+        started::Bool = true
+    )
+
+Create a new remote Gurobi environment object.
+
+You can specify server_address in the format "address:port" and optionally
+the server password.
+
+The extra kw argument started delays starting the environment if set to false.
+Gurobi defaults to connecting to the server when the environment is started.
+
+## Example
+
+```julia
+using JuMP, Gurobi
+const env = Gurobi.createRemoteEnv("localhost:61000")
+model = JuMP.Model(() -> Gurobi.Optimizer(env))
+```
+"""
+function createRemoteEnv(server_address::String, server_password::Union{String,Nothing}=nothing; started::Bool = true)
+
+    env = Env(started=false)
+    ret = GRBsetstrparam(env.ptr_env, GRB_STR_PAR_COMPUTESERVER, server_address)
+    _check_ret(env, ret)
+    if !isnothing(server_password)
+        ret = GRBsetstrparam(env.ptr_env, GRB_STR_PAR_SERVERPASSWORD, server_password)
+        _check_ret(env, ret)
+    end
+    if started
+        ret = GRBstartenv(env.ptr_env)
+        _check_ret(env, ret)
+    end
+    return env
 end
 
 Base.cconvert(::Type{Ptr{Cvoid}}, x::Env) = x
