@@ -1,6 +1,7 @@
 [gurobilinux64]
 git-tree-sha1 = "612b2b4f80fd7b9d6c2f765124b7c2905dce80c7"
 os = "linux"
+lazy = true
 
     [[gurobilinux64.download]]
     url = "https://packages.gurobi.com/9.5/gurobi9.5.1_linux64.tar.gz"
