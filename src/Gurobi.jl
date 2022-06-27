@@ -6,7 +6,7 @@
 
 module Gurobi
 
-import Pkg
+import LazyArtifacts
 
 # deps.jl file is always built via `Pkg.build`, even if we didn't find a local
 # install and we want to use the artifact instead. This is so Gurobi.jl will be
@@ -18,7 +18,7 @@ if isdefined(@__MODULE__, :libgurobi)
 elseif Sys.islinux()
     # Let's use the artifact instead.
     const libgurobi = joinpath(
-        Pkg.Artifacts.artifact"gurobilinux64",
+        LazyArtifacts.artifact"gurobilinux64",
         "gurobi951/linux64/lib/libgurobi95.so",
     )
 else
