@@ -3144,6 +3144,11 @@ function MOI.get(model::Optimizer, attr::MOI.RelativeGap)
     return valueP[]
 end
 
+function MOI.set(model::Optimizer, ::MOI.RelativeGap, gap::Real)
+    MOI.set(model, MOI.RawOptimizerAttribute("MIPGap"), gap)
+    return nothing
+end
+
 function MOI.get(model::Optimizer, attr::MOI.DualObjectiveValue)
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
