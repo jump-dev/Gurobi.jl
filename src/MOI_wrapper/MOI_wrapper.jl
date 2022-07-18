@@ -622,6 +622,8 @@ MOI.supports(::Optimizer, ::MOI.Name) = true
 MOI.supports(::Optimizer, ::MOI.Silent) = true
 MOI.supports(::Optimizer, ::MOI.NumberOfThreads) = true
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
+MOI.supports(::Optimizer, ::MOI.AbsoluteGapTolerance) = true
+MOI.supports(::Optimizer, ::MOI.RelativeGapTolerance) = true
 MOI.supports(::Optimizer, ::MOI.ObjectiveSense) = true
 MOI.supports(::Optimizer, ::MOI.RawOptimizerAttribute) = true
 MOI.supports(::Optimizer, ::MOI.ConstraintPrimalStart) = false
@@ -3188,6 +3190,24 @@ end
 
 function MOI.set(model::Optimizer, ::MOI.NumberOfThreads, ::Nothing)
     MOI.set(model, MOI.RawOptimizerAttribute("Threads"), 0)
+    return
+end
+
+function MOI.get(model::Optimizer, ::MOI.AbsoluteGapTolerance)
+    return MOI.get(model, MOI.RawOptimizerAttribute("MIPGapAbs"))
+end
+
+function MOI.set(model::Optimizer, ::MOI.AbsoluteGapTolerance, value::Real)
+    MOI.set(model, MOI.RawOptimizerAttribute("MIPGapAbs"), value)
+    return
+end
+
+function MOI.get(model::Optimizer, ::MOI.RelativeGapTolerance)
+    return MOI.get(model, MOI.RawOptimizerAttribute("MIPGap"))
+end
+
+function MOI.set(model::Optimizer, ::MOI.RelativeGapTolerance, value::Real)
+    MOI.set(model, MOI.RawOptimizerAttribute("MIPGap"), value)
     return
 end
 
