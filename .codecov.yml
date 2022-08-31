@@ -1,0 +1,4 @@
+ignore:
+  - 'src/gen90'
+  - 'src/gen91'
+  - 'src/gen95'
