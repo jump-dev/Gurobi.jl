@@ -23,6 +23,7 @@ function write_depsfile(path)
 end
 
 const ALIASES = [
+    "gurobi100",
     "gurobi95",
     "gurobi91",
     "gurobi90"
@@ -60,25 +61,26 @@ for l in paths_to_try
 end
 
 function _print_GUROBI_HOME_help()
+    version = "1000"
     println("""
     You should set the `GUROBI_HOME` environment variable to point to the
     install location then try again. For example (updating the path to the
     correct location if needed):
     ```
     # On Windows, this might be
-    ENV["GUROBI_HOME"] = "C:\\\\Program Files\\\\gurobi950\\\\win64\\\\"
+    ENV["GUROBI_HOME"] = "C:\\\\Program Files\\\\gurobi$(version)\\\\win64\\\\"
     import Pkg
     Pkg.add("Gurobi")
     Pkg.build("Gurobi")
 
     # On OSX, this might be
-    ENV["GUROBI_HOME"] = "/Library/gurobi950/mac64/"
+    ENV["GUROBI_HOME"] = "/Library/gurobi$(version)/mac64/"
     import Pkg
     Pkg.add("Gurobi")
     Pkg.build("Gurobi")
 
     # On Unix, this might be
-    ENV["GUROBI_HOME"] = "/opt/gurobi950/linux64/"
+    ENV["GUROBI_HOME"] = "/opt/gurobi$(version)/linux64/"
     import Pkg
     Pkg.add("Gurobi")
     Pkg.build("Gurobi")
