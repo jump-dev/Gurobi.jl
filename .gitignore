@@ -2,5 +2,4 @@ Manifest.toml
 perf/*/*.json
 perf/*/*.toml
 perf/Project.toml
-scripts/Project.toml
 scripts/*.h
