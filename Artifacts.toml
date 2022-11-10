@@ -1,8 +1,8 @@
 [gurobilinux64]
-git-tree-sha1 = "612b2b4f80fd7b9d6c2f765124b7c2905dce80c7"
+git-tree-sha1 = "e1ea344a512fd4849fd788ddbe04e5f2c0d986b2"
 os = "linux"
 lazy = true
 
     [[gurobilinux64.download]]
-    url = "https://packages.gurobi.com/9.5/gurobi9.5.1_linux64.tar.gz"
-    sha256 = "fa82859d33f08fb8aeb9da66b0fbd91718ed573c534f571aa52372c9deb891da"
+    url = "https://packages.gurobi.com/10.0/gurobi10.0.0_linux64.tar.gz"
+    sha256 = "91a9ce1464f5f948809fcdfbdeb55f77698ed8a6d6cfa6985295424b6ece2bd4"
