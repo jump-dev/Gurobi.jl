@@ -19,7 +19,7 @@ elseif Sys.islinux()
     # Let's use the artifact instead.
     const libgurobi = joinpath(
         LazyArtifacts.artifact"gurobilinux64",
-        "gurobi951/linux64/lib/libgurobi95.so",
+        "gurobi1000/linux64/lib/libgurobi100.so",
     )
 else
     error("""
@@ -31,7 +31,7 @@ end
 const _GUROBI_VERSION = if libgurobi == "__skipped_installation__"
     # The deps file is fake, with the intention to make Gurobi.jl loadable but
     # not usable.
-    VersionNumber(9, 5, 1)
+    VersionNumber(10, 0, 0)
 else
     let
         majorP, minorP, technicalP = Ref{Cint}(), Ref{Cint}(), Ref{Cint}()
