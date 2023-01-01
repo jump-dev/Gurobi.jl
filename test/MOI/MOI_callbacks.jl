@@ -320,7 +320,7 @@ function test_heuristic_callback()
                 MOI.HeuristicSolution(cb_data),
                 x,
                 ceil.(x_vals),
-            ) == MOI.HEURISTIC_SOLUTION_REJECTED
+            ) == MOI.HEURISTIC_SOLUTION_UNKNOWN
                 solution_rejected = true
             end
         end,

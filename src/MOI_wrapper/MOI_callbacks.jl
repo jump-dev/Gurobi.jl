@@ -299,7 +299,11 @@ function MOI.submit(
     objP = Ref{Cdouble}()
     ret = GRBcbsolution(cb.callback_data, solution, objP)
     _check_ret(model, ret)
-    return objP[] < GRB_INFINITY ? MOI.HEURISTIC_SOLUTION_ACCEPTED :
-           MOI.HEURISTIC_SOLUTION_REJECTED
+    if objP[] < GRB_INFINITY
+        return MOI.HEURISTIC_SOLUTION_ACCEPTED
+    end
+    # Although not accepted at present, Gurobi may cache the solution and use it
+    # later in the optimization process.
+    return MOI.HEURISTIC_SOLUTION_UNKNOWN
 end
 MOI.supports(::Optimizer, ::MOI.HeuristicSolution{CallbackData}) = true
