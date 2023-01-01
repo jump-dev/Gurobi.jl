@@ -506,7 +506,8 @@ function test_CallbackFunction_callback_HeuristicSolution()
             if cb_where == Gurobi.GRB_CB_MIP
                 attr = MOI.HeuristicSolution(cb_data)
                 status = MOI.submit(model, attr, x, fill(2.0, length(x)))
-                solution_unknown |= (status == MOI.HEURISTIC_SOLUTION_UNKNOWN)
+                solution_unknown |=
+                    (status == MOI.HEURISTIC_SOLUTION_UNKNOWN)
             end
             if cb_where != Gurobi.GRB_CB_MIPNODE
                 return
