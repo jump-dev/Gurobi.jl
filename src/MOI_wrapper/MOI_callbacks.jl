@@ -302,6 +302,10 @@ function MOI.submit(
     if objP[] < GRB_INFINITY
         return MOI.HEURISTIC_SOLUTION_ACCEPTED
     end
+    if cb.callback_data.cb_where == GRB_CB_MIPNODE
+        # In a MIPNODE callback, Gurobi will process the solution immediately.
+        return MOI.HEURISTIC_SOLUTION_REJECTED
+    end
     # Although not accepted at present, Gurobi may cache the solution and use it
     # later in the optimization process.
     return MOI.HEURISTIC_SOLUTION_UNKNOWN
