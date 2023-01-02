@@ -496,12 +496,19 @@ function test_CallbackFunction_callback_HeuristicSolution()
     model, x, item_weights = callback_knapsack_model()
     solution_accepted = false
     solution_rejected = false
+    solution_unknown = false
     cb_calls = Int32[]
     MOI.set(
         model,
         Gurobi.CallbackFunction(),
         (cb_data, cb_where) -> begin
             push!(cb_calls, cb_where)
+            if cb_where == Gurobi.GRB_CB_MIP
+                attr = MOI.HeuristicSolution(cb_data)
+                status = MOI.submit(model, attr, x, fill(2.0, length(x)))
+                solution_unknown |=
+                    (status == MOI.HEURISTIC_SOLUTION_UNKNOWN)
+            end
             if cb_where != Gurobi.GRB_CB_MIPNODE
                 return
             end
@@ -539,6 +546,7 @@ function test_CallbackFunction_callback_HeuristicSolution()
     MOI.optimize!(model)
     @test solution_accepted
     @test solution_rejected
+    @test solution_unknown
     @test Gurobi.GRB_CB_MIPNODE in cb_calls
 end
 
