@@ -126,3 +126,21 @@ function MOI.get(model::Gurobi.Optimizer, attr::MultiObjectiveValue)
     _check_ret(model, ret)
     return val[]
 end
+
+function MOI.set(
+    model::Optimizer,
+    ::MOI.ObjectiveFunction{F},
+    f::F,
+) where {F<:MOI.VectorAffineFunction{Float64}}
+    for (i, fi) in enumerate(MOI.Utilities.eachscalar(f))
+        MOI.set(model, MultiObjectiveFunction(i), fi)
+    end
+    return
+end
+
+function MOI.supports(
+    model::Optimizer,
+    ::MOI.ObjectiveFunction{MOI.VectorAffineFunction{Float64}},
+)
+    return true
+end

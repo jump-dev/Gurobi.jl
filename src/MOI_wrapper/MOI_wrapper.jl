@@ -3091,6 +3091,10 @@ function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
             attr.result_index - 1,
         )
     end
+    N = MOI.get(model, NumberOfObjectives())
+    if N > 1
+        return [MOI.get(model, MultiObjectiveValue(i)) for i in 1:N]
+    end
     valueP = Ref{Cdouble}()
     key = attr.result_index == 1 ? "ObjVal" : "PoolObjVal"
     ret = GRBgetdblattr(model, key, valueP)
