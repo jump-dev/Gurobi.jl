@@ -135,6 +135,7 @@ function MOI.set(
     for (i, fi) in enumerate(MOI.Utilities.eachscalar(f))
         MOI.set(model, MultiObjectiveFunction(i), fi)
     end
+    model.objective_type = _VECTOR_AFFINE
     return
 end
 

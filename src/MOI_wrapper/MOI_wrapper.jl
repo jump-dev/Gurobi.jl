@@ -18,7 +18,14 @@ const CleverDicts = MOI.Utilities.CleverDicts
     _INTERVAL,
     _EQUAL_TO
 )
-@enum(_ObjectiveType, _SINGLE_VARIABLE, _SCALAR_AFFINE, _SCALAR_QUADRATIC)
+@enum(
+    _ObjectiveType,
+    _SINGLE_VARIABLE,
+    _SCALAR_AFFINE,
+    _SCALAR_QUADRATIC,
+    _VECTOR_AFFINE,
+)
+
 @enum(
     _CallbackState,
     _CB_NONE,
@@ -3419,9 +3426,11 @@ function MOI.get(model::Optimizer, ::MOI.ObjectiveFunctionType)
         return MOI.VariableIndex
     elseif model.objective_type == _SCALAR_AFFINE
         return MOI.ScalarAffineFunction{Float64}
-    else
-        @assert model.objective_type == _SCALAR_QUADRATIC
+    elseif model.objective_type == _SCALAR_QUADRATIC
         return MOI.ScalarQuadraticFunction{Float64}
+    else
+        @assert model.objective_type == _VECTOR_AFFINE
+        return MOI.VectorAffineFunction{Float64}
     end
 end
 
