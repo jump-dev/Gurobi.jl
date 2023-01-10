@@ -1150,6 +1150,25 @@ function MOI.set(
     return
 end
 
+function _get_affine_objective(model::Optimizer; is_multiobjective::Bool)
+    _update_if_necessary(model)
+    dest = zeros(length(model.variable_info))
+    name = is_multiobjective ? "ObjN" : "Obj"
+    ret = GRBgetdblattrarray(model, name, 0, length(dest), dest)
+    _check_ret(model, ret)
+    terms = MOI.ScalarAffineTerm{Float64}[]
+    for (index, info) in model.variable_info
+        coefficient = dest[info.column]
+        iszero(coefficient) && continue
+        push!(terms, MOI.ScalarAffineTerm(coefficient, index))
+    end
+    constant = Ref{Cdouble}()
+    name = is_multiobjective ? "ObjNCon" : "ObjCon"
+    ret = GRBgetdblattr(model, name, constant)
+    _check_ret(model, ret)
+    return MOI.ScalarAffineFunction(terms, constant[])
+end
+
 function MOI.get(
     model::Optimizer,
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
@@ -1160,20 +1179,7 @@ function MOI.get(
             "$(model.objective_type).",
         )
     end
-    _update_if_necessary(model)
-    dest = zeros(length(model.variable_info))
-    ret = GRBgetdblattrarray(model, "Obj", 0, length(dest), dest)
-    _check_ret(model, ret)
-    terms = MOI.ScalarAffineTerm{Float64}[]
-    for (index, info) in model.variable_info
-        coefficient = dest[info.column]
-        iszero(coefficient) && continue
-        push!(terms, MOI.ScalarAffineTerm(coefficient, index))
-    end
-    constant = Ref{Cdouble}()
-    ret = GRBgetdblattr(model, "ObjCon", constant)
-    _check_ret(model, ret)
-    return MOI.ScalarAffineFunction(terms, constant[])
+    return _get_affine_objective(model; is_multiobjective = false)
 end
 
 function MOI.set(

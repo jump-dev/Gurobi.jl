@@ -138,6 +138,21 @@ function MOI.set(
     return
 end
 
+function MOI.get(
+    model::Optimizer,
+    ::MOI.ObjectiveFunction{MOI.VectorAffineFunction{Float64}},
+)
+    env = GRBgetenv(model)
+    F = MOI.ScalarAffineFunction{Float64}
+    f = F[]
+    for i in 1:MOI.get(model, NumberOfObjectives())
+        ret = GRBsetintparam(env, "ObjNumber", i - 1)
+        _check_ret(env, ret)
+        push!(f, _get_affine_objective(model; is_multiobjective = true))
+    end
+    return MOI.Utilities.operate(vcat, Float64, f...)
+end
+
 function MOI.supports(
     model::Optimizer,
     ::MOI.ObjectiveFunction{MOI.VectorAffineFunction{Float64}},
