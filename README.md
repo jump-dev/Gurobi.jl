@@ -237,7 +237,9 @@ for i = 1:100
 end
 ```
 
-## Using Gurobi v9.0 and you got an error like `Q not PSD`?
+## Common errors
+
+### Using Gurobi v9.0 and you got an error like `Q not PSD`?
 
 You need to set the NonConvex parameter:
 ```julia
@@ -245,10 +247,15 @@ model = Model(Gurobi.Optimizer)
 set_optimizer_attribute(model, "NonConvex", 2)
 ```
 
-## Gurobi Error 1009: Version number is XX.X, license is for version XX.X
+### Gurobi Error 1009: Version number is XX.X, license is for version XX.X
 
-First, please make sure that your license is correct for your Gurobi version. See the [Gurobi documentation](https://support.gurobi.com/hc/en-us/articles/360034784572-How-do-I-check-for-a-valid-license-file-) about that.
+First, please make sure that your license is correct for your Gurobi version.
+See the [Gurobi documentation](https://support.gurobi.com/hc/en-us/articles/360034784572-How-do-I-check-for-a-valid-license-file-)
+for details.
 
-If you are sure that the license and Gurobi match, you probably have not run `Pkg.build("Gurobi")`.
-
-If you still having this problem, please open an issue.
+Once you are sure that the license and Gurobi versions match, re-install
+Gurobi.jl by running:
+```julia
+import Pkg
+Pkg.build("Gurobi")
+```
