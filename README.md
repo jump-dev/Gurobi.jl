@@ -244,3 +244,11 @@ You need to set the NonConvex parameter:
 model = Model(Gurobi.Optimizer)
 set_optimizer_attribute(model, "NonConvex", 2)
 ```
+
+## Gurobi Error 1009: Version number is XX.X, license is for version XX.X
+
+First, please make sure that your license is correct for your Gurobi version. See the [Gurobi documentation](https://support.gurobi.com/hc/en-us/articles/360034784572-How-do-I-check-for-a-valid-license-file-) about that.
+
+If you are sure that the license and Gurobi match, you probably have not run `Pkg.build("Gurobi")`.
+
+If you still having this problem, please open an issue.
