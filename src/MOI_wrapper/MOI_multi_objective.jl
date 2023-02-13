@@ -78,16 +78,11 @@ struct MultiObjectiveAttribute <: MOI.AbstractModelAttribute
     name::String
 end
 
-function MOI.set(
-    model::Optimizer,
-    attr::MultiObjectiveAttribute,
-    value,
-)
+function MOI.set(model::Optimizer, attr::MultiObjectiveAttribute, value)
     env = GRBgetenv(model)
     ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
     _check_ret(env, ret)
-    _set_attribute(model, ModelAttribute(attr.name), value)
-    _require_update(model)
+    MOI.set(model, ModelAttribute(attr.name), value)
     return
 end
 
@@ -96,7 +91,7 @@ function MOI.get(model::Optimizer, attr::MultiObjectiveAttribute)
     env = GRBgetenv(model)
     ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
     _check_ret(env, ret)
-    return _get_attribute(model, ModelAttribute(attr.name))
+    return MOI.get(model, ModelAttribute(attr.name))
 end
 
 struct MultiObjectivePriority <: MOI.AbstractModelAttribute
