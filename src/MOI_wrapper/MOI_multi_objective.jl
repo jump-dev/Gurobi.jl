@@ -55,76 +55,77 @@ function MOI.set(
     return
 end
 
-struct MultiObjectivePriority <: MOI.AbstractModelAttribute
+"""
+    MultiObjectiveAttribute(index::Int, name::String)
+
+A Gurobi-specific attribute for interacting with multi-objective attributes.
+
+`index` is the 1-based index of the objective to query. It corresponds to
+setting `ObjNumber` to `index - 1`.
+
+See also: `MultiObjectiveWeight`, `MultiObjectivePriority`, `MultiObjectiveValue`.
+
+## Examples
+
+```julia
+MOI.get(model, MultiObjectiveAttribute(1, "ObjNPriority"))
+MOI.get(model, MultiObjectiveAttribute(2, "ObjNVal"))
+MOI.set(model, MultiObjectiveAttribute(2, "ObjNWeight"), 2.0)
+```
+"""
+struct MultiObjectiveAttribute <: MOI.AbstractModelAttribute
     index::Int
+    name::String
 end
 
-function MOI.set(
-    model::Gurobi.Optimizer,
-    attr::MultiObjectivePriority,
-    priority::Int,
-)
+function MOI.set(model::Optimizer, attr::MultiObjectiveAttribute, value)
     env = GRBgetenv(model)
     ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
     _check_ret(env, ret)
-    ret = GRBsetintattr(model, "ObjNPriority", priority)
-    _check_ret(model, ret)
-    _require_update(model)
+    MOI.set(model, ModelAttribute(attr.name), value)
     return
 end
 
-function MOI.get(model::Gurobi.Optimizer, attr::MultiObjectivePriority)
+function MOI.get(model::Optimizer, attr::MultiObjectiveAttribute)
     _update_if_necessary(model)
     env = GRBgetenv(model)
     ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
     _check_ret(env, ret)
-    n = Ref{Cint}()
-    ret = GRBgetintattr(model, "ObjNPriority", n)
-    _check_ret(model, ret)
-    return Int(n[])
+    return MOI.get(model, ModelAttribute(attr.name))
+end
+
+struct MultiObjectivePriority <: MOI.AbstractModelAttribute
+    index::Int
+end
+
+function MOI.set(model::Optimizer, attr::MultiObjectivePriority, value::Int)
+    MOI.set(model, MultiObjectiveAttribute(attr.index, "ObjNPriority"), value)
+    return
+end
+
+function MOI.get(model::Optimizer, attr::MultiObjectivePriority)
+    return MOI.get(model, MultiObjectiveAttribute(attr.index, "ObjNPriority"))
 end
 
 struct MultiObjectiveWeight <: MOI.AbstractModelAttribute
     index::Int
 end
 
-function MOI.set(
-    model::Gurobi.Optimizer,
-    attr::MultiObjectiveWeight,
-    weight::Float64,
-)
-    env = GRBgetenv(model)
-    ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
-    _check_ret(env, ret)
-    ret = GRBsetdblattr(model, "ObjNWeight", weight)
-    _check_ret(model, ret)
-    _require_update(model)
+function MOI.set(model::Optimizer, attr::MultiObjectiveWeight, weight::Float64)
+    MOI.set(model, MultiObjectiveAttribute(attr.index, "ObjNWeight"), weight)
     return
 end
 
-function MOI.get(model::Gurobi.Optimizer, attr::MultiObjectiveWeight)
-    _update_if_necessary(model)
-    env = GRBgetenv(model)
-    ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
-    _check_ret(env, ret)
-    weight = Ref{Cdouble}()
-    ret = GRBgetdblattr(model, "ObjNWeight", weight)
-    _check_ret(model, ret)
-    return weight[]
+function MOI.get(model::Optimizer, attr::MultiObjectiveWeight)
+    return MOI.get(model, MultiObjectiveAttribute(attr.index, "ObjNWeight"))
 end
 
 struct MultiObjectiveValue <: MOI.AbstractModelAttribute
     index::Int
 end
 
-function MOI.get(model::Gurobi.Optimizer, attr::MultiObjectiveValue)
-    env = GRBgetenv(model)
-    ret = GRBsetintparam(env, "ObjNumber", attr.index - 1)
-    _check_ret(env, ret)
-    val = Ref{Cdouble}()
-    ret = GRBgetdblattr(model, "ObjNVal", val)
-    _check_ret(model, ret)
-    return val[]
+function MOI.get(model::Optimizer, attr::MultiObjectiveValue)
+    return MOI.get(model, MultiObjectiveAttribute(attr.index, "ObjNVal"))
 end
 
 function MOI.set(
