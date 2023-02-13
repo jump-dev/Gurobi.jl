@@ -715,6 +715,22 @@ function test_multiple_modifications()
     @test MOI.coefficient.(obj.terms) == [4.0, 10.0, 2.0]
 end
 
+function test_attributes_is_set_by_optimize()
+    model = MOI.Utilities.CachingOptimizer(
+        MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
+        Gurobi.Optimizer(GRB_ENV),
+    )
+    MOI.Utilities.attach_optimizer(model)
+    x = MOI.add_variable(model)
+    MOI.add_constraint(model, x, MOI.GreaterThan(1.5))
+    MOI.add_constraint(model, x, MOI.Integer())
+    c = MOI.add_constraint(model, 1.0 * x, MOI.EqualTo(2.0))
+    @test MOI.get(model, Gurobi.ModelAttribute("IsMIP")) == 1
+    @test MOI.get(model, Gurobi.VariableAttribute("LB"), x) == 1.5
+    @test MOI.get(model, Gurobi.ConstraintAttribute("RHS"), c) == 2.0
+    return
+end
+
 end
 
 TestMOIWrapper.runtests()

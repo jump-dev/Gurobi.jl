@@ -3911,13 +3911,19 @@ struct ModelAttribute <: MOI.AbstractModelAttribute
     name::String
 end
 
+MOI.is_set_by_optimize(::ModelAttribute) = true
+
 struct VariableAttribute <: MOI.AbstractVariableAttribute
     name::String
 end
 
+MOI.is_set_by_optimize(::VariableAttribute) = true
+
 struct ConstraintAttribute <: MOI.AbstractConstraintAttribute
     name::String
 end
+
+MOI.is_set_by_optimize(::ConstraintAttribute) = true
 
 _supported_attrtypes(::ModelAttribute) = (0,)
 _supported_attrtypes(::VariableAttribute) = (1,)
