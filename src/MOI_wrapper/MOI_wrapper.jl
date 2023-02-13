@@ -3912,18 +3912,21 @@ struct ModelAttribute <: MOI.AbstractModelAttribute
 end
 
 MOI.is_set_by_optimize(::ModelAttribute) = true
+MOI.is_copyable(::ModelAttribute) = true
 
 struct VariableAttribute <: MOI.AbstractVariableAttribute
     name::String
 end
 
 MOI.is_set_by_optimize(::VariableAttribute) = true
+MOI.is_copyable(::VariableAttribute) = true
 
 struct ConstraintAttribute <: MOI.AbstractConstraintAttribute
     name::String
 end
 
 MOI.is_set_by_optimize(::ConstraintAttribute) = true
+MOI.is_copyable(::ConstraintAttribute) = true
 
 _supported_attrtypes(::ModelAttribute) = (0,)
 _supported_attrtypes(::VariableAttribute) = (1,)

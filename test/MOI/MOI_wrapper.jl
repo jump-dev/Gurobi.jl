@@ -731,6 +731,20 @@ function test_attributes_is_set_by_optimize()
     return
 end
 
+function test_attributes_is_copyable()
+    model = MOI.Utilities.CachingOptimizer(
+        MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
+        Gurobi.Optimizer(GRB_ENV),
+    )
+    x = MOI.add_variables(model, 2)
+    MOI.set(model, Gurobi.VariableAttribute("VarHintVal"), x[1], 5.0)
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
+    @test MOI.get(model, Gurobi.VariableAttribute("VarHintVal"), x[1]) == 5.0
+    @test MOI.get(model, Gurobi.VariableAttribute("VarHintVal"), x[2]) == 1e101
+    return
+end
+
 end
 
 TestMOIWrapper.runtests()
