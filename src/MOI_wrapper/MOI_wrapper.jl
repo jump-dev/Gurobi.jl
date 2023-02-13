@@ -18,7 +18,14 @@ const CleverDicts = MOI.Utilities.CleverDicts
     _INTERVAL,
     _EQUAL_TO
 )
-@enum(_ObjectiveType, _SINGLE_VARIABLE, _SCALAR_AFFINE, _SCALAR_QUADRATIC)
+@enum(
+    _ObjectiveType,
+    _SINGLE_VARIABLE,
+    _SCALAR_AFFINE,
+    _SCALAR_QUADRATIC,
+    _VECTOR_AFFINE,
+)
+
 @enum(
     _CallbackState,
     _CB_NONE,
@@ -1150,6 +1157,25 @@ function MOI.set(
     return
 end
 
+function _get_affine_objective(model::Optimizer; is_multiobjective::Bool)
+    _update_if_necessary(model)
+    dest = zeros(length(model.variable_info))
+    name = is_multiobjective ? "ObjN" : "Obj"
+    ret = GRBgetdblattrarray(model, name, 0, length(dest), dest)
+    _check_ret(model, ret)
+    terms = MOI.ScalarAffineTerm{Float64}[]
+    for (index, info) in model.variable_info
+        coefficient = dest[info.column]
+        iszero(coefficient) && continue
+        push!(terms, MOI.ScalarAffineTerm(coefficient, index))
+    end
+    constant = Ref{Cdouble}()
+    name = is_multiobjective ? "ObjNCon" : "ObjCon"
+    ret = GRBgetdblattr(model, name, constant)
+    _check_ret(model, ret)
+    return MOI.ScalarAffineFunction(terms, constant[])
+end
+
 function MOI.get(
     model::Optimizer,
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
@@ -1160,20 +1186,7 @@ function MOI.get(
             "$(model.objective_type).",
         )
     end
-    _update_if_necessary(model)
-    dest = zeros(length(model.variable_info))
-    ret = GRBgetdblattrarray(model, "Obj", 0, length(dest), dest)
-    _check_ret(model, ret)
-    terms = MOI.ScalarAffineTerm{Float64}[]
-    for (index, info) in model.variable_info
-        coefficient = dest[info.column]
-        iszero(coefficient) && continue
-        push!(terms, MOI.ScalarAffineTerm(coefficient, index))
-    end
-    constant = Ref{Cdouble}()
-    ret = GRBgetdblattr(model, "ObjCon", constant)
-    _check_ret(model, ret)
-    return MOI.ScalarAffineFunction(terms, constant[])
+    return _get_affine_objective(model; is_multiobjective = false)
 end
 
 function MOI.set(
@@ -3091,6 +3104,10 @@ function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
             attr.result_index - 1,
         )
     end
+    N = MOI.get(model, NumberOfObjectives())
+    if N > 1
+        return [MOI.get(model, MultiObjectiveValue(i)) for i in 1:N]
+    end
     valueP = Ref{Cdouble}()
     key = attr.result_index == 1 ? "ObjVal" : "PoolObjVal"
     ret = GRBgetdblattr(model, key, valueP)
@@ -3409,9 +3426,11 @@ function MOI.get(model::Optimizer, ::MOI.ObjectiveFunctionType)
         return MOI.VariableIndex
     elseif model.objective_type == _SCALAR_AFFINE
         return MOI.ScalarAffineFunction{Float64}
-    else
-        @assert model.objective_type == _SCALAR_QUADRATIC
+    elseif model.objective_type == _SCALAR_QUADRATIC
         return MOI.ScalarQuadraticFunction{Float64}
+    else
+        @assert model.objective_type == _VECTOR_AFFINE
+        return MOI.VectorAffineFunction{Float64}
     end
 end
 

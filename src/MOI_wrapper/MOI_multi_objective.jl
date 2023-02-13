@@ -126,3 +126,37 @@ function MOI.get(model::Gurobi.Optimizer, attr::MultiObjectiveValue)
     _check_ret(model, ret)
     return val[]
 end
+
+function MOI.set(
+    model::Optimizer,
+    ::MOI.ObjectiveFunction{F},
+    f::F,
+) where {F<:MOI.VectorAffineFunction{Float64}}
+    for (i, fi) in enumerate(MOI.Utilities.eachscalar(f))
+        MOI.set(model, MultiObjectiveFunction(i), fi)
+    end
+    model.objective_type = _VECTOR_AFFINE
+    return
+end
+
+function MOI.get(
+    model::Optimizer,
+    ::MOI.ObjectiveFunction{MOI.VectorAffineFunction{Float64}},
+)
+    env = GRBgetenv(model)
+    F = MOI.ScalarAffineFunction{Float64}
+    f = F[]
+    for i in 1:MOI.get(model, NumberOfObjectives())
+        ret = GRBsetintparam(env, "ObjNumber", i - 1)
+        _check_ret(env, ret)
+        push!(f, _get_affine_objective(model; is_multiobjective = true))
+    end
+    return MOI.Utilities.operate(vcat, Float64, f...)
+end
+
+function MOI.supports(
+    model::Optimizer,
+    ::MOI.ObjectiveFunction{MOI.VectorAffineFunction{Float64}},
+)
+    return true
+end
