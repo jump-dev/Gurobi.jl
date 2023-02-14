@@ -745,6 +745,65 @@ function test_attributes_is_copyable()
     return
 end
 
+function test_dual_qcp_failure()
+    model = MOI.Bridges.full_bridge_optimizer(Gurobi.Optimizer(), Float64)
+    MOI.set(model, MOI.RawOptimizerAttribute("QCPDual"), 1)
+    p = MOI.add_variables(model, 3)
+    x = MOI.add_variables(model, 6)
+    MOI.add_constraint.(model, p, MOI.GreaterThan(0.0))
+    MOI.add_constraint.(model, x, MOI.Interval(0.0, 1.0))
+    MOI.add_constraint(model, 1.0 * p[1] + p[2] + p[3], MOI.EqualTo(300.0))
+    MOI.add_constraint(model, 1.0 * x[1] + x[2] + x[3], MOI.EqualTo(1.0))
+    MOI.add_constraint(model, 1.0 * x[4] + x[5] + x[6], MOI.EqualTo(1.0))
+    MOI.add_constraint(
+        model,
+        MOI.Utilities.operate(
+            vcat,
+            Float64,
+            120.0 - 0.6p[2] + 7.2x[2] + 7.2x[5], 2.5x[2], 2.5x[5],
+        ),
+        MOI.SecondOrderCone(3),
+    )
+    MOI.add_constraint(
+        model,
+        MOI.Utilities.operate(
+            vcat,
+            Float64,
+            120.0 - 0.6p[3] + 7.2x[3] + 7.2x[6], 2.5x[3], 2.5x[6],
+        ),
+        MOI.SecondOrderCone(3),
+    )
+    MOI.add_constraint(
+        model,
+        MOI.Utilities.operate(
+            vcat,
+            Float64,
+            0.6p[1] - 7.2x[1] - 7.2x[4], 2.5x[1], 2.5x[4],
+        ),
+        MOI.SecondOrderCone(3),
+    )
+    MOI.add_constraint(
+        model,
+        MOI.Utilities.operate(
+            vcat,
+            Float64,
+            0.6p[2] - 7.2x[2] - 7.2x[5], 2.5x[2], 2.5x[5],
+        ),
+        MOI.SecondOrderCone(3),
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    f = 0.15 * (p[1] - 12.0x[1] - 12.0x[4]) * (p[1] - 12.0x[1] - 12.0x[4]) +
+        0.20 * (p[2] - 12.0x[2] - 12.0x[5]) * (p[2] - 12.0x[2] - 12.0x[5]) +
+        0.25 * (p[3] - 12.0x[3] - 12.0x[6]) * (p[3] - 12.0x[3] - 12.0x[6]) +
+        0.9x[1] * x[1] + 1.2x[2] * x[2] + 1.5x[3] * x[3] +
+        0.9x[4] * x[4] + 1.2x[5] * x[5] + 1.5x[6] * x[6] +
+        1.1p[1] + 1.2p[2] + 1.3p[3] - 13.2x[1] - 14.4x[2] - 15.6x[3] - 13.2x[4] - 14.4x[5] - 15.6x[6]
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    MOI.get(model, MOI.DualStatus()) == MOI.NO_SOLUTION
+    return
+end
+
 end
 
 TestMOIWrapper.runtests()
