@@ -2841,7 +2841,18 @@ function MOI.get(model::Optimizer, attr::MOI.DualStatus)
     valueP = Ref{Cint}()
     ret = GRBgetintattr(model, "SolCount", valueP)
     _check_ret(model, ret)
-    return valueP[] > 0 ? MOI.FEASIBLE_POINT : MOI.NO_SOLUTION
+    if valueP[] == 0
+        return MOI.NO_SOLUTION
+    end
+    # But unfortunately, even if SolCount is 1, sometimes a dual solution is not
+    # available. The only way to check this is to query directly.
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "RC", 0, valueP)
+    if ret == 0
+        return MOI.FEASIBLE_POINT
+    else  # Something went wrong
+        return MOI.NO_SOLUTION
+    end
 end
 
 function _has_primal_ray(model::Optimizer)
