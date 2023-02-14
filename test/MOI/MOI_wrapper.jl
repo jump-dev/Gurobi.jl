@@ -59,9 +59,6 @@ function test_runtests()
         model,
         MOI.Test.Config(atol = 1e-3, rtol = 1e-3),
         exclude = String[
-            # TODO(odow): new tests from MOI that need implementing
-            "test_infeasible_",
-            "test_unbounded_",
             # TODO(odow): investigate errors
             # Gurobi Error 10015: Cannot compute IIS on a feasible model
             # https://www.gurobi.com/documentation/9.5/refman/error_codes.html
