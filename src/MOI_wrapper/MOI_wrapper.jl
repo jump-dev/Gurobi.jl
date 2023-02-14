@@ -3743,23 +3743,26 @@ end
 
 function MOI.compute_conflict!(model::Optimizer)
     ret = GRBcomputeIIS(model)
-    _check_ret(model, ret)
+    if ret != GRB_ERROR_IIS_NOT_INFEASIBLE
+        _check_ret(model, ret)
+    end
     model.conflict = ret
     return
 end
 
 function _ensure_conflict_computed(model::Optimizer)
-    if model.conflict == -1
+    if MOI.get(model, ConflictStatus()) == -1
         error(
             "Cannot access conflict status. Call " *
             "`Gurobi.compute_conflict(model)` first. In case the model " *
             "is modified, the computed conflict will not be purged.",
         )
     end
+    return
 end
 
 function _is_feasible(model::Optimizer)
-    return model.conflict == Gurobi.GRB_INFEASIBLE
+    return MOI.get(model, ConflictStatus()) == GRB_INFEASIBLE
 end
 
 """
@@ -3774,9 +3777,7 @@ computed conflict. It returns an integer:
 """
 struct ConflictStatus <: MOI.AbstractModelAttribute end
 
-function MOI.get(model::Optimizer, ::ConflictStatus)
-    return model.conflict
-end
+MOI.get(model::Optimizer, ::ConflictStatus) = model.conflict
 
 function MOI.get(model::Optimizer, ::MOI.ConflictStatus)
     status = MOI.get(model, ConflictStatus())
@@ -3784,7 +3785,7 @@ function MOI.get(model::Optimizer, ::MOI.ConflictStatus)
         return MOI.COMPUTE_CONFLICT_NOT_CALLED
     elseif status == 0
         return MOI.CONFLICT_FOUND
-    elseif status == Gurobi.IIS_NOT_INFEASIBLE
+    elseif status == GRB_ERROR_IIS_NOT_INFEASIBLE
         return MOI.NO_CONFLICT_EXISTS
     else
         return MOI.NO_CONFLICT_FOUND
