@@ -3762,7 +3762,7 @@ function _ensure_conflict_computed(model::Optimizer)
 end
 
 function _is_feasible(model::Optimizer)
-    return MOI.get(model, ConflictStatus()) == Gurobi.GRB_INFEASIBLE
+    return MOI.get(model, ConflictStatus()) == GRB_INFEASIBLE
 end
 
 """
@@ -3785,7 +3785,7 @@ function MOI.get(model::Optimizer, ::MOI.ConflictStatus)
         return MOI.COMPUTE_CONFLICT_NOT_CALLED
     elseif status == 0
         return MOI.CONFLICT_FOUND
-    elseif status == Gurobi.IIS_NOT_INFEASIBLE
+    elseif status == GRB_ERROR_IIS_NOT_INFEASIBLE
         return MOI.NO_CONFLICT_EXISTS
     else
         return MOI.NO_CONFLICT_FOUND
