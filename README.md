@@ -3,7 +3,7 @@
 [![Build Status](https://github.com/jump-dev/Gurobi.jl/workflows/CI/badge.svg?branch=master)](https://github.com/jump-dev/Gurobi.jl/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/jump-dev/Gurobi.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/jump-dev/Gurobi.jl)
 
-Gurobi.jl is a wrapper for the [Gurobi Optimizer](https://www.gurobi.com).
+[Gurobi.jl](https://github.com/jump-dev/Gurobi.jl) is a wrapper for the [Gurobi Optimizer](https://www.gurobi.com).
 
 It has two components:
  - a thin wrapper around the complete C API
@@ -13,10 +13,21 @@ The C API can be accessed via `Gurobi.GRBxx` functions, where the names and
 arguments are identical to the C API. See the [Gurobi documentation](https://www.gurobi.com/documentation/9.0/refman/c_api_details.html)
 for details.
 
-*Note: This wrapper is maintained by the JuMP community and is not officially
+## Affiliation
+
+This wrapper is maintained by the JuMP community and is not officially
 supported by Gurobi. However, we thank Gurobi for providing us with a license
 to test Gurobi.jl on GitHub. If you are a commercial customer interested in
-official support for Gurobi in Julia, let them know!.*
+official support for Gurobi in Julia, let them know.
+
+## License
+
+`Gurobi.jl` is licensed under the [MIT License](https://github.com/jump-dev/Gurobi.jl/blob/master/LICENSE.md).
+
+The underlying solver is a closed-source commercial product for which you must
+[purchase a license](https://www.gurobi.com).
+
+Free Gurobi licenses are available for [academics and students](https://www.gurobi.com/academia/academic-program-and-licenses/)s.
 
 ## Installation
 
@@ -53,18 +64,60 @@ make *Gurobi.jl* installable (but not usable).
 
 ## Use with JuMP
 
-We highly recommend that you use the *Gurobi.jl* package with higher level
-packages such as [JuMP.jl](https://github.com/jump-dev/JuMP.jl).
-
-This can be done using the ``Gurobi.Optimizer`` object. Here is how to create a
-*JuMP* model that uses Gurobi as the solver.
+To use Gurobi with [JuMP](https://github.com/jump-dev/JuMP.jl), use
+`Gurobi.Optimizer`:
 ```julia
 using JuMP, Gurobi
-
 model = Model(Gurobi.Optimizer)
-set_optimizer_attribute(model, "TimeLimit", 100)
-set_optimizer_attribute(model, "Presolve", 0)
+set_attribute(model, "TimeLimit", 100)
+set_attribute(model, "Presolve", 0)
 ```
+
+## MathOptInterface API
+
+The Gurobi optimizer supports the following constraints and attributes.
+
+List of supported objective functions:
+
+ * [`MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}`](@ref)
+ * [`MOI.ObjectiveFunction{MOI.ScalarQuadraticFunction{Float64}}`](@ref)
+ * [`MOI.ObjectiveFunction{MOI.VariableIndex}`](@ref)
+ * [`MOI.ObjectiveFunction{MOI.VectorAffineFunction{Float64}}`](@ref)
+
+List of supported variable types:
+
+ * [`MOI.Reals`](@ref)
+
+List of supported constraint types:
+
+ * [`MOI.ScalarAffineFunction{Float64}`](@ref) in [`MOI.EqualTo{Float64}`](@ref)
+ * [`MOI.ScalarAffineFunction{Float64}`](@ref) in [`MOI.GreaterThan{Float64}`](@ref)
+ * [`MOI.ScalarAffineFunction{Float64}`](@ref) in [`MOI.LessThan{Float64}`](@ref)
+ * [`MOI.ScalarQuadraticFunction{Float64}`](@ref) in [`MOI.EqualTo{Float64}`](@ref)
+ * [`MOI.ScalarQuadraticFunction{Float64}`](@ref) in [`MOI.GreaterThan{Float64}`](@ref)
+ * [`MOI.ScalarQuadraticFunction{Float64}`](@ref) in [`MOI.LessThan{Float64}`](@ref)
+ * [`MOI.VariableIndex`](@ref) in [`MOI.EqualTo{Float64}`](@ref)
+ * [`MOI.VariableIndex`](@ref) in [`MOI.GreaterThan{Float64}`](@ref)
+ * [`MOI.VariableIndex`](@ref) in [`MOI.Integer`](@ref)
+ * [`MOI.VariableIndex`](@ref) in [`MOI.Interval{Float64}`](@ref)
+ * [`MOI.VariableIndex`](@ref) in [`MOI.LessThan{Float64}`](@ref)
+ * [`MOI.VariableIndex`](@ref) in [`MOI.Semicontinuous{Float64}`](@ref)
+ * [`MOI.VariableIndex`](@ref) in [`MOI.Semiinteger{Float64}`](@ref)
+ * [`MOI.VariableIndex`](@ref) in [`MOI.ZeroOne`](@ref)
+ * [`MOI.VectorOfVariables`](@ref) in [`MOI.SOS1{Float64}`](@ref)
+ * [`MOI.VectorOfVariables`](@ref) in [`MOI.SOS2{Float64}`](@ref)
+ * [`MOI.VectorOfVariables`](@ref) in [`MOI.SecondOrderCone`](@ref)
+
+List of supported model attributes:
+
+ * [`MOI.HeuristicCallback()`](@ref)
+ * [`MOI.LazyConstraintCallback()`](@ref)
+ * [`MOI.Name()`](@ref)
+ * [`MOI.ObjectiveSense()`](@ref)
+ * [`MOI.UserCutCallback()`](@ref)
+
+## Options
+
 See the [Gurobi Documentation](https://www.gurobi.com/documentation/current/refman/parameters.html)
 for a list and description of allowable parameters.
 
@@ -81,14 +134,13 @@ code snippet solves multiple problems with JuMP using the same license token:
 
 ```julia
 using JuMP, Gurobi
-
 const GRB_ENV = Gurobi.Env()
 
 model1 = Model(() -> Gurobi.Optimizer(GRB_ENV))
 
 # The solvers can have different options too
 model2 = Model(() -> Gurobi.Optimizer(GRB_ENV))
-set_optimizer_attribute(model2, "OutputFlag", 0)
+set_attribute(model2, "OutputFlag", 0)
 ```
 
 ## Accessing Gurobi-specific attributes via JuMP
@@ -98,14 +150,12 @@ via JuMP as follows:
 
 ```julia
 using JuMP, Gurobi
-
 model = direct_model(Gurobi.Optimizer())
 @variable(model, x >= 0)
 @constraint(model, c, 2x >= 1)
 @objective(model, Min, x)
 MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c, 2)
 optimize!(model)
-
 MOI.get(model, Gurobi.VariableAttribute("LB"), x)  # Returns 0.0
 MOI.get(model, Gurobi.ModelAttribute("NumConstrs")) # Returns 1
 ```
