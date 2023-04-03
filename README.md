@@ -27,40 +27,34 @@ official support for Gurobi in Julia, let them know.
 The underlying solver is a closed-source commercial product for which you must
 [purchase a license](https://www.gurobi.com).
 
-Free Gurobi licenses are available for [academics and students](https://www.gurobi.com/academia/academic-program-and-licenses/)s.
+Free Gurobi licenses are available for [academics and students](https://www.gurobi.com/academia/academic-program-and-licenses/).
 
 ## Installation
 
-**Minimum version requirement:** Gurobi.jl requires Gurobi version 9.0 or 9.1 or 9.5 or 10.0.
-
 First, obtain a license of Gurobi and install Gurobi solver, following the
 instructions on [Gurobi's website](http://www.gurobi.com). Then, set the
-`GUROBI_HOME` environment variable as appropriate and run `Pkg.add("Gurobi")`,
-the `Pkg.build("Gurobi")`. For example:
+`GUROBI_HOME` environment variable as appropriate and run `Pkg.add("Gurobi")`:
+
 ```julia
 # On Windows, this might be
 ENV["GUROBI_HOME"] = "C:\\Program Files\\gurobi1000\\win64"
 # ... or perhaps ...
 ENV["GUROBI_HOME"] = "C:\\gurobi1000\\win64"
-import Pkg
-Pkg.add("Gurobi")
-Pkg.build("Gurobi")
-
 # On Mac, this might be
 ENV["GUROBI_HOME"] = "/Library/gurobi1000/mac64"
+
 import Pkg
 Pkg.add("Gurobi")
-Pkg.build("Gurobi")
 ```
 **Note: your path may differ. Check which folder you installed Gurobi in, and
 update the path accordingly.**
 
-By default, `build`ing *Gurobi.jl* will fail if the Gurobi library is not found.
+By default, building Gurobi.jl will fail if the Gurobi library is not found.
 This may not be desirable in certain cases, for example when part of a package's
 test suite uses Gurobi as an optional test dependency, but Gurobi cannot be
 installed on a CI server running the test suite. To support this use case, the
 `GUROBI_JL_SKIP_LIB_CHECK` environment variable may be set (to any value) to
-make *Gurobi.jl* installable (but not usable).
+make Gurobi.jl installable (but not usable).
 
 ## Use with JuMP
 
@@ -126,7 +120,7 @@ for a list and description of allowable parameters.
 When using this package via other packages such as [JuMP.jl](https://github.com/jump-dev/JuMP.jl),
 the default behavior is to obtain a new Gurobi license token every time a model
 is created. If you are using Gurobi in a setting where the number of concurrent
-Gurobi uses is limited (e.g. ["Single-Use" or "Floating-Use" licenses](http://www.gurobi.com/products/licensing-pricing/licensing-overview)),
+Gurobi uses is limited (for example, ["Single-Use" or "Floating-Use" licenses](http://www.gurobi.com/products/licensing-pricing/licensing-overview)),
 you might instead prefer to obtain a single license token that is shared by all
 models that your program solves. You can do this by passing a Gurobi Environment
 object as the first parameter to `Gurobi.Optimizer`. For example, the follow
@@ -248,7 +242,7 @@ To guide such restructuring it is good to keep in mind the following bits of
 information:
 
 1. `GRBupdatemodel` is only called if changes were done since last
-`GRBupdatemodel` (i.e., the internal buffer is not empty).
+   `GRBupdatemodel` (that is, if the internal buffer is not empty).
 2. `GRBupdatemodel` is called when `JuMP.optimize!` is called, but this often is
 not the source of the problem.
 3. `GRBupdatemodel` *may* be called when *ANY* model attribute is queried *even
