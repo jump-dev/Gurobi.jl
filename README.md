@@ -10,7 +10,6 @@ It has two components:
 
  - a thin wrapper around the complete C API
  - an interface to [MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl)
-s
 ## Affiliation
 
 This wrapper is maintained by the JuMP community and is not officially
@@ -162,7 +161,7 @@ MOI.get(model, Gurobi.ModelAttribute("NumConstrs")) # Returns 1
 ```
 
 A complete list of supported Gurobi attributes can be found in
-[their online documentation](https://www.gurobi.com/documentation/currents/refman/attributes.html).
+[their online documentation](https://www.gurobi.com/documentation/current/refman/attributes.html).
 
 ## Callbacks
 
