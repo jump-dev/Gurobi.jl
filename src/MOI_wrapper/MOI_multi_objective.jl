@@ -138,6 +138,7 @@ function MOI.set(
         MOI.set(model, MultiObjectiveFunction(i), fi)
     end
     model.objective_type = _VECTOR_AFFINE
+    model.is_objective_set = true
     return
 end
 
