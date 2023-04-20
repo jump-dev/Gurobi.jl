@@ -64,6 +64,8 @@ function test_runtests()
             "test_constraint_PrimalStart_DualStart_SecondOrderCone",
             "_RotatedSecondOrderCone_",
             "_GeometricMeanCone_",
+            # TODO(odow): fixed in MOI v1.15.1
+            "test_multiobjective_vector_of_variables_delete_",
         ],
     )
     MOI.Test.runtests(
