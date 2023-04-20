@@ -133,10 +133,12 @@ function MOI.set(
     ::MOI.ObjectiveFunction{F},
     f::F,
 ) where {F<:MOI.VectorAffineFunction{Float64}}
+    MOI.set(model, NumberOfObjectives(), MOI.output_dimension(f))
     for (i, fi) in enumerate(MOI.Utilities.eachscalar(f))
         MOI.set(model, MultiObjectiveFunction(i), fi)
     end
     model.objective_type = _VECTOR_AFFINE
+    model.is_objective_set = true
     return
 end
 
