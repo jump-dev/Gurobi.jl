@@ -1,7 +1,7 @@
 name = "Gurobi"
 uuid = "2e9cd046-0924-5485-92f1-d5272153d98b"
 repo = "https://github.com/jump-dev/Gurobi.jl"
-version = "1.0.0"
+version = "1.0.1"
 
 [deps]
 LazyArtifacts = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
