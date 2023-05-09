@@ -139,7 +139,7 @@ const GRB_ENV = Gurobi.Env()
 model_1 = Model(() -> Gurobi.Optimizer(GRB_ENV))
 
 # The solvers can have different options too
-model_2 = Model(() -> Gurobi.Optimizer(GRB_ENV))
+model_2 = direct_model(Gurobi.Optimizer(GRB_ENV))
 set_attribute(model_2, "OutputFlag", 0)
 ```
 
