@@ -811,6 +811,52 @@ function test_dual_qcp_failure()
     return
 end
 
+function test_modify_after_delete()
+    model = Gurobi.Optimizer(GRB_ENV)
+    x = MOI.add_variable(model)
+    c = [MOI.add_constraint(model, i * x, MOI.LessThan(i)) for i in [1.0, 2.0]]
+    MOI.delete(model, c[1])
+    MOI.modify(model, c[2], MOI.ScalarCoefficientChange(x, 4.0))
+    @test MOI.get(model, MOI.ConstraintFunction(), c[2]) ≈ 4.0 * x
+    return
+end
+
+function test_modify_after_delete_plural()
+    model = Gurobi.Optimizer(GRB_ENV)
+    x = MOI.add_variable(model)
+    c = [MOI.add_constraint(model, i * x, MOI.LessThan(i)) for i in [1.0, 2.0]]
+    MOI.delete(model, c[1])
+    MOI.modify(model, [c[2]], [MOI.ScalarCoefficientChange(x, 4.0)])
+    @test MOI.get(model, MOI.ConstraintFunction(), c[2]) ≈ 4.0 * x
+    return
+end
+
+function test_modify_after_delete_objective()
+    model = Gurobi.Optimizer(GRB_ENV)
+    x = MOI.add_variables(model, 2)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    f = 1.0 * x[1] + 2.0 * x[2]
+    attr = MOI.ObjectiveFunction{typeof(f)}()
+    MOI.set(model, attr, f)
+    MOI.delete(model, x[1])
+    MOI.modify(model, attr, MOI.ScalarCoefficientChange(x[2], 3.0))
+    @test MOI.get(model, attr) ≈ 3.0 * x[2]
+    return
+end
+
+function test_modify_after_delete_objective_plural()
+    model = Gurobi.Optimizer(GRB_ENV)
+    x = MOI.add_variables(model, 2)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    f = 1.0 * x[1] + 2.0 * x[2]
+    attr = MOI.ObjectiveFunction{typeof(f)}()
+    MOI.set(model, attr, f)
+    MOI.delete(model, x[1])
+    MOI.modify(model, attr, [MOI.ScalarCoefficientChange(x[2], 3.0)])
+    @test MOI.get(model, attr) ≈ 3.0 * x[2]
+    return
+end
+
 end
 
 TestMOIWrapper.runtests()
