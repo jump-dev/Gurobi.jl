@@ -811,6 +811,16 @@ function test_dual_qcp_failure()
     return
 end
 
+function test_modify_after_delete()
+    model = Gurobi.Optimizer()
+    x = MOI.add_variable(model)
+    c = [MOI.add_constraint(model, i * x, MOI.LessThan(i)) for i in [1.0, 2.0]]
+    MOI.delete(model, c[1])
+    MOI.modify(model, c[2], MOI.ScalarCoefficientChange(x, 4.0))
+    @test MOI.get(model, MOI.ConstraintFunction(), c[2]) ≈ 4.0 * x
+    return
+end
+
 end
 
 TestMOIWrapper.runtests()

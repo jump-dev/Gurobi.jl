@@ -3459,6 +3459,7 @@ function MOI.modify(
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},<:Any},
     chg::MOI.ScalarCoefficientChange{Float64},
 )
+    _update_if_necessary(model)
     ret = GRBchgcoeffs(
         model,
         1,
@@ -3476,6 +3477,7 @@ function MOI.modify(
     cis::Vector{MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},S}},
     changes::Vector{MOI.ScalarCoefficientChange{Float64}},
 ) where {S}
+    _update_if_necessary(model)
     nels = length(cis)
     @assert nels == length(changes)
     rows = Vector{Cint}(undef, nels)
@@ -3497,6 +3499,7 @@ function MOI.modify(
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
     chg::MOI.ScalarCoefficientChange{Float64},
 )
+    _update_if_necessary(model)
     ret = GRBsetdblattrelement(
         model,
         "Obj",
@@ -3514,6 +3517,7 @@ function MOI.modify(
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
     changes::Vector{MOI.ScalarCoefficientChange{Float64}},
 )
+    _update_if_necessary(model)
     nels = length(changes)
     cols = Vector{Cint}(undef, nels)
     coefs = Vector{Cdouble}(undef, nels)
