@@ -812,7 +812,7 @@ function test_dual_qcp_failure()
 end
 
 function test_modify_after_delete()
-    model = Gurobi.Optimizer()
+    model = Gurobi.Optimizer(GRB_ENV)
     x = MOI.add_variable(model)
     c = [MOI.add_constraint(model, i * x, MOI.LessThan(i)) for i in [1.0, 2.0]]
     MOI.delete(model, c[1])
