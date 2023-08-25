@@ -857,6 +857,19 @@ function test_modify_after_delete_objective_plural()
     return
 end
 
+function test_attribute_TimeLimitSec()
+    model = Gurobi.Optimizer(GRB_ENV)
+    @test MOI.supports(model, MOI.TimeLimitSec())
+    @test MOI.get(model, MOI.TimeLimitSec()) === nothing
+    MOI.set(model, MOI.TimeLimitSec(), 0.0)
+    @test MOI.get(model, MOI.TimeLimitSec()) == 0.0
+    MOI.set(model, MOI.TimeLimitSec(), nothing)
+    @test MOI.get(model, MOI.TimeLimitSec()) === nothing
+    MOI.set(model, MOI.TimeLimitSec(), 1.0)
+    @test MOI.get(model, MOI.TimeLimitSec()) == 1.0
+    return
+end
+
 end
 
 TestMOIWrapper.runtests()

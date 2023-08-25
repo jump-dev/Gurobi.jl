@@ -651,7 +651,8 @@ function MOI.set(model::Optimizer, raw::MOI.RawOptimizerAttribute, value)
         @assert param_type == 3
         GRBsetstrparam(env, param, value)
     end
-    return _check_ret(env, ret)
+    _check_ret(env, ret)
+    return
 end
 
 function MOI.get(model::Optimizer, raw::MOI.RawOptimizerAttribute)
@@ -681,13 +682,19 @@ function MOI.get(model::Optimizer, raw::MOI.RawOptimizerAttribute)
     end
 end
 
-function MOI.set(model::Optimizer, ::MOI.TimeLimitSec, limit::Real)
-    MOI.set(model, MOI.RawOptimizerAttribute("TimeLimit"), limit)
+function MOI.set(
+    model::Optimizer,
+    ::MOI.TimeLimitSec,
+    limit::Union{Real,Nothing},
+)
+    float_limit = convert(Float64, something(limit, GRB_INFINITY))
+    MOI.set(model, MOI.RawOptimizerAttribute("TimeLimit"), float_limit)
     return
 end
 
 function MOI.get(model::Optimizer, ::MOI.TimeLimitSec)
-    return MOI.get(model, MOI.RawOptimizerAttribute("TimeLimit"))
+    limit = MOI.get(model, MOI.RawOptimizerAttribute("TimeLimit"))
+    return limit == GRB_INFINITY ? nothing : limit
 end
 
 MOI.supports_incremental_interface(::Optimizer) = true
