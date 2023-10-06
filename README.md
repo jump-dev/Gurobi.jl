@@ -10,12 +10,19 @@ It has two components:
 
  - a thin wrapper around the complete C API
  - an interface to [MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl)
+
 ## Affiliation
 
-This wrapper is maintained by the JuMP community and is not officially
-supported by Gurobi. However, we thank Gurobi for providing us with a license
-to test Gurobi.jl on GitHub. If you are a commercial customer interested in
-official support for Gurobi in Julia, let them know.
+This wrapper is maintained by the JuMP community with help from Gurobi. 
+ 
+If you encounter a problem with this interface, please either open an issue in
+this repository directly or create a topic in the [Julia Discourse](https://discourse.julialang.org/c/domain/opt/13)
+with the [`gurobi` tag](https://discourse.julialang.org/tag/gurobi). 
+ 
+If you encounter a problem with the Gurobi solver, please post in Gurobi’s
+[Community Forum](https://support.gurobi.com/hc/en-us/community/topics), or if
+you are a commercial customer, please contact Gurobi directly through the
+[Gurobi Help Center](https://support.gurobi.com/hc/en-us).
 
 ## License
 
