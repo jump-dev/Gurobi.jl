@@ -150,6 +150,29 @@ model_2 = direct_model(Gurobi.Optimizer(GRB_ENV))
 set_attribute(model_2, "OutputFlag", 0)
 ```
 
+If you create a module with a `Gurobi.Env` as a module-level constant, use an
+`__init__` function to ensure that a new environment is created each time the
+module is loaded:
+
+```julia
+module MyModule
+
+import Gurobi
+
+const GRB_ENV_REF = Ref{Gurobi.Env}()
+
+function __init__()
+    global GRB_ENV_REF
+    GRB_ENV_REF[] = Gurobi.Env()
+    return
+end
+
+# Note the need for GRB_ENV_REF[] not GRB_ENV_REF
+create_optimizer() = Gurobi.Optimizer(GRB_ENV_REF[])
+
+end
+```
+
 ## Accessing Gurobi-specific attributes
 
 Get and set Gurobi-specific variable, constraint, and model attributes as
