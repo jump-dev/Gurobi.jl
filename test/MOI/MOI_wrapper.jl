@@ -870,6 +870,14 @@ function test_attribute_TimeLimitSec()
     return
 end
 
+function test_last_constraint_index()
+    model = Gurobi.Optimizer(GRB_ENV)
+    x = MOI.add_variable(model)
+    c = MOI.add_constraint(model, 1.0 * x, MOI.GreaterThan(1.0))
+    @test c.value == 1
+    return
+end
+
 end
 
 TestMOIWrapper.runtests()
