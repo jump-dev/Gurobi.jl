@@ -2706,7 +2706,7 @@ end
 
 # These strings are taken directly from the following page of the online Gurobi
 # documentation:
-# https://www.com/documentation/8.1/refman/optimization_status_codes.html#sec:StatusCodes
+# https://www.gurobi.com/documentation/10.0/refman/optimization_status_codes.html#sec:StatusCodes
 const _RAW_STATUS_STRINGS = [
     # TerminationStatus,          RawStatusString
     (
@@ -2764,7 +2764,7 @@ const _RAW_STATUS_STRINGS = [
         "User specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached.",
     ),
     (
-        MOI.TIME_LIMIT,
+        MOI.OTHER_LIMIT,
         "Optimization terminated because the work expended exceeded the value specified in the WorkLimit parameter.",
     ),
     (
