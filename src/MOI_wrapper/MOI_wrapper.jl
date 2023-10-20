@@ -2706,7 +2706,7 @@ end
 
 # These strings are taken directly from the following page of the online Gurobi
 # documentation:
-# https://www.com/documentation/8.1/refman/optimization_status_codes.html#sec:StatusCodes
+# https://www.gurobi.com/documentation/10.0/refman/optimization_status_codes.html#sec:StatusCodes
 const _RAW_STATUS_STRINGS = [
     # TerminationStatus,          RawStatusString
     (
@@ -2763,6 +2763,14 @@ const _RAW_STATUS_STRINGS = [
         MOI.OBJECTIVE_LIMIT,
         "User specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached.",
     ),
+    (
+        MOI.OTHER_LIMIT,
+        "Optimization terminated because the work expended exceeded the value specified in the WorkLimit parameter.",
+    ),
+    (
+        MOI.MEMORY_LIMIT,
+        "Optimization terminated because the total amount of allocated memory exceeded the value specified in the SoftMemLimit parameter.",
+    ),
 ]
 
 function _raw_status(model::Optimizer)
@@ -2772,7 +2780,7 @@ function _raw_status(model::Optimizer)
     valueP = Ref{Cint}()
     ret = GRBgetintattr(model, "Status", valueP)
     _check_ret(model, ret)
-    @assert 1 <= valueP[] <= 15
+    @assert 1 <= valueP[] <= 17
     return _RAW_STATUS_STRINGS[valueP[]]
 end
 
