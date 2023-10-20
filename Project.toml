@@ -1,7 +1,7 @@
 name = "Gurobi"
 uuid = "2e9cd046-0924-5485-92f1-d5272153d98b"
 repo = "https://github.com/jump-dev/Gurobi.jl"
-version = "1.0.3"
+version = "1.0.4"
 
 [deps]
 LazyArtifacts = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
@@ -9,7 +9,11 @@ Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 
 [compat]
+LazyArtifacts = "1.6"
+Libdl = "1.6"
 MathOptInterface = "1.12"
+Random = "1.6"
+Test = "1.6"
 julia = "1.6"
 
 [extras]
