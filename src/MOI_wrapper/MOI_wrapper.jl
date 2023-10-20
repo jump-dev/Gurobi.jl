@@ -2763,6 +2763,14 @@ const _RAW_STATUS_STRINGS = [
         MOI.OBJECTIVE_LIMIT,
         "User specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached.",
     ),
+    (
+        MOI.TIME_LIMIT,
+        "Optimization terminated because the work expended exceeded the value specified in the WorkLimit parameter.",
+    ),
+    (
+        MOI.MEMORY_LIMIT,
+        "Optimization terminated because the total amount of allocated memory exceeded the value specified in the SoftMemLimit parameter.",
+    ),
 ]
 
 function _raw_status(model::Optimizer)
@@ -2772,7 +2780,7 @@ function _raw_status(model::Optimizer)
     valueP = Ref{Cint}()
     ret = GRBgetintattr(model, "Status", valueP)
     _check_ret(model, ret)
-    @assert 1 <= valueP[] <= 15
+    @assert 1 <= valueP[] <= 17
     return _RAW_STATUS_STRINGS[valueP[]]
 end
 
