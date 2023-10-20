@@ -338,7 +338,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
                 _INVERSE_HASH,
             )
         model.next_column = 1
-        model.last_constraint_index = 1
+        model.last_constraint_index = 0
         model.columns_deleted_since_last_update = Int[]
         model.affine_constraint_info = Dict{Int,_ConstraintInfo}()
         model.quadratic_constraint_info = Dict{Int,_ConstraintInfo}()
