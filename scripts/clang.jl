@@ -9,13 +9,15 @@
 # This script can be used to build the C interface to Gurobi. However, it
 # requires you to manually set the path to the appropriate gurobi_c.h.
 
+# Note that clang 0.12 requires julia 1.5
+
 import Clang
 
 const LIBGRB_HEADERS = [
-    "/Library/gurobi910/mac64/include/gurobi_c.h",
+    "/Library/gurobi1100/macos_universal2/include/gurobi_c.h",
 ]
 
-const GRB_VERSION = "91"
+const GRB_VERSION = "110"
 
 const GEN_DIR = joinpath(dirname(@__DIR__), "src", "gen$(GRB_VERSION)")
 if !isdir(GEN_DIR)
