@@ -23,6 +23,7 @@ function write_depsfile(path)
 end
 
 const ALIASES = [
+    "gurobi110",
     "gurobi100",
     "gurobi95",
     "gurobi91",
