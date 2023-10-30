@@ -127,6 +127,55 @@ arguments are identical to the C API.
 See the [Gurobi documentation](https://www.gurobi.com/documentation/current/refman/c_api_details.html)
 for details.
 
+As general rules when converting from Julia to C:
+
+ * When Gurobi requires the column index of a variable `x`, use
+   `Cint(Gurobi.column(model, x) - 1)`
+ * When Gurobi requires a `Ptr{T}` that holds one element, like `* int`,
+   use a `Ref{T}()`
+ * When Gurobi requries a `Ptr{T}` that holds multiple elements, use
+   a `Vector{T}`.
+
+For example:
+
+```julia
+julia> import MathOptInterface as MOI
+
+julia> using Gurobi
+
+julia> model = Gurobi.Optimizer();
+
+julia> x = MOI.add_variable(model)
+MOI.VariableIndex(1)
+
+julia> x_col = Cint(Gurobi.column(model, x) - 1)
+0
+
+julia> GRBupdatemodel(model)
+0
+
+julia> pValue = Ref{Cdouble}(NaN)
+Base.RefValue{Float64}(NaN)
+
+julia> GRBgetdblattrelement(model, "LB", x_col, pValue)
+0
+
+julia> pValue[]
+-1.0e100
+
+julia> GRBsetdblattrelement(model, "LB", x_col, 1.5)
+0
+
+julia> GRBupdatemodel(model)
+0
+
+julia> GRBgetdblattrelement(model, "LB", x_col, pValue)
+0
+
+julia> pValue[]
+1.5
+```
+
 ## Reusing the same Gurobi environment for multiple solves
 
 When using this package via other packages such as [JuMP.jl](https://github.com/jump-dev/JuMP.jl),
