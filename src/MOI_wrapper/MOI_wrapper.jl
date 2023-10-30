@@ -858,22 +858,36 @@ function _info(model::Optimizer, key::MOI.VariableIndex)
 end
 
 """
-    column(model::Optimizer, x::MOI.VariableIndex)
+    column(
+        model::Optimizer,
+        x::Union{MOI.VariableIndex,<:MOI.ConstraintIndex{MOI.VariableIndex}},
+    ) --> Int
 
 Return the 1-indexed column associated with `x`.
 
 For use with the C API, see `Gurobi.c_column`.
 """
-function column(model::Optimizer, x::MOI.VariableIndex)
+function column(
+    model::Optimizer,
+    x::Union{MOI.VariableIndex,<:MOI.ConstraintIndex{MOI.VariableIndex}},
+)
     return _info(model, x).column
 end
-
+    
 """
-    c_column(model::Optimizer, x::MOI.VariableIndex) --> Cint
+    c_column(
+        model::Optimizer,
+        x::Union{MOI.VariableIndex,<:MOI.ConstraintIndex{MOI.VariableIndex}},
+    ) --> Cint
 
 Return the `Cint` 0-indexed column associated with `x` for use with the C API.
 """
-c_column(model::Optimizer, x::MOI.VariableIndex) = Cint(column(model, x) - 1)
+function c_column(
+    model::Optimizer,
+    x::Union{MOI.VariableIndex,<:MOI.ConstraintIndex{MOI.VariableIndex}},
+)
+    return Cint(column(model, x) - 1)
+end
 
 function _get_next_column(model::Optimizer)
     model.next_column += 1
@@ -1301,20 +1315,6 @@ function _info(
         return _info(model, var_index)
     end
     return throw(MOI.InvalidIndex(c))
-end
-
-"""
-    column(model::Optimizer, c::MOI.ConstraintIndex{MOI.VariableIndex, <:Any})
-
-Return the 1-indexed column associated with `c`.
-
-The C API requires 0-indexed columns.
-"""
-function column(
-    model::Optimizer,
-    c::MOI.ConstraintIndex{MOI.VariableIndex,<:Any},
-)
-    return _info(model, c).column
 end
 
 function MOI.is_valid(
