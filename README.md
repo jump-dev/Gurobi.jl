@@ -13,12 +13,12 @@ It has two components:
 
 ## Affiliation
 
-This wrapper is maintained by the JuMP community with help from Gurobi. 
- 
+This wrapper is maintained by the JuMP community with help from Gurobi.
+
 If you encounter a problem with this interface, please either open an issue in
 this repository directly or create a topic in the [Julia Discourse](https://discourse.julialang.org/c/domain/opt/13)
-with the [`gurobi` tag](https://discourse.julialang.org/tag/gurobi). 
- 
+with the [`gurobi` tag](https://discourse.julialang.org/tag/gurobi).
+
 If you encounter a problem with the Gurobi solver, please post in Gurobi’s
 [Community Forum](https://support.gurobi.com/hc/en-us/community/topics), or if
 you are a commercial customer, please contact Gurobi directly through the
@@ -130,7 +130,7 @@ for details.
 As general rules when converting from Julia to C:
 
  * When Gurobi requires the column index of a variable `x`, use
-   `Cint(Gurobi.column(model, x) - 1)`
+   `Gurobi.c_column(model, x)`
  * When Gurobi requires a `Ptr{T}` that holds one element, like `double *`,
    use a `Ref{T}()`.
  * When Gurobi requries a `Ptr{T}` that holds multiple elements, use
@@ -151,7 +151,7 @@ julia> model = Gurobi.Optimizer();
 julia> x = MOI.add_variable(model)
 MOI.VariableIndex(1)
 
-julia> x_col = Cint(Gurobi.column(model, x) - 1)
+julia> x_col = Gurobi.c_column(model, x)
 0
 
 julia> GRBupdatemodel(model)

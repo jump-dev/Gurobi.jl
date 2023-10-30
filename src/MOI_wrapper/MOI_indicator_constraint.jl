@@ -115,10 +115,10 @@ function MOI.add_constraint(
                     "be 1.0. Got $(term.coefficient).",
                 )
             end
-            binvar = Cint(column(model, term.variable) - 1)
+            binvar = c_column(model, term.variable)
         else
             @assert row == 2
-            vars[i] = Cint(column(model, term.variable) - 1)
+            vars[i] = c_column(model, term.variable)
             vals[i] = term.coefficient
             i += 1
         end
