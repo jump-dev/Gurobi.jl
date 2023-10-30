@@ -1,0 +1,9 @@
+[general]
+library_name = "libgurobi"
+prologue_file_path = "prologue.jl"
+output_file_path = "../src/gen100/libgrb_api.jl"
+print_using_CEnum = false
+extract_c_comment_style = "doxygen"
+
+[codegen.macro]
+ignore_header_guards_with_suffixes = ["__stdcall"]
