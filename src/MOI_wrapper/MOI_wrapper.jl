@@ -873,7 +873,6 @@ function column(
 )
     return _info(model, x).column
 end
-    
 """
     c_column(
         model::Optimizer,
