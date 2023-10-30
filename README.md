@@ -13,12 +13,12 @@ It has two components:
 
 ## Affiliation
 
-This wrapper is maintained by the JuMP community with help from Gurobi. 
- 
+This wrapper is maintained by the JuMP community with help from Gurobi.
+
 If you encounter a problem with this interface, please either open an issue in
 this repository directly or create a topic in the [Julia Discourse](https://discourse.julialang.org/c/domain/opt/13)
-with the [`gurobi` tag](https://discourse.julialang.org/tag/gurobi). 
- 
+with the [`gurobi` tag](https://discourse.julialang.org/tag/gurobi).
+
 If you encounter a problem with the Gurobi solver, please post in Gurobi’s
 [Community Forum](https://support.gurobi.com/hc/en-us/community/topics), or if
 you are a commercial customer, please contact Gurobi directly through the
@@ -126,6 +126,58 @@ arguments are identical to the C API.
 
 See the [Gurobi documentation](https://www.gurobi.com/documentation/current/refman/c_api_details.html)
 for details.
+
+As general rules when converting from Julia to C:
+
+ * When Gurobi requires the column index of a variable `x`, use
+   `Gurobi.c_column(model, x)`
+ * When Gurobi requires a `Ptr{T}` that holds one element, like `double *`,
+   use a `Ref{T}()`.
+ * When Gurobi requries a `Ptr{T}` that holds multiple elements, use
+   a `Vector{T}`.
+ * When Gurobi requires a `double`, use `Cdouble`
+ * When Gurobi requires an `int`, use `Cint`
+ * When Gurobi requires a `NULL`, use `C_NULL`
+
+For example:
+
+```julia
+julia> import MathOptInterface as MOI
+
+julia> using Gurobi
+
+julia> model = Gurobi.Optimizer();
+
+julia> x = MOI.add_variable(model)
+MOI.VariableIndex(1)
+
+julia> x_col = Gurobi.c_column(model, x)
+0
+
+julia> GRBupdatemodel(model)
+0
+
+julia> pValue = Ref{Cdouble}(NaN)
+Base.RefValue{Float64}(NaN)
+
+julia> GRBgetdblattrelement(model, "LB", x_col, pValue)
+0
+
+julia> pValue[]
+-1.0e100
+
+julia> GRBsetdblattrelement(model, "LB", x_col, 1.5)
+0
+
+julia> GRBupdatemodel(model)
+0
+
+julia> GRBgetdblattrelement(model, "LB", x_col, pValue)
+0
+
+julia> pValue[]
+1.5
+```
 
 ## Reusing the same Gurobi environment for multiple solves
 
