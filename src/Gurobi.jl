@@ -66,7 +66,8 @@ elseif _is_patch(_GUROBI_VERSION, v"11.0")
 else
     error("""
     You have installed version $_GUROBI_VERSION of Gurobi, which is not
-    supported by Gurobi.jl. We require Gurobi version 9.0 or 9.1 or 9.5 or 10.0.
+    supported by Gurobi.jl. We require Gurobi version 9.0 or 9.1 or 9.5
+    or 10.0 or 11.0.
 
     After installing a supported version of Gurobi, run:
 
