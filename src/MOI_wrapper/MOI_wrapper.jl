@@ -2994,7 +2994,7 @@ function MOI.get(
 )
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    col = c_column(model, x)
+    col = c_column(model, c)
     if model.has_infeasibility_cert
         dual = _farkas_variable_dual(model, col)
         return min(dual, 0.0)
