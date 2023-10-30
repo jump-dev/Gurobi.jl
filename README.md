@@ -131,10 +131,13 @@ As general rules when converting from Julia to C:
 
  * When Gurobi requires the column index of a variable `x`, use
    `Cint(Gurobi.column(model, x) - 1)`
- * When Gurobi requires a `Ptr{T}` that holds one element, like `* int`,
-   use a `Ref{T}()`
+ * When Gurobi requires a `Ptr{T}` that holds one element, like `double *`,
+   use a `Ref{T}()`.
  * When Gurobi requries a `Ptr{T}` that holds multiple elements, use
    a `Vector{T}`.
+ * When Gurobi requires a `double`, use `Cdouble`
+ * When Gurobi requires an `int`, use `Cint`
+ * When Gurobi requires a `NULL`, use `C_NULL`
 
 For example:
 
