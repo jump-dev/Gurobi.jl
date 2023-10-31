@@ -15,7 +15,7 @@
 
 using Clang.Generators
 
-const gurobi_c = "/Library/gurobi1000/macos_universal2/include/gurobi_c.h"
+const gurobi_c = "/Library/gurobi1003/macos_universal2/include/gurobi_c.h"
 const output_folder = "gen100"
 
 options = load_options(joinpath(@__DIR__, "generate.toml"))

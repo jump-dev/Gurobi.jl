@@ -1,9 +1,22 @@
 [general]
 library_name = "libgurobi"
 prologue_file_path = "prologue.jl"
-output_file_path = "../src/gen100/libgrb_api.jl"
+output_file_path = "../src/gen100/libgrb_api.jl"  # adjusted by gen.jl
 print_using_CEnum = false
 extract_c_comment_style = "doxygen"
+output_ignorelist = [
+    "THREADCREATECB_ARGS",
+    "THREADJOINCB_ARGS",
+    "MALLOCCB_ARGS",
+    "CALLOCCB_ARGS",
+    "REALLOCCB_ARGS",
+    "FREECB_ARGS",
+    "CB_ARGS",
+    "LOGCB_ARGS",
+]
+
+[codegen]
+opaque_as_mutable_struct = false
 
 [codegen.macro]
 ignore_header_guards_with_suffixes = ["__stdcall"]
