@@ -1055,21 +1055,21 @@ const GRB_ERROR_TUNE_MODEL_TYPES = 10031
 
 const GRB_ERROR_SECURITY = 10032
 
-const GRB_LESS_EQUAL = Cchar('<')
+const GRB_LESS_EQUAL = '<'
 
-const GRB_GREATER_EQUAL = Cchar('>')
+const GRB_GREATER_EQUAL = '>'
 
-const GRB_EQUAL = Cchar('=')
+const GRB_EQUAL = '='
 
-const GRB_CONTINUOUS = Cchar('C')
+const GRB_CONTINUOUS = 'C'
 
-const GRB_BINARY = Cchar('B')
+const GRB_BINARY = 'B'
 
-const GRB_INTEGER = Cchar('I')
+const GRB_INTEGER = 'I'
 
-const GRB_SEMICONT = Cchar('S')
+const GRB_SEMICONT = 'S'
 
-const GRB_SEMIINT = Cchar('N')
+const GRB_SEMIINT = 'N'
 
 const GRB_MINIMIZE = 1
 
