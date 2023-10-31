@@ -59,7 +59,6 @@ elseif _is_patch(_GUROBI_VERSION, v"9.5")
     include("gen95/libgrb_common.jl")
     include("gen95/libgrb_api.jl")
 elseif _is_patch(_GUROBI_VERSION, v"10.0")
-    include("gen100/libgrb_common.jl")
     include("gen100/libgrb_api.jl")
 else
     error("""
