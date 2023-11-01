@@ -13,6 +13,14 @@ output_ignorelist = [
     "FREECB_ARGS",
     "CB_ARGS",
     "LOGCB_ARGS",
+    "GRB_LESS_EQUAL",
+    "GRB_GREATER_EQUAL",
+    "GRB_EQUAL",
+    "GRB_CONTINUOUS",
+    "GRB_BINARY",
+    "GRB_INTEGER",
+    "GRB_SEMICONT",
+    "GRB_SEMIINT"
 ]
 
 [codegen]

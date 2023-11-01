@@ -5,3 +5,19 @@
 # in the LICENSE.md file or at https://opensource.org/licenses/MIT.
 
 # !format: off
+
+const GRB_LESS_EQUAL = '<'
+
+const GRB_GREATER_EQUAL = '>'
+
+const GRB_EQUAL = '='
+
+const GRB_CONTINUOUS = 'C'
+
+const GRB_BINARY = 'B'
+
+const GRB_INTEGER = 'I'
+
+const GRB_SEMICONT = 'S'
+
+const GRB_SEMIINT = 'N'
