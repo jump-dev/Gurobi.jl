@@ -6,6 +6,22 @@
 
 # !format: off
 
+const GRB_LESS_EQUAL = '<'
+
+const GRB_GREATER_EQUAL = '>'
+
+const GRB_EQUAL = '='
+
+const GRB_CONTINUOUS = 'C'
+
+const GRB_BINARY = 'B'
+
+const GRB_INTEGER = 'I'
+
+const GRB_SEMICONT = 'S'
+
+const GRB_SEMIINT = 'N'
+
 
 const _GRBmodel = Cvoid
 
@@ -1054,22 +1070,6 @@ const GRB_ERROR_CSWORKER = 10030
 const GRB_ERROR_TUNE_MODEL_TYPES = 10031
 
 const GRB_ERROR_SECURITY = 10032
-
-const GRB_LESS_EQUAL = '<'
-
-const GRB_GREATER_EQUAL = '>'
-
-const GRB_EQUAL = '='
-
-const GRB_CONTINUOUS = 'C'
-
-const GRB_BINARY = 'B'
-
-const GRB_INTEGER = 'I'
-
-const GRB_SEMICONT = 'S'
-
-const GRB_SEMIINT = 'N'
 
 const GRB_MINIMIZE = 1
 
