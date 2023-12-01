@@ -42,11 +42,11 @@ Then, set the `GUROBI_HOME` environment variable as appropriate and run
 
 ```julia
 # On Windows, this might be
-ENV["GUROBI_HOME"] = "C:\\Program Files\\gurobi1000\\win64"
+ENV["GUROBI_HOME"] = "C:\\Program Files\\gurobi1100\\win64"
 # ... or perhaps ...
-ENV["GUROBI_HOME"] = "C:\\gurobi1000\\win64"
+ENV["GUROBI_HOME"] = "C:\\gurobi1100\\win64"
 # On Mac, this might be
-ENV["GUROBI_HOME"] = "/Library/gurobi1000/mac64"
+ENV["GUROBI_HOME"] = "/Library/gurobi1100/mac64"
 
 import Pkg
 Pkg.add("Gurobi")
