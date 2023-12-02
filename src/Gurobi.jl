@@ -19,7 +19,7 @@ elseif Sys.islinux()
     # Let's use the artifact instead.
     const libgurobi = joinpath(
         LazyArtifacts.artifact"gurobilinux64",
-        "gurobi1000/linux64/lib/libgurobi100.so",
+        "gurobi1100/linux64/lib/libgurobi110.so",
     )
 else
     error("""
