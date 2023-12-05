@@ -179,6 +179,34 @@ julia> pValue[]
 1.5
 ```
 
+### The C API from JuMP
+
+You can call the C API from JuMP if you use `direct_model`. This is most useful
+for adding `GRBaddgenXXX` constraints. Here are some examples:
+
+```julia
+using JuMP, Gurobi
+column(x::VariableRef) = Gurobi.c_column(backend(owner_model(x)), index(x))
+model = direct_model(Gurobi.Optimizer())
+@variable(model, x)
+@variable(model, y)
+p = [3.0, 0.0, 0.0, 7.0, 3.0]
+GRBaddgenconstrPoly(backend(model), C_NULL, column(x), column(y), 5, p, "")
+optimize!(model)
+```
+
+```julia
+using JuMP, Gurobi
+column(x::VariableRef) = Gurobi.c_column(backend(owner_model(x)), index(x))
+model = direct_model(Gurobi.Optimizer())
+@variable(model, x[i in 1:2])
+@variable(model, y[1:2])
+GRBaddgenconstrPow(backend(model), "x1^0.7", column(x[1]), column(y[1]), 0.7, "")
+GRBaddgenconstrPow(backend(model), "x2^3", column(x[2]), column(y[2]), 3.0, "")
+@objective(model, Min, y[1] + y[2])
+optimize!(model)
+```
+
 ## Reusing the same Gurobi environment for multiple solves
 
 When using this package via other packages such as [JuMP.jl](https://github.com/jump-dev/JuMP.jl),
