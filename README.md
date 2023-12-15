@@ -264,10 +264,11 @@ model = direct_model(Gurobi.Optimizer())
 @variable(model, x >= 0)
 @constraint(model, c, 2x >= 1)
 @objective(model, Min, x)
-MOI.set(model, Gurobi.ConstraintAttribute("Lazy"), c, 2)
+grb = backend(model)
+MOI.set(grb, Gurobi.ConstraintAttribute("Lazy"), index(c), 2)
 optimize!(model)
-MOI.get(model, Gurobi.VariableAttribute("LB"), x)  # Returns 0.0
-MOI.get(model, Gurobi.ModelAttribute("NumConstrs")) # Returns 1
+MOI.get(grb, Gurobi.VariableAttribute("LB"), index(x))  # Returns 0.0
+MOI.get(grb, Gurobi.ModelAttribute("NumConstrs")) # Returns 1
 ```
 
 A complete list of supported Gurobi attributes can be found in
