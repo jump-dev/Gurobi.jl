@@ -8,7 +8,7 @@ module TestMOIWrapper
 
 using Test
 
-import Gurobi
+using Gurobi
 import MathOptInterface as MOI
 import Random
 
