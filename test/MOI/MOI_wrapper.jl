@@ -6,11 +6,11 @@
 
 module TestMOIWrapper
 
-using Gurobi
-using Random
 using Test
 
-const MOI = Gurobi.MOI
+import Gurobi
+import MathOptInterface as MOI
+import Random
 
 function runtests()
     for name in names(@__MODULE__; all = true)
@@ -875,6 +875,26 @@ function test_last_constraint_index()
     x = MOI.add_variable(model)
     c = MOI.add_constraint(model, 1.0 * x, MOI.GreaterThan(1.0))
     @test c.value == 1
+    return
+end
+
+function test_delete_indicator()
+    model = Gurobi.Optimizer(GRB_ENV)
+    x = MOI.add_variable(model)
+    z = MOI.add_variables(model, 3)
+    MOI.add_constraint.(model, z, MOI.ZeroOne())
+    c = map(1:3) do i
+        return MOI.add_constraint(
+            model,
+            MOI.Utilities.operate(vcat, Float64, z[i], 1.0 * i * x),
+            MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.EqualTo(1.0 * i)),
+        )
+    end
+    f = MOI.get(model, MOI.ConstraintFunction(), c[2])
+    MOI.delete(model, c[1])
+    MOI.delete(model, c[3])
+    g = MOI.get(model, MOI.ConstraintFunction(), c[2])
+    @test isapprox(f, g)
     return
 end
 
