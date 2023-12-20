@@ -195,6 +195,7 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{<:MOI.VectorAffineFunction,<:MOI.Indicator},
 )
+    _update_if_necessary(model)
     MOI.throw_if_not_valid(model, c)
     row = _info(model, c).row
     ind = Ref{Cint}(row - 1)
