@@ -1570,13 +1570,15 @@ function _set_variable_lower_bound(model, info, value)
     if info.num_soc_constraints == 0
         # No SOC constraints, set directly.
         @assert isnan(info.lower_bound_if_soc)
-        GRBsetdblattrelement(model, "LB", Cint(info.column - 1), value)
+        ret = GRBsetdblattrelement(model, "LB", Cint(info.column - 1), value)
+        _check_ret(model, ret)
         _require_update(model)
     elseif value >= 0.0
         # Regardless of whether there are SOC constraints, this is a valid
         # bound for the SOC constraint and should override any previous bounds.
         info.lower_bound_if_soc = NaN
-        GRBsetdblattrelement(model, "LB", Cint(info.column - 1), value)
+        ret = GRBsetdblattrelement(model, "LB", Cint(info.column - 1), value)
+        _check_ret(model, ret)
         _require_update(model)
     elseif isnan(info.lower_bound_if_soc)
         # Previously, we had a non-negative lower bound (i.e., it was set in
@@ -1584,7 +1586,8 @@ function _set_variable_lower_bound(model, info, value)
         # there are still some SOC constraints, so we cache `value` and set the
         # variable lower bound to `0.0`.
         @assert value < 0.0
-        GRBsetdblattrelement(model, "LB", Cint(info.column - 1), 0.0)
+        ret = GRBsetdblattrelement(model, "LB", Cint(info.column - 1), 0.0)
+        _check_ret(model, ret)
         _require_update(model)
         info.lower_bound_if_soc = value
     else
@@ -1941,6 +1944,7 @@ function MOI.get(
     lower = _get_variable_lower_bound(model, info)
     upper = Ref{Cdouble}()
     ret = GRBgetdblattrelement(model, "UB", Cint(info.column - 1), upper)
+    _check_ret(model, ret)
     return MOI.Semicontinuous(lower, upper[])
 end
 
@@ -1994,6 +1998,7 @@ function MOI.get(
     lower = _get_variable_lower_bound(model, info)
     upper = Ref{Cdouble}()
     ret = GRBgetdblattrelement(model, "UB", Cint(info.column - 1), upper)
+    _check_ret(model, ret)
     return MOI.Semiinteger(lower, upper[])
 end
 
@@ -2102,7 +2107,7 @@ function MOI.add_constraints(
             _ConstraintInfo(length(model.affine_constraint_info) + 1, si)
     end
     pop!(row_starts)  # Gurobi doesn't need the final row start.
-    ret = GC.@preserve GRBaddconstrs(
+    ret = GRBaddconstrs(
         model,
         length(f),
         length(coefficients),
@@ -2113,6 +2118,7 @@ function MOI.add_constraints(
         rhss,
         C_NULL,
     )
+    _check_ret(model, ret)
     _require_update(model)
     return indices
 end
@@ -2126,6 +2132,7 @@ function MOI.delete(
     _update_if_necessary(model)
     rows_to_delete = sort!([Cint(_info(model, x).row - 1) for x in cs])
     ret = GRBdelconstrs(model, length(rows_to_delete), rows_to_delete)
+    _check_ret(model, ret)
     _require_update(model)
     for (_, info) in model.affine_constraint_info
         # The trick here is: searchsortedlast returns, in O(log n), the
