@@ -2126,7 +2126,9 @@ function MOI.delete(
     _update_if_necessary(model)
     rows_to_delete = sort!([Cint(_info(model, x).row - 1) for x in cs])
     ret = GRBdelconstrs(model, length(rows_to_delete), rows_to_delete)
+    _check_ret(model, ret)
     _require_update(model)
+    _update_if_necessary(model)
     for (_, info) in model.affine_constraint_info
         # The trick here is: searchsortedlast returns, in O(log n), the
         # last index with a row smaller than info.row, over rows_to_delete
@@ -2153,6 +2155,7 @@ function MOI.delete(
     ret = GRBdelconstrs(model, 1, Ref{Cint}(row - 1))
     _check_ret(model, ret)
     _require_update(model)
+    _update_if_necessary(model)
     for (key, info) in model.affine_constraint_info
         if info.row > row
             info.row -= 1
