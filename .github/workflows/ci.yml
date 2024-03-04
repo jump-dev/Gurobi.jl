@@ -15,14 +15,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ['1.6', '1']
-        os: [ubuntu-latest, macOS-latest, macos-14, windows-latest]
+        include:
+         - version: '1.6'
+           os: ubuntu-latest
+           arch: x64
+         - version: '1'
+           os: ubuntu-latest
+           arch: x64
+         - version: '1'
+           os: macOS-latest
+           arch: x64
+         - version: '1'
+           os: windows-latest
+           arch: x64
+         - version: '1'
+           os: macos-14
+           arch: aarch64
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v1
         with:
           version: ${{ matrix.version }}
-          arch: 'x64'
+          arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v1
       # - uses: julia-actions/julia-buildpkg@v1
       # - uses: julia-actions/julia-runtest@v1
