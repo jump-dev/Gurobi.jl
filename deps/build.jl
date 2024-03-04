@@ -172,7 +172,7 @@ if haskey(ENV, "GUROBI_JL_SKIP_LIB_CHECK")
 elseif get(ENV, "JULIA_REGISTRYCI_AUTOMERGE", "false") == "true"
     # We write a fake depsfile so Gurobi.jl is loadable but not usable.
     write_depsfile("__skipped_installation__")
-elseif !found && Sys.islinux()
+elseif !found && (Sys.islinux() || Sys.isapple() || Sys.iswindows())
     open(DEPS_FILE, "w") do io
         println(io, "# No libgurobi constant; we're using the Artifact.")
     end
