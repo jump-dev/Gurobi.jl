@@ -174,7 +174,8 @@ elseif get(ENV, "JULIA_REGISTRYCI_AUTOMERGE", "false") == "true"
     write_depsfile("__skipped_installation__")
 elseif !found && (Sys.islinux() || Sys.isapple() || Sys.iswindows())
     if haskey(ENV, "WLSLICENSE")
-        write(joinpath(ENV["HOME"], "gurobi.lic"), ENV["WLSLICENSE"])
+        home = Sys.iswindows() ? ENV["HOMEPATH"] : ENV["HOME"]
+        write(joinpath(home, "gurobi.lic"), ENV["WLSLICENSE"])
     end
     open(DEPS_FILE, "w") do io
         println(io, "# No libgurobi constant; we're using the Artifact.")
