@@ -174,7 +174,7 @@ elseif get(ENV, "JULIA_REGISTRYCI_AUTOMERGE", "false") == "true"
     write_depsfile("__skipped_installation__")
 elseif !found && (Sys.islinux() || Sys.isapple() || Sys.iswindows())
     if haskey(ENV, "WLSLICENSE")
-        home = Sys.iswindows() ? ENV["HOMEPATH"] : ENV["HOME"]
+        home = Sys.iswindows() ? ENV["USERPROFILE"] : ENV["HOME"]
         write(joinpath(home, "gurobi.lic"), ENV["WLSLICENSE"])
     end
     open(DEPS_FILE, "w") do io
