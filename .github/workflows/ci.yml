@@ -24,16 +24,12 @@ jobs:
           version: ${{ matrix.version }}
           arch: 'x64'
       - uses: julia-actions/cache@v1
-      # - shell: bash
-      #   env:
-      #     WLSLICENSE: ${{ secrets.WLSLICENSE }}
-      #   run: |
-      #     mkdir -p /opt/gurobi
-      #     echo "$WLSLICENSE" > /opt/gurobi/gurobi.lic
-      # # - uses: julia-actions/julia-buildpkg@v1
+      # - uses: julia-actions/julia-buildpkg@v1
       # - uses: julia-actions/julia-runtest@v1
       - name: Test
         shell: julia --color=yes --project=. {0}
+        env:
+          WLSLICENSE: ${{ secrets.WLSLICENSE }}
         run: |
           import Pkg
           Pkg.pkg"add https://github.com/jump-dev/Gurobi_jll.jl"
