@@ -174,13 +174,17 @@ elseif get(ENV, "JULIA_REGISTRYCI_AUTOMERGE", "false") == "true"
     write_depsfile("__skipped_installation__")
 elseif !found && (Sys.islinux() || Sys.isapple() || Sys.iswindows())
     if haskey(ENV, "WLSLICENSE")
-        if Sys.islinux()
-            write("/opt/gurobi/gurobi.lic", ENV["WLSLICENSE"])
+        dir = if Sys.islinux()
+            "/opt/gurobi"
         elseif Sys.isapple()
-            write("/Library/gurobi/gurobi.lic", ENV["WLSLICENSE"])
+            "/Library/gurobi"
         elseif Sys.iswindows()
-            write("C:\\gurobi\\gurobi.lic", ENV["WLSLICENSE"])
+            "C:\\gurobi"
         end
+        if !isdir(dir)
+            mkdir(dir)
+        end
+        write(joinpath(dir, "gurobi.lic"), ENV["WLSLICENSE"])
     end
     open(DEPS_FILE, "w") do io
         println(io, "# No libgurobi constant; we're using the Artifact.")
