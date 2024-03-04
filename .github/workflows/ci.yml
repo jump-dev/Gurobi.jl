@@ -24,13 +24,13 @@ jobs:
           version: ${{ matrix.version }}
           arch: 'x64'
       - uses: julia-actions/cache@v1
-      - shell: bash
-        env:
-          WLSLICENSE: ${{ secrets.WLSLICENSE }}
-        run: |
-          mkdir -p /opt/gurobi
-          echo "$WLSLICENSE" > /opt/gurobi/gurobi.lic
-      # - uses: julia-actions/julia-buildpkg@v1
+      # - shell: bash
+      #   env:
+      #     WLSLICENSE: ${{ secrets.WLSLICENSE }}
+      #   run: |
+      #     mkdir -p /opt/gurobi
+      #     echo "$WLSLICENSE" > /opt/gurobi/gurobi.lic
+      # # - uses: julia-actions/julia-buildpkg@v1
       # - uses: julia-actions/julia-runtest@v1
       - name: Test
         shell: julia --color=yes --project=. {0}
