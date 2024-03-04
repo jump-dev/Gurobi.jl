@@ -15,19 +15,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        version: ['1.6', '1']
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+        arch: [x64]
         include:
-         - version: '1.6'
-           os: ubuntu-latest
-           arch: x64
-         - version: '1'
-           os: ubuntu-latest
-           arch: x64
-         - version: '1'
-           os: macOS-latest
-           arch: x64
-         - version: '1'
-           os: windows-latest
-           arch: x64
          - version: '1'
            os: macos-14
            arch: aarch64
