@@ -6,8 +6,6 @@
 
 module Gurobi
 
-import LazyArtifacts
-
 # deps.jl file is always built via `Pkg.build`, even if we didn't find a local
 # install and we want to use the artifact instead. This is so Gurobi.jl will be
 # recompiled if we update the file. See issue #438 for more details.
@@ -15,12 +13,9 @@ include(joinpath(dirname(@__FILE__), "..", "deps", "deps.jl"))
 
 if isdefined(@__MODULE__, :libgurobi)
     # deps.jl must define a local installation.
-elseif Sys.islinux()
-    # Let's use the artifact instead.
-    const libgurobi = joinpath(
-        LazyArtifacts.artifact"gurobilinux64",
-        "gurobi1100/linux64/lib/libgurobi110.so",
-    )
+elseif Sys.islinux() || Sys.isapple() || Sys.iswindows()
+    import Gurobi_jll
+    const libgurobi = Gurobi_jll.libgurobi
 else
     error("""
         Gurobi not properly installed. Please run Pkg.build(\"Gurobi\"). For
