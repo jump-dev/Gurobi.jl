@@ -105,6 +105,7 @@ List of supported constraint types:
  * [`MOI.VectorOfVariables`](@ref) in [`MOI.SOS1{Float64}`](@ref)
  * [`MOI.VectorOfVariables`](@ref) in [`MOI.SOS2{Float64}`](@ref)
  * [`MOI.VectorOfVariables`](@ref) in [`MOI.SecondOrderCone`](@ref)
+ * [`MOI.VectorAffineFunction`](@ref) in [`MOI.Indicator`](@ref)
 
 List of supported model attributes:
 
