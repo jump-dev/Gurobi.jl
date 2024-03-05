@@ -2831,8 +2831,19 @@ function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
     valueP = Ref{Cint}()
     ret = GRBgetintattr(model, "SolCount", valueP)
     _check_ret(model, ret)
-    return 1 <= attr.result_index <= valueP[] ? MOI.FEASIBLE_POINT :
-           MOI.NO_SOLUTION
+    if !(1 <= attr.result_index <= valueP[])
+        return MOI.NO_SOLUTION
+    end
+    doubleP = Ref{Cdouble}()
+    ret = GRBgetdblattr(model, "MaxVio", doubleP)
+    _check_ret(model, ret)
+    if doubleP[] < 1e-8
+        return MOI.FEASIBLE_POINT
+    elseif doubleP[] < 1e-6
+        return MOI.NEARLY_FEASIBLE_POINT
+    else
+        return MOI.INFEASIBLE_POINT
+    end
 end
 
 function _has_dual_ray(model::Optimizer)
@@ -2869,17 +2880,24 @@ function MOI.get(model::Optimizer, attr::MOI.DualStatus)
     valueP = Ref{Cint}()
     ret = GRBgetintattr(model, "SolCount", valueP)
     _check_ret(model, ret)
-    if valueP[] == 0
+    if !(1 <= attr.result_index <= valueP[])
         return MOI.NO_SOLUTION
     end
     # But unfortunately, even if SolCount is 1, sometimes a dual solution is not
     # available. The only way to check this is to query directly.
-    valueP = Ref{Cdouble}()
-    ret = GRBgetdblattrelement(model, "RC", 0, valueP)
-    if ret == 0
-        return MOI.FEASIBLE_POINT
-    else  # Something went wrong
+    doubleP = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "RC", 0, doubleP)
+    if ret != 0  # Something went wrong
         return MOI.NO_SOLUTION
+    end
+    ret = GRBgetdblattr(model, "MaxVio", doubleP)
+    _check_ret(model, ret)
+    if doubleP[] < 1e-8
+        return MOI.FEASIBLE_POINT
+    elseif doubleP[] < 1e-6
+        return MOI.NEARLY_FEASIBLE_POINT
+    else
+        return MOI.INFEASIBLE_POINT
     end
 end
 
