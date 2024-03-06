@@ -2843,11 +2843,8 @@ function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
     _check_ret(model, ret)
     if doubleP[] < 1e-8
         return MOI.FEASIBLE_POINT
-    elseif doubleP[] < 1e-6
-        return MOI.NEARLY_FEASIBLE_POINT
-    else
-        return MOI.INFEASIBLE_POINT
     end
+    return MOI.UNKNOWN_RESULT_STATUS
 end
 
 function _has_dual_ray(model::Optimizer)
@@ -2902,11 +2899,8 @@ function MOI.get(model::Optimizer, attr::MOI.DualStatus)
     _check_ret(model, ret)
     if doubleP[] < 1e-8
         return MOI.FEASIBLE_POINT
-    elseif doubleP[] < 1e-6
-        return MOI.NEARLY_FEASIBLE_POINT
-    else
-        return MOI.INFEASIBLE_POINT
     end
+    return MOI.UNKNOWN_RESULT_STATUS
 end
 
 function _has_primal_ray(model::Optimizer)
