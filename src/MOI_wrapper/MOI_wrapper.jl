@@ -2834,6 +2834,10 @@ function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
     if !(1 <= attr.result_index <= valueP[])
         return MOI.NO_SOLUTION
     end
+    if term in (MOI.OPTIMAL, MOI.SOLUTION_LIMIT)
+        return MOI.FEASIBLE_POINT
+    end
+    # Feasibility of solution is unknown. Check for violations.
     doubleP = Ref{Cdouble}()
     ret = GRBgetdblattr(model, "MaxVio", doubleP)
     _check_ret(model, ret)
@@ -2890,6 +2894,10 @@ function MOI.get(model::Optimizer, attr::MOI.DualStatus)
     if ret != 0  # Something went wrong
         return MOI.NO_SOLUTION
     end
+    if term in (MOI.OPTIMAL, MOI.SOLUTION_LIMIT)
+        return MOI.FEASIBLE_POINT
+    end
+    # Feasibility of solution is unknown. Check for violations.
     ret = GRBgetdblattr(model, "MaxVio", doubleP)
     _check_ret(model, ret)
     if doubleP[] < 1e-8
