@@ -2833,18 +2833,58 @@ function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
     _check_ret(model, ret)
     if !(1 <= attr.result_index <= valueP[])
         return MOI.NO_SOLUTION
-    end
-    if term in (MOI.OPTIMAL, MOI.SOLUTION_LIMIT)
+    elseif term in (MOI.OPTIMAL, MOI.SOLUTION_LIMIT)
+        # Assume that if Gurobi tells us the problem is optimal, or if it found
+        # too manny solutions, then we have a feasible point.
         return MOI.FEASIBLE_POINT
-    end
-    # Feasibility of solution is unknown. Check for violations.
-    doubleP = Ref{Cdouble}()
-    ret = GRBgetdblattr(model, "MaxVio", doubleP)
-    _check_ret(model, ret)
-    if doubleP[] < 1e-8
+    elseif _is_primal_feasible_to_tolerance(model)
+        # Feasibility of solution is unknown. Check for violations.
         return MOI.FEASIBLE_POINT
     end
     return MOI.UNKNOWN_RESULT_STATUS
+end
+
+"""
+    _is_primal_feasible_to_tolerance(model::Optimizer)
+
+This function checks whether a solution stored in `model` is feasible according
+to:
+
+ 1. `max(BoundVio, ConstrVio) <= FeasibilityTol`
+ 2. `IntVio <= IntFeasTol` (if applicable)
+
+For a discussion on why this is needed, see:
+
+  * https://github.com/jump-dev/Gurobi.jl/pull/546
+  * https://github.com/jump-dev/Gurobi.jl/pull/548
+
+Ideally, a future version of Gurobi would provide a C function for this.
+"""
+function _is_primal_feasible_to_tolerance(model::Optimizer)
+    boundVioP, constrVioP = Ref{Cdouble}(0.0), Ref{Cdouble}(0.0)
+    ret = GRBgetdlbattr(model, "ConstrVio", constrVioP)
+    _check_ret(model, ret)
+    ret = GRBgetdlbattr(model, "BoundVio", boundVioP)
+    _check_ret(model, ret)
+    feasibilityTolP = Ref{Cdouble}(0.0)
+    ret = GRBgetdlbparam(model, "FeasibilityTol", feasibilityTolP)
+    _check_ret(model, ret)
+    if max(boundVioP[], constrVioP[]) > feasibilityTolP[]
+        return false
+    end
+    intVioP = Ref{Cdouble}(0.0)
+    ret = GRBgetdlbattr(model, "IntVio", intVioP)
+    if ret == GRB_ERROR_DATA_NOT_AVAILABLE
+        return true  # IntVio is available only for Int models
+    end
+    _check_ret(model, ret)
+    intFeasTolP = Ref{Cdouble}(0.0)
+    ret = GRBgetdlbparam(model, "IntFeasTol", intFeasTolP)
+    _check_ret(model, ret)
+    if intVioP[] > intFeasTolP[]
+        return false
+    end
+    return true
 end
 
 function _has_dual_ray(model::Optimizer)
@@ -2894,12 +2934,8 @@ function MOI.get(model::Optimizer, attr::MOI.DualStatus)
     if term in (MOI.OPTIMAL, MOI.SOLUTION_LIMIT)
         return MOI.FEASIBLE_POINT
     end
-    # Feasibility of solution is unknown. Check for violations.
-    ret = GRBgetdblattr(model, "MaxVio", doubleP)
-    _check_ret(model, ret)
-    if doubleP[] < 1e-8
-        return MOI.FEASIBLE_POINT
-    end
+    # There is no easy equivalence to _is_primal_feasible_to_tolerance, so we
+    # punt and return UNKNOWN_RESULT_STATUS.
     return MOI.UNKNOWN_RESULT_STATUS
 end
 
