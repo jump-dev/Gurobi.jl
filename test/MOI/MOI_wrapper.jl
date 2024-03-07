@@ -898,6 +898,57 @@ function test_delete_indicator()
     return
 end
 
+function test_is_primal_feasible_to_tolerance()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.Utilities.loadfromstring!(
+        model,
+        """
+        variables: x, z
+        maxobjective: 2.0x + 1000.0
+        c1: x + -1_333_333.12345 * z <= 0.0
+        c2: z <= 0.000001
+        c3: z in ZeroOne()
+        """,
+    )
+    MOI.optimize!(model)
+    @test Gurobi._is_primal_feasible_to_tolerance(model)
+    return
 end
+
+function test_is_primal_feasible_to_tolerance_infeasible()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.Utilities.loadfromstring!(
+        model,
+        """
+        variables: x, z
+        maxobjective: 2.0x + 1000.0
+        x + -1.0 * z <= 0.0
+        z <= 0.5
+        x >= 0.5
+        z in ZeroOne()
+        """,
+    )
+    MOI.optimize!(model)
+    @test !Gurobi._is_primal_feasible_to_tolerance(model)
+    return
+end
+
+function test_is_primal_feasible_to_tolerance_lp()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.Utilities.loadfromstring!(
+        model,
+        """
+        variables: x
+        minobjective: x
+        c1: x >= 0.0
+        c2: 2x >= 1.0
+        """,
+    )
+    MOI.optimize!(model)
+    @test Gurobi._is_primal_feasible_to_tolerance(model)
+    return
+end
+
+end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()

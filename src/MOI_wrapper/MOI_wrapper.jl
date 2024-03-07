@@ -2863,28 +2863,27 @@ Ideally, a future version of Gurobi would provide a C function for this.
 function _is_primal_feasible_to_tolerance(model::Optimizer)
     boundVioP, constrVioP = Ref{Cdouble}(0.0), Ref{Cdouble}(0.0)
     ret = GRBgetdblattr(model, "ConstrVio", constrVioP)
+    if ret == GRB_ERROR_DATA_NOT_AVAILABLE
+        return false  # No solution present
+    end
     _check_ret(model, ret)
     ret = GRBgetdblattr(model, "BoundVio", boundVioP)
     _check_ret(model, ret)
-    feasibilityTolP = Ref{Cdouble}(0.0)
-    ret = GRBgetdblparam(model, "FeasibilityTol", feasibilityTolP)
-    _check_ret(model, ret)
-    if max(boundVioP[], constrVioP[]) > feasibilityTolP[]
-        return false
-    end
     intVioP = Ref{Cdouble}(0.0)
     ret = GRBgetdblattr(model, "IntVio", intVioP)
     if ret == GRB_ERROR_DATA_NOT_AVAILABLE
-        return true  # IntVio is available only for Int models
+        intVioP[] = 0.0
+    else
+        _check_ret(model, ret)
     end
+    feasibilityTolP = Ref{Cdouble}(0.0)
+    ret = GRBgetdblparam(model.env, "FeasibilityTol", feasibilityTolP)
     _check_ret(model, ret)
     intFeasTolP = Ref{Cdouble}(0.0)
-    ret = GRBgetdblparam(model, "IntFeasTol", intFeasTolP)
+    ret = GRBgetdblparam(model.env, "IntFeasTol", intFeasTolP)
     _check_ret(model, ret)
-    if intVioP[] > intFeasTolP[]
-        return false
-    end
-    return true
+    return max(boundVioP[], constrVioP[]) <= feasibilityTolP[] &&
+           intVioP[] <= intFeasTolP[]
 end
 
 function _has_dual_ray(model::Optimizer)
