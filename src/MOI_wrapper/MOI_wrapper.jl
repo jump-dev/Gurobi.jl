@@ -2862,24 +2862,24 @@ Ideally, a future version of Gurobi would provide a C function for this.
 """
 function _is_primal_feasible_to_tolerance(model::Optimizer)
     boundVioP, constrVioP = Ref{Cdouble}(0.0), Ref{Cdouble}(0.0)
-    ret = GRBgetdlbattr(model, "ConstrVio", constrVioP)
+    ret = GRBgetdblattr(model, "ConstrVio", constrVioP)
     _check_ret(model, ret)
-    ret = GRBgetdlbattr(model, "BoundVio", boundVioP)
+    ret = GRBgetdblattr(model, "BoundVio", boundVioP)
     _check_ret(model, ret)
     feasibilityTolP = Ref{Cdouble}(0.0)
-    ret = GRBgetdlbparam(model, "FeasibilityTol", feasibilityTolP)
+    ret = GRBgetdblparam(model, "FeasibilityTol", feasibilityTolP)
     _check_ret(model, ret)
     if max(boundVioP[], constrVioP[]) > feasibilityTolP[]
         return false
     end
     intVioP = Ref{Cdouble}(0.0)
-    ret = GRBgetdlbattr(model, "IntVio", intVioP)
+    ret = GRBgetdblattr(model, "IntVio", intVioP)
     if ret == GRB_ERROR_DATA_NOT_AVAILABLE
         return true  # IntVio is available only for Int models
     end
     _check_ret(model, ret)
     intFeasTolP = Ref{Cdouble}(0.0)
-    ret = GRBgetdlbparam(model, "IntFeasTol", intFeasTolP)
+    ret = GRBgetdblparam(model, "IntFeasTol", intFeasTolP)
     _check_ret(model, ret)
     if intVioP[] > intFeasTolP[]
         return false
