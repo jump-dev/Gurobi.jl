@@ -949,6 +949,34 @@ function test_is_primal_feasible_to_tolerance_lp()
     return
 end
 
+function test_primal_feasible_status()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.set(model, MOI.RawOptimizerAttribute("Heuristics"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Presolve"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("IterationLimit"), 0)
+    N = 100
+    x = MOI.add_variables(model, N)
+    MOI.add_constraint.(model, x, MOI.ZeroOne())
+    MOI.set.(model, MOI.VariablePrimalStart(), x, 0.0)
+    Random.seed!(1)
+    item_weights, item_values = rand(N), rand(N)
+    MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(item_weights, x), 0.0),
+        MOI.LessThan(10.0),
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(item_values, x), 0.0),
+    )
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
