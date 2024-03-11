@@ -2925,8 +2925,8 @@ function MOI.get(model::Optimizer, attr::MOI.DualStatus)
     end
     # But unfortunately, even if SolCount is 1, sometimes a dual solution is not
     # available. The only way to check this is to query directly.
-    doubleP = Ref{Cdouble}()
-    ret = GRBgetdblattrelement(model, "RC", 0, doubleP)
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, "RC", 0, valueP)
     if ret != 0  # Something went wrong
         return MOI.NO_SOLUTION
     end
