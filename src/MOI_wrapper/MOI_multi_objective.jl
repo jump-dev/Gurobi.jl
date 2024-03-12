@@ -36,7 +36,6 @@ function MOI.set(
         obj[column] += term.coefficient
     end
     indices, coefficients = _indices_and_coefficients(model, f)
-    _update_if_necessary(model)
     ret = GRBsetobjectiven(
         model,
         Cint(attr.index - 1),
