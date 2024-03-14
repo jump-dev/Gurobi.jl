@@ -1017,8 +1017,7 @@ function MOI.delete(model::Optimizer, indices::Vector{<:MOI.VariableIndex})
     # We throw away name_to_constraint_index so we will rebuild VariableIndex
     # constraint names without v.
     model.name_to_constraint_index = nothing
-    _require_update(model)
-    _update_if_necessary(model)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -1035,8 +1034,7 @@ function MOI.delete(model::Optimizer, v::MOI.VariableIndex)
     # We throw away name_to_constraint_index so we will rebuild VariableIndex
     # constraint names without v.
     model.name_to_constraint_index = nothing
-    _require_update(model)
-    _update_if_necessary(model)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -4373,7 +4371,7 @@ function MOI.set(
     _update_if_necessary(model)
     ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
     _check_ret(model, ret)
-    # _require_update(model)
+    _require_update(model)
     info.name = name
     if model.name_to_constraint_index === nothing || isempty(name)
         return
