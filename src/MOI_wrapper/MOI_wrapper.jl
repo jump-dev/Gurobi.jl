@@ -517,7 +517,7 @@ Calls `GRBupdatemodel`, but only if the `model.needs_update` flag is set or
 force is true. This is necessary before most `GRBget*` calls (exceptions include
 some ModelAttributes that require calling optimize beforehand e.g. `ObjVal`)
 """
-function _update_if_necessary(model::Optimizer; force::Bool=false)
+function _update_if_necessary(model::Optimizer; force::Bool = false)
     if model.needs_update || force
         sort!(model.columns_deleted_since_last_update)
         for var_info in values(model.variable_info)
@@ -1546,7 +1546,7 @@ function MOI.delete(
     end
     info.upper_bound_if_bounded = NaN
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -1661,7 +1661,7 @@ function MOI.delete(
     end
     info.lower_bound_if_bounded = NaN
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -1677,7 +1677,7 @@ function MOI.delete(
     info.bound = _NONE
     info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -1693,7 +1693,7 @@ function MOI.delete(
     info.bound = _NONE
     info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -1841,7 +1841,7 @@ function MOI.delete(
     _check_ret(model, ret)
     info.type = GRB_CONTINUOUS
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -1879,7 +1879,7 @@ function MOI.delete(
     _check_ret(model, ret)
     info.type = GRB_CONTINUOUS
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -1927,7 +1927,7 @@ function MOI.delete(
     _check_ret(model, ret)
     info.type = GRB_CONTINUOUS
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -1981,7 +1981,7 @@ function MOI.delete(
     _check_ret(model, ret)
     info.type = GRB_CONTINUOUS
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -2144,7 +2144,7 @@ function MOI.delete(
         return isempty(searchsorted(cs_values, pair.first))
     end
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -2162,7 +2162,7 @@ function MOI.delete(
     end
     delete!(model.affine_constraint_info, c.value)
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -2381,7 +2381,7 @@ function MOI.delete(
     end
     delete!(model.quadratic_constraint_info, c.value)
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -2553,7 +2553,7 @@ function MOI.delete(
     end
     delete!(model.sos_constraint_info, c.value)
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -2573,7 +2573,7 @@ function MOI.delete(
         return isempty(searchsorted(cs_values, pair.first))
     end
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -2656,7 +2656,7 @@ function _check_moi_callback_validity(model::Optimizer)
 end
 
 function MOI.optimize!(model::Optimizer)
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     # Initialize callbacks if necessary.
     has_null_callback = false
     if _check_moi_callback_validity(model)
@@ -4307,7 +4307,7 @@ function MOI.delete(
         tmp_lower_bound,
     )
     _check_ret(model, ret)
-    _update_if_necessary(model, force=true)
+    _update_if_necessary(model, force = true)
     return
 end
 
