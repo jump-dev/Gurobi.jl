@@ -3715,6 +3715,7 @@ function MOI.set(
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},S},
     bs::MOI.BasisStatusCode,
 ) where {S<:_SCALAR_SETS}
+    _update_if_necessary(model)
     row = _info(model, c).row
     valueP::Cint = (
         if bs == MOI.BASIC
@@ -3737,6 +3738,7 @@ function MOI.set(
     x::MOI.VariableIndex,
     bs::MOI.BasisStatusCode,
 )
+    _update_if_necessary(model)
     valueP = if bs == MOI.BASIC
         Cint(0)
     elseif bs == MOI.NONBASIC_AT_LOWER
