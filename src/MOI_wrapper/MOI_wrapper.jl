@@ -1565,7 +1565,7 @@ function MOI.delete(
     end
     info.upper_bound_if_bounded = NaN
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force = true)
+    _update_if_necessary(model)
     return
 end
 
@@ -1680,7 +1680,7 @@ function MOI.delete(
     end
     info.lower_bound_if_bounded = NaN
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force = true)
+    _update_if_necessary(model)
     return
 end
 
@@ -1696,7 +1696,7 @@ function MOI.delete(
     info.bound = _NONE
     info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force = true)
+    _update_if_necessary(model)
     return
 end
 
@@ -1712,7 +1712,7 @@ function MOI.delete(
     info.bound = _NONE
     info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force = true)
+    _update_if_necessary(model)
     return
 end
 
@@ -1860,7 +1860,7 @@ function MOI.delete(
     _check_ret(model, ret)
     info.type = GRB_CONTINUOUS
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force = true)
+    _update_if_necessary(model)
     return
 end
 
@@ -1898,7 +1898,7 @@ function MOI.delete(
     _check_ret(model, ret)
     info.type = GRB_CONTINUOUS
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force = true)
+    _update_if_necessary(model)
     return
 end
 
@@ -1946,7 +1946,7 @@ function MOI.delete(
     _check_ret(model, ret)
     info.type = GRB_CONTINUOUS
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force = true)
+    _update_if_necessary(model)
     return
 end
 
@@ -2000,7 +2000,7 @@ function MOI.delete(
     _check_ret(model, ret)
     info.type = GRB_CONTINUOUS
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force = true)
+    _update_if_necessary(model)
     return
 end
 
