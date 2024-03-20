@@ -50,7 +50,7 @@ function MOI.set(
         coefficients,
     )
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, model_change = true)
     return
 end
 
