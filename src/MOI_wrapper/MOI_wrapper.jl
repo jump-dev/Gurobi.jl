@@ -513,6 +513,7 @@ function _require_update(
     attribute_change::Bool = false,
     model_change::Bool = false,
 )
+    @assert attribute_change || model_change
     if attribute_change
         model.attribute_change = true
     end
