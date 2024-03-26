@@ -220,10 +220,13 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     # The current user-provided parameters for the model.
     params::Dict{String,Any}
 
-    # The next field is used to cleverly manage calls to `update_model!`.
-    # `needs_update` is used to record whether an update should be called
-    # before accessing a model attribute (such as the value of a RHS term).
-    needs_update::Bool
+    # The next fields are used to cleverly manage calls to `_update_if_necessary`.
+    # `attribute_change` is to record whether a change has been made to the
+    # attributes (of any type)
+    # `model_change` is used to record whether a change has been made to the
+    # model (variable/constraint/objective)
+    attribute_change::Bool
+    model_change::Bool
 
     # A flag to keep track of MOI.Silent, which over-rides the OutputFlag
     # parameter.
@@ -246,20 +249,19 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         typeof(_INVERSE_HASH),
     }
 
-    # If you add variables to a model that had variables deleted AND has
-    # not called `update_model!` since the deletion, then the newly created
-    # variables may have attributes set, but their column index before the
-    # call to `update_model!` is different than after the `update_model!`.
-    # Before the `update_model!` their column is the same as if no variables
-    # were deleted, after the `update_model!` the columns indexes are
-    # shifted (by being being subtracted by the number of variables deleted
-    # with column indexes smaller than them). To control this the two
-    # fields below are used:
-    # `next_column`: The column index of the next variable/column added. It is
-    # updated when variables are added, and when the `_update_if_necessary!` is
-    # called AND `columns_deleted_since_last_update` is not empty.
+    # If you add variables to a model that had variables deleted AND has not
+    # called `_update_if_necessary` since the deletion, then the newly created
+    # variables may have attributes set, but their column index before the call
+    # to `_update_if_necessary` is different.  Before the `_update_if_necessary`
+    # their column is the same as if no variables were deleted, after the
+    # `_update_if_necessary` the columns indexes are shifted (by being being
+    # subtracted by the number of variables deleted with column indexes smaller
+    # than them).  To control this the two fields below are used: `next_column`:
+    # The column index of the next variable/column added. It is updated when
+    # variables are added, and when the `_update_if_necessary` is called AND
+    # `columns_deleted_since_last_update` is not empty.
     # `columns_deleted_since_last_update`: Stores the column indexes of all
-    # columns that were deleted since the last call to `_update_if_necessary!`,
+    # columns that were deleted since the last call to `_update_if_necessary`,
     # after such call the vector is emptied.
     next_column::Int
     columns_deleted_since_last_update::Vector{Int}
@@ -298,7 +300,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     # This is a different mechanism than Gurobi "Status" (that is used for
     # reporting why an optimization finished) and, in fact, may be triggered in
     # other cases than optimization (for example, when assembling the model).
-    # For convenience, and homogeinity with other solvers, we save the code
+    # For convenience, and homogeneity with other solvers, we save the code
     # returned by `GRBoptimize` in `ret_GRBoptimize`, and do not throw
     # an exception case it should be interpreted as a termination status.
     # Then, when/if the termination status is queried, we may override the
@@ -448,7 +450,8 @@ function MOI.empty!(model::Optimizer)
     for (name, value) in model.params
         MOI.set(model, MOI.RawOptimizerAttribute(name), value)
     end
-    model.needs_update = false
+    model.attribute_change = false
+    model.model_change = false
     model.objective_type = _SCALAR_AFFINE
     model.is_objective_set = false
     model.objective_sense = nothing
@@ -476,7 +479,7 @@ function MOI.empty!(model::Optimizer)
 end
 
 function MOI.is_empty(model::Optimizer)
-    model.needs_update && return false
+    (model.model_change || model.attribute_change) && return false
     model.objective_type != _SCALAR_AFFINE && return false
     model.is_objective_set == true && return false
     model.objective_sense !== nothing && return false
@@ -503,20 +506,39 @@ end
 """
     _require_update(model::Optimizer)
 
-Sets the `model.needs_update` flag. Call this at the end of any mutating method.
+Sets the `model.needs_update` flag. Call this at the end of any `GRBset*` call.
 """
-function _require_update(model::Optimizer)
-    model.needs_update = true
+function _require_update(
+    model::Optimizer;
+    attribute_change::Bool = false,
+    model_change::Bool = false,
+)
+    @assert attribute_change || model_change
+    if attribute_change
+        model.attribute_change = true
+    end
+    if model_change
+        model.model_change = true
+    end
     return
 end
 
 """
-    _update_if_necessary(model::Optimizer)
+    _update_if_necessary(model::Optimizer, force::Bool,
+                         check_attribute_change::Bool)
 
-Calls `update_model!`, but only if the `model.needs_update` flag is set.
+Calls `GRBupdatemodel` only when needed. This is necessary before most `GRBget*`
+calls and before some `GRBset*` calls e.g. `VBasis`, or `GenConstrName`
+attributes.
 """
-function _update_if_necessary(model::Optimizer)
-    if model.needs_update
+function _update_if_necessary(
+    model::Optimizer;
+    force::Bool = false,
+    check_attribute_change::Bool = true,
+)
+    if model.model_change ||
+       force ||
+       (check_attribute_change && model.attribute_change)
         sort!(model.columns_deleted_since_last_update)
         for var_info in values(model.variable_info)
             # The trick here is: searchsortedlast returns, in O(log n), the
@@ -533,7 +555,9 @@ function _update_if_necessary(model::Optimizer)
         empty!(model.columns_deleted_since_last_update)
         ret = GRBupdatemodel(model)
         _check_ret(model, ret)
-        model.needs_update = false
+        # Reset flags
+        model.attribute_change = false
+        model.model_change = false
     else
         @assert isempty(model.columns_deleted_since_last_update)
     end
@@ -873,6 +897,7 @@ function column(
 )
     return _info(model, x).column
 end
+
 """
     c_column(
         model::Optimizer,
@@ -907,7 +932,7 @@ function MOI.add_variable(model::Optimizer)
     ret =
         GRBaddvar(model, 0, C_NULL, C_NULL, 0.0, -Inf, Inf, GRB_CONTINUOUS, "")
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, model_change = true)
     return index
 end
 
@@ -940,7 +965,7 @@ function MOI.add_variables(model::Optimizer, N::Int)
         info.column = _get_next_column(model)
         indices[i] = index
     end
-    _require_update(model)
+    _require_update(model, model_change = true)
     return indices
 end
 
@@ -990,7 +1015,7 @@ function MOI.add_constrained_variable(
     end
     ret = GRBaddvar(model, 0, C_NULL, C_NULL, 0.0, lb, ub, GRB_CONTINUOUS, "")
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, model_change = true)
     ci = MOI.ConstraintIndex{MOI.VariableIndex,typeof(set)}(vi.value)
     return vi, ci
 end
@@ -1000,7 +1025,6 @@ function MOI.is_valid(model::Optimizer, v::MOI.VariableIndex)
 end
 
 function MOI.delete(model::Optimizer, indices::Vector{<:MOI.VariableIndex})
-    #_update_if_necessary(model)
     info = [_info(model, var_idx) for var_idx in indices]
     soc_idx = findfirst(e -> e.num_soc_constraints > 0, info)
     soc_idx !== nothing && throw(MOI.DeleteNotAllowed(indices[soc_idx]))
@@ -1015,12 +1039,12 @@ function MOI.delete(model::Optimizer, indices::Vector{<:MOI.VariableIndex})
     # We throw away name_to_constraint_index so we will rebuild VariableIndex
     # constraint names without v.
     model.name_to_constraint_index = nothing
-    _require_update(model)
+    # _require_update(model, model_change = true)
+    _update_if_necessary(model, force = true)
     return
 end
 
 function MOI.delete(model::Optimizer, v::MOI.VariableIndex)
-    #_update_if_necessary(model)
     info = _info(model, v)
     if info.num_soc_constraints > 0
         throw(MOI.DeleteNotAllowed(v))
@@ -1033,7 +1057,7 @@ function MOI.delete(model::Optimizer, v::MOI.VariableIndex)
     # We throw away name_to_constraint_index so we will rebuild VariableIndex
     # constraint names without v.
     model.name_to_constraint_index = nothing
-    _require_update(model)
+    _require_update(model, model_change = true)
     return
 end
 
@@ -1080,7 +1104,7 @@ function MOI.set(
     info.name = name
     ret = GRBsetstrattrelement(model, "VarName", Cint(info.column) - 1, name)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     model.name_to_variable = nothing
     return
 end
@@ -1092,14 +1116,13 @@ end
 function _zero_objective(model::Optimizer)
     num_vars = length(model.variable_info)
     obj = zeros(Float64, num_vars)
-    _update_if_necessary(model)
     ret = GRBdelq(model)
     _check_ret(model, ret)
     ret = GRBsetdblattrarray(model, "Obj", 0, num_vars, obj)
     _check_ret(model, ret)
     ret = GRBsetdblattr(model, "ObjCon", 0.0)
     _check_ret(model, ret)
-    return _require_update(model)
+    return _require_update(model, attribute_change = true, model_change = true)
 end
 
 function MOI.set(
@@ -1120,7 +1143,7 @@ function MOI.set(
         _check_ret(model, ret)
     end
     model.objective_sense = sense
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -1170,15 +1193,11 @@ function MOI.set(
     for term in f.terms
         obj[column(model, term.variable)] += term.coefficient
     end
-    # NOTE: variables added may be referred before a `_update_if_necessary`
-    # what is the problem we try to prevent below?
-    # This update is needed because we might have added some variables.
-    _update_if_necessary(model)
     ret = GRBsetdblattrarray(model, "Obj", 0, num_vars, obj)
     _check_ret(model, ret)
     ret = GRBsetdblattr(model, "ObjCon", f.constant)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true, model_change = true)
     model.objective_type = _SCALAR_AFFINE
     model.is_objective_set = true
     return
@@ -1223,7 +1242,6 @@ function MOI.set(
 ) where {F<:MOI.ScalarQuadraticFunction{Float64}}
     affine_indices, affine_coefficients, I, J, V =
         _indices_and_coefficients(model, f)
-    _update_if_necessary(model)
     # We need to zero out any existing linear objective.
     obj = zeros(length(model.variable_info))
     for (i, c) in zip(affine_indices, affine_coefficients)
@@ -1238,7 +1256,7 @@ function MOI.set(
     _check_ret(model, ret)
     ret = GRBaddqpterms(model, length(I), I, J, V)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true, model_change = true)
     model.objective_type = _SCALAR_QUADRATIC
     model.is_objective_set = true
     return
@@ -1297,7 +1315,7 @@ function MOI.modify(
 )
     ret = GRBsetdblattr(model, "ObjCon", chg.new_constant)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -1542,7 +1560,6 @@ function MOI.delete(
     info = _info(model, c)
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
     _check_ret(model, ret)
-    _require_update(model)
     if info.bound == _LESS_AND_GREATER_THAN
         info.bound = _GREATER_THAN
     else
@@ -1550,6 +1567,7 @@ function MOI.delete(
     end
     info.upper_bound_if_bounded = NaN
     model.name_to_constraint_index = nothing
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -1572,14 +1590,14 @@ function _set_variable_lower_bound(model, info, value)
         @assert isnan(info.lower_bound_if_soc)
         ret = GRBsetdblattrelement(model, "LB", Cint(info.column - 1), value)
         _check_ret(model, ret)
-        _require_update(model)
+        _require_update(model, attribute_change = true)
     elseif value >= 0.0
         # Regardless of whether there are SOC constraints, this is a valid
         # bound for the SOC constraint and should override any previous bounds.
         info.lower_bound_if_soc = NaN
         ret = GRBsetdblattrelement(model, "LB", Cint(info.column - 1), value)
         _check_ret(model, ret)
-        _require_update(model)
+        _require_update(model, attribute_change = true)
     elseif isnan(info.lower_bound_if_soc)
         # Previously, we had a non-negative lower bound (i.e., it was set in
         # the case above). Now we are setting this with a negative one, but
@@ -1588,7 +1606,7 @@ function _set_variable_lower_bound(model, info, value)
         @assert value < 0.0
         ret = GRBsetdblattrelement(model, "LB", Cint(info.column - 1), 0.0)
         _check_ret(model, ret)
-        _require_update(model)
+        _require_update(model, attribute_change = true)
         info.lower_bound_if_soc = value
     else
         # Previously, we had a negative lower bound. We are setting this with
@@ -1664,6 +1682,7 @@ function MOI.delete(
     end
     info.lower_bound_if_bounded = NaN
     model.name_to_constraint_index = nothing
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -1676,10 +1695,10 @@ function MOI.delete(
     _set_variable_lower_bound(model, info, -Inf)
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
     _check_ret(model, ret)
-    _require_update(model)
     info.bound = _NONE
     info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
     model.name_to_constraint_index = nothing
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -1692,10 +1711,10 @@ function MOI.delete(
     _set_variable_lower_bound(model, info, -Inf)
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
     _check_ret(model, ret)
-    _require_update(model)
     info.bound = _NONE
     info.upper_bound_if_bounded = info.lower_bound_if_bounded = NaN
     model.name_to_constraint_index = nothing
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -1791,7 +1810,7 @@ function _set_bounds(
         )
         _check_ret(model, ret)
     end
-    return _require_update(model)
+    return _require_update(model, attribute_change = true)
 end
 
 function MOI.set(
@@ -1814,7 +1833,7 @@ function MOI.set(
         ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), upper)
         _check_ret(model, ret)
     end
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -1827,7 +1846,7 @@ function MOI.add_constraint(
     ret =
         GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('B'))
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     info.type = GRB_BINARY
     return MOI.ConstraintIndex{MOI.VariableIndex,MOI.ZeroOne}(f.value)
 end
@@ -1841,9 +1860,9 @@ function MOI.delete(
     ret =
         GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('C'))
     _check_ret(model, ret)
-    _require_update(model)
     info.type = GRB_CONTINUOUS
     model.name_to_constraint_index = nothing
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -1865,7 +1884,7 @@ function MOI.add_constraint(
     ret =
         GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('I'))
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     info.type = GRB_INTEGER
     return MOI.ConstraintIndex{MOI.VariableIndex,MOI.Integer}(f.value)
 end
@@ -1879,9 +1898,9 @@ function MOI.delete(
     ret =
         GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('C'))
     _check_ret(model, ret)
-    _require_update(model)
     info.type = GRB_CONTINUOUS
     model.name_to_constraint_index = nothing
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -1908,7 +1927,7 @@ function MOI.add_constraint(
     _set_variable_lower_bound(model, info, s.lower)
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), s.upper)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     info.type = GRB_SEMICONT
     return MOI.ConstraintIndex{MOI.VariableIndex,MOI.Semicontinuous{Float64}}(
         f.value,
@@ -1927,9 +1946,9 @@ function MOI.delete(
     _set_variable_lower_bound(model, info, -Inf)
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
     _check_ret(model, ret)
-    _require_update(model)
     info.type = GRB_CONTINUOUS
     model.name_to_constraint_index = nothing
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -1938,9 +1957,9 @@ function MOI.get(
     ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.VariableIndex,MOI.Semicontinuous{Float64}},
 )
+    _update_if_necessary(model)
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
-    _update_if_necessary(model)
     lower = _get_variable_lower_bound(model, info)
     upper = Ref{Cdouble}()
     ret = GRBgetdblattrelement(model, "UB", Cint(info.column - 1), upper)
@@ -1962,7 +1981,7 @@ function MOI.add_constraint(
     _set_variable_lower_bound(model, info, s.lower)
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), s.upper)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     info.type = GRB_SEMIINT
     return MOI.ConstraintIndex{MOI.VariableIndex,MOI.Semiinteger{Float64}}(
         f.value,
@@ -1981,9 +2000,9 @@ function MOI.delete(
     _set_variable_lower_bound(model, info, -Inf)
     ret = GRBsetdblattrelement(model, "UB", Cint(info.column - 1), Inf)
     _check_ret(model, ret)
-    _require_update(model)
     info.type = GRB_CONTINUOUS
     model.name_to_constraint_index = nothing
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -1992,9 +2011,9 @@ function MOI.get(
     ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.VariableIndex,MOI.Semiinteger{Float64}},
 )
+    _update_if_necessary(model)
     MOI.throw_if_not_valid(model, c)
     info = _info(model, c)
-    _update_if_necessary(model)
     lower = _get_variable_lower_bound(model, info)
     upper = Ref{Cdouble}()
     ret = GRBgetdblattrelement(model, "UB", Cint(info.column - 1), upper)
@@ -2056,7 +2075,7 @@ function MOI.add_constraint(
         "",
     )
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, model_change = true)
     return MOI.ConstraintIndex{typeof(f),typeof(s)}(model.last_constraint_index)
 end
 
@@ -2119,7 +2138,7 @@ function MOI.add_constraints(
         C_NULL,
     )
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, model_change = true)
     return indices
 end
 
@@ -2129,11 +2148,9 @@ function MOI.delete(
 )
     # The `sort!`s called are necessary for improving the efficiency of the
     # updates (i.e., without them we cannot use `searchsorted*` methods).
-    _update_if_necessary(model)
     rows_to_delete = sort!([Cint(_info(model, x).row - 1) for x in cs])
     ret = GRBdelconstrs(model, length(rows_to_delete), rows_to_delete)
     _check_ret(model, ret)
-    _require_update(model)
     for (_, info) in model.affine_constraint_info
         # The trick here is: searchsortedlast returns, in O(log n), the
         # last index with a row smaller than info.row, over rows_to_delete
@@ -2148,6 +2165,7 @@ function MOI.delete(
         return isempty(searchsorted(cs_values, pair.first))
     end
     model.name_to_constraint_index = nothing
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -2156,10 +2174,8 @@ function MOI.delete(
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},<:Any},
 )
     row = _info(model, c).row
-    _update_if_necessary(model)
     ret = GRBdelconstrs(model, 1, Ref{Cint}(row - 1))
     _check_ret(model, ret)
-    _require_update(model)
     for (key, info) in model.affine_constraint_info
         if info.row > row
             info.row -= 1
@@ -2167,6 +2183,7 @@ function MOI.delete(
     end
     delete!(model.affine_constraint_info, c.value)
     model.name_to_constraint_index = nothing
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -2195,7 +2212,7 @@ function MOI.set(
         MOI.constant(s),
     )
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -2244,13 +2261,14 @@ function MOI.set(
         ret =
             GRBsetstrattrelement(model, "ConstrName", Cint(info.row - 1), name)
         _check_ret(model, ret)
-        _require_update(model)
+        _require_update(model, attribute_change = true)
     end
     model.name_to_constraint_index = nothing
     return
 end
 
 function MOI.get(model::Optimizer, ::Type{MOI.ConstraintIndex}, name::String)
+    _update_if_necessary(model)
     if model.name_to_constraint_index === nothing
         _rebuild_name_to_constraint_index(model)
     end
@@ -2353,7 +2371,7 @@ function MOI.add_constraint(
         "",
     )
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, model_change = true)
     model.last_constraint_index += 1
     model.quadratic_constraint_info[model.last_constraint_index] =
         _ConstraintInfo(length(model.quadratic_constraint_info) + 1, s)
@@ -2374,11 +2392,9 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64},S},
 ) where {S}
-    _update_if_necessary(model)
     info = _info(model, c)
     ret = GRBdelqconstrs(model, 1, Ref{Cint}(info.row - 1))
     _check_ret(model, ret)
-    _require_update(model)
     for (key, info_2) in model.quadratic_constraint_info
         if info_2.row > info.row
             info_2.row -= 1
@@ -2386,6 +2402,7 @@ function MOI.delete(
     end
     delete!(model.quadratic_constraint_info, c.value)
     model.name_to_constraint_index = nothing
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -2403,6 +2420,7 @@ function MOI.get(
 end
 
 function _getqconstr(model::Optimizer, row::Cint)
+    _update_if_necessary(model)
     numlnzP = Ref{Cint}()
     numqnzP = Ref{Cint}()
     ret = GRBgetqconstr(
@@ -2442,7 +2460,6 @@ function MOI.get(
     ::MOI.ConstraintFunction,
     c::MOI.ConstraintIndex{MOI.ScalarQuadraticFunction{Float64},S},
 ) where {S}
-    _update_if_necessary(model)
     li, lv, I, J, V = _getqconstr(model, Cint(_info(model, c).row - 1))
     affine_terms = Vector{MOI.ScalarAffineTerm{Float64}}(undef, length(li))
     for i in 1:length(li)
@@ -2482,7 +2499,6 @@ function MOI.set(
     # Don't set QCName because it requires an update. This is expensive if you
     # are adding lots of quadratic constraints in a sequence due to Gurobi's
     # updating semantics.
-    # _update_if_needed(model)
     # ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
     # _check_ret(model, ret)
     # _require_update(model)
@@ -2539,7 +2555,7 @@ function MOI.add_constraint(model::Optimizer, f::MOI.VectorOfVariables, s::_SOS)
     )
     model.sos_constraint_info[index.value] =
         _ConstraintInfo(length(model.sos_constraint_info) + 1, s)
-    _require_update(model)
+    _require_update(model, model_change = true)
     return index
 end
 
@@ -2548,11 +2564,9 @@ function MOI.delete(
     c::MOI.ConstraintIndex{MOI.VectorOfVariables,<:_SOS},
 )
     row = _info(model, c).row
-    _update_if_necessary(model)
     rows = Ref{Cint}(row - 1)
     ret = GRBdelsos(model, 1, rows)
     _check_ret(model, ret)
-    _require_update(model)
     for (key, info) in model.sos_constraint_info
         if info.row > row
             info.row -= 1
@@ -2560,6 +2574,7 @@ function MOI.delete(
     end
     delete!(model.sos_constraint_info, c.value)
     model.name_to_constraint_index = nothing
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -2568,11 +2583,9 @@ function MOI.delete(
     cs::Vector{<:MOI.ConstraintIndex{MOI.VectorOfVariables,<:_SOS}},
 )
     # The batch delete method is same as batch delete of `MOI.ScalarAffineFunction{Float64}, <:Any}`
-    _update_if_necessary(model)
     rows_to_delete = sort!([Cint(_info(model, c).row - 1) for c in cs])
     ret = GRBdelsos(model, length(rows_to_delete), rows_to_delete)
     _check_ret(model, ret)
-    _require_update(model)
     for (_, info) in model.sos_constraint_info
         info.row -= searchsortedlast(rows_to_delete, info.row - 1)
     end
@@ -2581,6 +2594,7 @@ function MOI.delete(
         return isempty(searchsorted(cs_values, pair.first))
     end
     model.name_to_constraint_index = nothing
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -2663,10 +2677,7 @@ function _check_moi_callback_validity(model::Optimizer)
 end
 
 function MOI.optimize!(model::Optimizer)
-    # Note: although Gurobi will call update regardless, we do it now so that
-    # the appropriate `needs_update` flag is set.
-    _update_if_necessary(model)
-
+    _update_if_necessary(model, force = true)
     # Initialize callbacks if necessary.
     has_null_callback = false
     if _check_moi_callback_validity(model)
@@ -3341,7 +3352,7 @@ end
 function MOI.set(model::Optimizer, ::MOI.Name, name::String)
     ret = GRBsetstrattr(model, "ModelName", name)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -3363,7 +3374,7 @@ function MOI.set(
     grb_value = value !== nothing ? value : GRB_UNDEFINED
     ret = GRBsetdblattrelement(model, "Start", Cint(info.column - 1), grb_value)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -3541,7 +3552,6 @@ function MOI.modify(
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},<:Any},
     chg::MOI.ScalarCoefficientChange{Float64},
 )
-    _update_if_necessary(model)
     ret = GRBchgcoeffs(
         model,
         1,
@@ -3550,7 +3560,7 @@ function MOI.modify(
         Ref{Cdouble}(chg.new_coefficient),
     )
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, model_change = true)
     return
 end
 
@@ -3559,7 +3569,6 @@ function MOI.modify(
     cis::Vector{MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},S}},
     changes::Vector{MOI.ScalarCoefficientChange{Float64}},
 ) where {S}
-    _update_if_necessary(model)
     nels = length(cis)
     @assert nels == length(changes)
     rows = Vector{Cint}(undef, nels)
@@ -3572,7 +3581,7 @@ function MOI.modify(
     end
     ret = GRBchgcoeffs(model, nels, rows, cols, coefs)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, model_change = true)
     return
 end
 
@@ -3581,7 +3590,6 @@ function MOI.modify(
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
     chg::MOI.ScalarCoefficientChange{Float64},
 )
-    _update_if_necessary(model)
     ret = GRBsetdblattrelement(
         model,
         "Obj",
@@ -3590,7 +3598,7 @@ function MOI.modify(
     )
     _check_ret(model, ret)
     model.is_objective_set = true
-    _require_update(model)
+    _require_update(model, model_change = true)
     return
 end
 
@@ -3599,7 +3607,6 @@ function MOI.modify(
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
     changes::Vector{MOI.ScalarCoefficientChange{Float64}},
 )
-    _update_if_necessary(model)
     nels = length(changes)
     cols = Vector{Cint}(undef, nels)
     coefs = Vector{Cdouble}(undef, nels)
@@ -3610,7 +3617,7 @@ function MOI.modify(
     ret = GRBsetdblattrlist(model, "Obj", nels, cols, coefs)
     _check_ret(model, ret)
     model.is_objective_set = true
-    _require_update(model)
+    _require_update(model, model_change = true)
     return
 end
 
@@ -3719,7 +3726,6 @@ function MOI.set(
     previous = MOI.get(model, MOI.ConstraintFunction(), c)
     MOI.Utilities.canonicalize!(previous)
     replacement = MOI.Utilities.canonical(f)
-    _update_if_necessary(model)
     # If the previous and replacement constraint functions have exactly
     # the same sparsity pattern, then we can take a faster path by just
     # passing the replacement terms to the model. But if their sparsity
@@ -3737,7 +3743,7 @@ function MOI.set(
     new_rhs = current_rhs[] - (replacement.constant - previous.constant)
     ret = GRBsetdblattrelement(model, "RHS", Cint(row - 1), new_rhs)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, model_change = true)
     return
 end
 
@@ -3746,8 +3752,8 @@ function MOI.get(
     ::MOI.ConstraintBasisStatus,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},S},
 ) where {S<:_SCALAR_SETS}
-    row = _info(model, c).row
     _update_if_necessary(model)
+    row = _info(model, c).row
     valueP = Ref{Cint}()
     ret = GRBgetintattrelement(model, "CBasis", Cint(row - 1), valueP)
     _check_ret(model, ret)
@@ -3787,6 +3793,7 @@ function MOI.set(
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},S},
     bs::MOI.BasisStatusCode,
 ) where {S<:_SCALAR_SETS}
+    _update_if_necessary(model, check_attribute_change = false)
     row = _info(model, c).row
     valueP::Cint = (
         if bs == MOI.BASIC
@@ -3799,7 +3806,7 @@ function MOI.set(
     )
     ret = GRBsetintattrelement(model, "CBasis", Cint(row - 1), valueP)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -3809,6 +3816,7 @@ function MOI.set(
     x::MOI.VariableIndex,
     bs::MOI.BasisStatusCode,
 )
+    _update_if_necessary(model, check_attribute_change = false)
     valueP = if bs == MOI.BASIC
         Cint(0)
     elseif bs == MOI.NONBASIC_AT_LOWER
@@ -3821,7 +3829,7 @@ function MOI.set(
     end
     ret = GRBsetintattrelement(model, "VBasis", c_column(model, x), valueP)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -4094,6 +4102,7 @@ function _set_attribute(model::Optimizer, attr::ModelAttribute, value)
 end
 
 function _get_attribute(model::Optimizer, attr::ModelAttribute)
+    _update_if_necessary(model)
     name = attr.name
     datatypeP, attrtypeP = Ref{Cint}(), Ref{Cint}()
     ret = GRBgetattrinfo(model, name, datatypeP, attrtypeP, C_NULL)
@@ -4144,10 +4153,12 @@ function _set_attribute(model::Optimizer, attr, element::Cint, value)
         GRBsetstrattrelement(model, name, element, value)
     end
     _check_ret(model, ret)
+    _require_update(model, attribute_change = true)
     return
 end
 
 function _get_attribute(model::Optimizer, attr, element::Cint)
+    _update_if_necessary(model)
     name = attr.name
     datatypeP, attrtypeP = Ref{Cint}(), Ref{Cint}()
     ret = GRBgetattrinfo(model, name, datatypeP, attrtypeP, C_NULL)
@@ -4197,7 +4208,7 @@ function MOI.set(
     value,
 )
     _set_attribute(model, attr, Cint(_info(model, ci).row - 1), value)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -4206,7 +4217,6 @@ function MOI.get(
     attr::ConstraintAttribute,
     ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}},
 )
-    _update_if_necessary(model)
     return _get_attribute(model, attr, Cint(_info(model, ci).row - 1))
 end
 
@@ -4227,7 +4237,7 @@ function MOI.set(
     value::T,
 ) where {T}
     _set_attribute(model, attr, c_column(model, vi), value)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -4236,7 +4246,6 @@ function MOI.get(
     attr::VariableAttribute,
     vi::MOI.VariableIndex,
 )
-    _update_if_necessary(model)
     return _get_attribute(model, attr, c_column(model, vi))
 end
 
@@ -4247,12 +4256,11 @@ Set a model attribute.
 """
 function MOI.set(model::Optimizer, attr::ModelAttribute, value)
     _set_attribute(model, attr, value)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     return
 end
 
 function MOI.get(model::Optimizer, attr::ModelAttribute)
-    _update_if_necessary(model)
     return _get_attribute(model, attr)
 end
 
@@ -4283,8 +4291,6 @@ function MOI.add_constraint(
     # t² - Σᵢ xᵢ² ≥ 0 and t ≥ 0.
 
     # First, check the lower bound on t.
-
-    _update_if_necessary(model)
     t_info = _info(model, f.variables[1])
     lb = _get_variable_lower_bound(model, t_info)
     if isnan(t_info.lower_bound_if_soc) && lb < 0.0
@@ -4317,7 +4323,7 @@ function MOI.add_constraint(
         "",
     )
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true, model_change = true)
     model.last_constraint_index += 1
     model.quadratic_constraint_info[model.last_constraint_index] =
         _ConstraintInfo(length(model.quadratic_constraint_info) + 1, s)
@@ -4338,12 +4344,10 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.SecondOrderCone},
 )
-    _update_if_necessary(model)
     f = MOI.get(model, MOI.ConstraintFunction(), c)
     info = _info(model, c)
     ret = GRBdelqconstrs(model, 1, [Cint(info.row - 1)])
     _check_ret(model, ret)
-    _require_update(model)
     for (key, info_2) in model.quadratic_constraint_info
         if info_2.row > info.row
             info_2.row -= 1
@@ -4381,7 +4385,7 @@ function MOI.delete(
         tmp_lower_bound,
     )
     _check_ret(model, ret)
-    _require_update(model)
+    _update_if_necessary(model, force = true)
     return
 end
 
@@ -4398,7 +4402,6 @@ function MOI.get(
     ::MOI.ConstraintFunction,
     c::MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.SecondOrderCone},
 )
-    _update_if_necessary(model)
     a, b, I, J, V = _getqconstr(model, Cint(_info(model, c).row - 1))
     @assert length(a) == length(b) == 0  # Check for no linear terms.
     t = nothing
@@ -4448,7 +4451,7 @@ function MOI.set(
     _update_if_necessary(model)
     ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
     _check_ret(model, ret)
-    _require_update(model)
+    _require_update(model, attribute_change = true)
     info.name = name
     if model.name_to_constraint_index === nothing || isempty(name)
         return

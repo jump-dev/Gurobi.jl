@@ -140,7 +140,7 @@ function MOI.add_constraint(
     model.last_constraint_index += 1
     info = _ConstraintInfo(length(model.indicator_constraint_info) + 1, s)
     model.indicator_constraint_info[model.last_constraint_index] = info
-    _require_update(model)
+    _require_update(model, model_change = true)
     return MOI.ConstraintIndex{typeof(func),typeof(s)}(
         model.last_constraint_index,
     )
@@ -180,7 +180,7 @@ function MOI.set(
     name::String,
 ) where {S<:MOI.Indicator}
     MOI.throw_if_not_valid(model, c)
-    _update_if_necessary(model)
+    _update_if_necessary(model, check_attribute_change = false)
     info = _info(model, c)
     info.name = name
     if !isempty(name)
@@ -188,6 +188,7 @@ function MOI.set(
         ret = GRBsetstrattrelement(model, "GenConstrName", row, name)
         _check_ret(model, ret)
     end
+    _require_update(model, attribute_change = true)
     return
 end
 
@@ -195,7 +196,6 @@ function MOI.delete(
     model::Optimizer,
     c::MOI.ConstraintIndex{<:MOI.VectorAffineFunction,<:MOI.Indicator},
 )
-    _update_if_necessary(model)
     MOI.throw_if_not_valid(model, c)
     row = _info(model, c).row
     ind = Ref{Cint}(row - 1)
@@ -207,6 +207,6 @@ function MOI.delete(
             info.row -= 1
         end
     end
-    _require_update(model)
+    _update_if_necessary(model, force = true)
     return
 end

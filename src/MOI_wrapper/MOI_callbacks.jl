@@ -83,7 +83,7 @@ function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
     model.generic_callback = user_data
     model.has_generic_callback = true
     # Mark the update as necessary and immediately call for the update.
-    _require_update(model)
+    _require_update(model, model_change = true)
     _update_if_necessary(model)
     return
 end
