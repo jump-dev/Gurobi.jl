@@ -15,14 +15,16 @@ It has two components:
 
 This wrapper is maintained by the JuMP community with help from Gurobi.
 
-If you encounter a problem with this interface, please either open an issue in
-this repository directly or create a topic in the [Julia Discourse](https://discourse.julialang.org/c/domain/opt/13)
-with the [`gurobi` tag](https://discourse.julialang.org/tag/gurobi).
+## Getting help
 
-If you encounter a problem with the Gurobi solver, please post in Gurobi’s
-[Community Forum](https://support.gurobi.com/hc/en-us/community/topics), or if
-you are a commercial customer, please contact Gurobi directly through the
+If you are a commercial customer, please contact Gurobi directly through the
 [Gurobi Help Center](https://support.gurobi.com/hc/en-us).
+
+Otherwise, you should ask a question on the [JuMP community forum](https://jump.dev/forum).
+with the [`gurobi` tag](https://discourse.julialang.org/tag/gurobi), or post in
+Gurobi’s [Community Forum](https://support.gurobi.com/hc/en-us/community/topics)
+
+If you have a reproducible example of a bug, please [open a GitHub issue](https://github.com/jump-dev/Gurobi.jl/issues/new).
 
 ## License
 
