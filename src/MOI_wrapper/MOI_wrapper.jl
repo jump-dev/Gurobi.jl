@@ -4,10 +4,8 @@
 # Use of this source code is governed by an MIT-style license that can be found
 # in the LICENSE.md file or at https://opensource.org/licenses/MIT.
 
-import MathOptInterface
-
-const MOI = MathOptInterface
-const CleverDicts = MOI.Utilities.CleverDicts
+import MathOptInterface as MOI
+import MathOptInterface.Utilities: CleverDicts
 
 @enum(
     _BoundType,
@@ -18,6 +16,7 @@ const CleverDicts = MOI.Utilities.CleverDicts
     _INTERVAL,
     _EQUAL_TO
 )
+
 @enum(
     _ObjectiveType,
     _SINGLE_VARIABLE,
@@ -4292,13 +4291,13 @@ function MOI.add_constraint(
 
     # First, check the lower bound on t.
     t_info = _info(model, f.variables[1])
-    lb = _get_variable_lower_bound(model, t_info)
-    if isnan(t_info.lower_bound_if_soc) && lb < 0.0
-        # If `t_info.lower_bound_if_bounded` is active, this just makes
-        # `t_info.lower_bound_if_soc` equal to it. If `lower_bound_if_bounded`
-        # is set after, then it will call `_set_variable_lower_bound` and
-        # update `lower_bound_if_soc` accordingly.
-        t_info.lower_bound_if_soc = lb
+    # Check `.lower_bound_if_bounded` instead of `_get_variable_lower_bound` so
+    # that we don't incur a call to `GRBupdate`.
+    lb = t_info.lower_bound_if_bounded
+    if isnan(t_info.lower_bound_if_soc) && (isnan(lb) || lb < 0.0)
+        # If `isnan(lb)`, then we haven't set a bound. The default should be
+        # Gurobi's default. This is necessary for when we delete SOC constraints.
+        t_info.lower_bound_if_soc = isnan(lb) ? -GRB_INFINITY : lb
         ret = GRBsetdblattrelement(model, "LB", Cint(t_info.column - 1), 0.0)
         _check_ret(model, ret)
     end
