@@ -13,13 +13,17 @@ if isfile(DEPS_FILE)
 end
 
 if Int === Int32
-    error("Gurobi.jl does not support 32-bit Julia. Please install a 64-bit Julia.")
+    error(
+        "Gurobi.jl does not support 32-bit Julia. Please install a 64-bit Julia.",
+    )
 end
 
 function write_depsfile(path)
     open(DEPS_FILE, "w") do io
         println(io, "const libgurobi = \"$(escape_string(path))\"")
+        return
     end
+    return
 end
 
 const ALIASES = [
@@ -30,35 +34,33 @@ const ALIASES = [
     "gurobi90"
 ]
 
-paths_to_try = copy(ALIASES)
-
-for a in ALIASES
-    if haskey(ENV, "GUROBI_HOME")
-        if Sys.isunix()
-            push!(paths_to_try, joinpath(ENV["GUROBI_HOME"], "lib", string("lib", a, ".so")))
+function _try_local_install()
+    paths_to_try = copy(ALIASES)
+    for a in ALIASES
+        root = get(ENV, "GUROBI_HOME", nothing)
+        if root !== nothing
+            if Sys.isunix()
+                push!(paths_to_try, joinpath(root, "lib", "lib$a.so"),)
+            end
+            if Sys.iswindows()
+                push!(paths_to_try, joinpath(root, "bin", "$a.$(Libdl.dlext)"))
+            end
+            if Sys.isapple()
+                push!(paths_to_try, joinpath(root, "lib", "lib$a.dylib"))
+            end
         end
-        if Sys.iswindows()
-            push!(paths_to_try, joinpath(ENV["GUROBI_HOME"], "bin", string(a, ".", Libdl.dlext)))
-        end
-        if Sys.isapple()
-            push!(paths_to_try, joinpath(ENV["GUROBI_HOME"], "lib", string("lib", a, ".dylib")))
+        if Sys.isapple()  # gurobi uses .so on OS X for some reason
+            push!(paths_to_try, string("lib$a.so"))
+            push!(paths_to_try, string("lib$a.dylib"))
         end
     end
-    # gurobi uses .so on OS X for some reason
-    if Sys.isapple()
-        push!(paths_to_try, string("lib$a.so"))
-        push!(paths_to_try, string("lib$a.dylib"))
+    for l in paths_to_try
+        if Libdl.dlopen_e(l) != C_NULL
+            write_depsfile(l)
+            return true
+        end
     end
-end
-
-found = false
-for l in paths_to_try
-    d = Libdl.dlopen_e(l)
-    if d != C_NULL
-        global found = true
-        write_depsfile(l)
-        break
-    end
+    return false
 end
 
 function _print_GUROBI_HOME_help()
@@ -164,6 +166,13 @@ function diagnose_gurobi_install()
             _print_GUROBI_HOME_help()
         end
     end
+    return error(
+        """
+        Unable to locate Gurobi installation. If the advice above did not help,
+        open an issue at https://github.com/jump-dev/Gurobi.jl and post the full
+        print-out of this diagnostic attempt.
+        """,
+    )
 end
 
 if haskey(ENV, "GUROBI_JL_SKIP_LIB_CHECK")
@@ -172,19 +181,19 @@ if haskey(ENV, "GUROBI_JL_SKIP_LIB_CHECK")
 elseif get(ENV, "JULIA_REGISTRYCI_AUTOMERGE", "false") == "true"
     # We write a fake depsfile so Gurobi.jl is loadable but not usable.
     write_depsfile("__skipped_installation__")
-elseif !found && (Sys.islinux() || Sys.isapple() || Sys.iswindows())
-    if haskey(ENV, "WLSLICENSE")
+elseif get(ENV, "GUROBI_JL_USE_GUROBI_JLL", "true") == "false"
+    # The user has asked to avoid Gurobi_jll
+    found = _try_local_install()
+    if !found
+        diagnose_gurobi_install()
+    end
+else
+    # We're using the artifact
+    if haskey(ENV, "WLSLICENSE")  # This is used by CI
         home = Sys.iswindows() ? ENV["USERPROFILE"] : ENV["HOME"]
         write(joinpath(home, "gurobi.lic"), ENV["WLSLICENSE"])
     end
     open(DEPS_FILE, "w") do io
         println(io, "# No libgurobi constant; we're using the Artifact.")
     end
-elseif !found
-    diagnose_gurobi_install()
-    error("""
-    Unable to locate Gurobi installation. If the advice above did not help,
-    open an issue at https://github.com/jump-dev/Gurobi.jl and post the full
-    print-out of this diagnostic attempt.
-    """)
 end

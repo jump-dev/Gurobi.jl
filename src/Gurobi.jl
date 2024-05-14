@@ -17,10 +17,10 @@ elseif Sys.islinux() || Sys.isapple() || Sys.iswindows()
     import Gurobi_jll
     const libgurobi = Gurobi_jll.libgurobi
 else
-    error("""
-        Gurobi not properly installed. Please run Pkg.build(\"Gurobi\"). For
-        more information go to https://github.com/jump-dev/Gurobi.jl
-    """)
+    error(
+        "Unsupported platform: Use a manual installation by setting " *
+        "`GUROBI_JL_USE_GUROBI_JLL` to false. See the README for details.",
+    )
 end
 
 const _GUROBI_VERSION = if libgurobi == "__skipped_installation__"

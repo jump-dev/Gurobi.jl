@@ -37,10 +37,35 @@ Free Gurobi licenses are available for [academics and students](https://www.guro
 
 ## Installation
 
-First, obtain a license of Gurobi and install Gurobi solver.
+To use Gurobi, you need a license. To install the license, first obtain a key
+from [gurobi.com](https://www.gurobi.com), then run:
+```julia
+import Pkg
+Pkg.add("Gurobi_jll")
+import Gurobi_jll
+# Replace the contents xxxxx with your actual key
+key = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+run(`$(Gurobi_jll.grbgetkey()) $key`)
+```
 
-Then, set the `GUROBI_HOME` environment variable as appropriate and run
-`Pkg.add("Gurobi")`:
+### Default installation
+
+Install Gurobi as follows:
+```julia
+import Pkg
+Pkg.add("Gurobi")
+```
+
+In addition to installing the Gurobi.jl package, this will also download and
+install the Gurobi binaries from [Gurobi_jll.jl](https://github.com/jump-dev/Gurobi_jll.jl).
+You do not need to install Gurobi separately.
+
+### Manual installation
+
+To opt-out of using the Gurobi_jll binaries, set the `GUROBI_HOME` environment
+variable to point to your local installation and set the
+`GUROBI_JL_USE_GUROBI_JLL` environment variable to `"false"`, then run
+`Pkg.add` and `Pkg.build`:
 
 ```julia
 # On Windows, this might be
@@ -48,20 +73,15 @@ ENV["GUROBI_HOME"] = "C:\\Program Files\\gurobi1100\\win64"
 # ... or perhaps ...
 ENV["GUROBI_HOME"] = "C:\\gurobi1100\\win64"
 # On Mac, this might be
-ENV["GUROBI_HOME"] = "/Library/gurobi1100/mac64"
+ENV["GUROBI_HOME"] = "/Library/gurobi1100/macos_universal2"
+
+# Opt-out of using Gurobi_jll
+ENV["GUROBI_JL_USE_GUROBI_JLL"] = "false"
 
 import Pkg
 Pkg.add("Gurobi")
+Pkg.build("Gurobi")
 ```
-**Note: your path may differ. Check which folder you installed Gurobi in, and
-update the path accordingly.**
-
-By default, building Gurobi.jl will fail if the Gurobi library is not found.
-This may not be desirable in certain cases, for example when part of a package's
-test suite uses Gurobi as an optional test dependency, but Gurobi cannot be
-installed on a CI server running the test suite. To support this use case, the
-`GUROBI_JL_SKIP_LIB_CHECK` environment variable may be set (to any value) to
-make Gurobi.jl installable (but not usable).
 
 ## Use with JuMP
 
