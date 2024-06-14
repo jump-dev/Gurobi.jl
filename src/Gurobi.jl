@@ -6,6 +6,8 @@
 
 module Gurobi
 
+using Libdl
+
 # deps.jl file is always built via `Pkg.build`, even if we didn't find a local
 # install and we want to use the artifact instead. This is so Gurobi.jl will be
 # recompiled if we update the file. See issue #438 for more details.
@@ -13,6 +15,18 @@ include(joinpath(dirname(@__FILE__), "..", "deps", "deps.jl"))
 
 if isdefined(@__MODULE__, :libgurobi)
     # deps.jl must define a local installation.
+    # Check if the library exists. Otherwise, the local installation might have
+    # been updated and the package needs to be rebuilt.
+    if isnothing(dlopen(libgurobi, throw_error = false))
+        println("Gurobi library $libgurobi not found, rebuilding the package...")
+        # Execute the build script to recreate the deps.jl file and load it.
+        include(joinpath(dirname(@__FILE__), "..", "deps", "build.jl"))
+        include(joinpath(dirname(@__FILE__), "..", "deps", "deps.jl"))
+        # Check again, if the library exists.
+        if isnothing(dlopen(libgurobi, throw_error = false))
+            error("Gurobi library $libgurobi not found.")
+        end
+    end
 elseif Sys.islinux() || Sys.isapple() || Sys.iswindows()
     import Gurobi_jll
     const libgurobi = Gurobi_jll.libgurobi

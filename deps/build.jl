@@ -20,7 +20,7 @@ end
 
 function write_depsfile(path)
     open(DEPS_FILE, "w") do io
-        println(io, "const libgurobi = \"$(escape_string(path))\"")
+        println(io, "libgurobi = \"$(escape_string(path))\"")
         return
     end
     return
