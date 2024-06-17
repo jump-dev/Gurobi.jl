@@ -62,7 +62,7 @@ You do not need to install Gurobi separately.
 
 ### Manual installation
 
-To opt-out of using the Gurobi_jll binaries, set the `GUROBI_HOME` environment
+To opt-out of using the `Gurobi_jll` binaries, set the `GUROBI_HOME` environment
 variable to point to your local installation and set the
 `GUROBI_JL_USE_GUROBI_JLL` environment variable to `"false"`, then run
 `Pkg.add` and `Pkg.build`:
@@ -82,6 +82,10 @@ import Pkg
 Pkg.add("Gurobi")
 Pkg.build("Gurobi")
 ```
+
+To change the location of a manual install, change the value of `GUROBI_HOME`,
+re-run `Pkg.build("Gurobi")`, and then re-start Julia for the change to take
+effect.
 
 ## Use with JuMP
 
