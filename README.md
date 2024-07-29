@@ -37,8 +37,16 @@ Free Gurobi licenses are available for [academics and students](https://www.guro
 
 ## Installation
 
-To use Gurobi, you need a license. To install the license, first obtain a key
-from [gurobi.com](https://www.gurobi.com), then run:
+To use Gurobi, you need a license, which you can obtain from from [gurobi.com](https://www.gurobi.com).
+
+Once you have a license, follow Gurobi's instructions to
+[retrieve and set up a Gurobi license](https://support.gurobi.com/hc/en-us/articles/12872879801105-How-do-I-retrieve-and-set-up-a-Gurobi-license).
+
+The instructions depend on the type of license that you have obtained.
+
+As one exception, if you have used the default installation of Gurobi.jl and the
+instructions call for `grbgetkey`, do:
+
 ```julia
 import Pkg
 Pkg.add("Gurobi_jll")
