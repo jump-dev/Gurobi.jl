@@ -3240,7 +3240,7 @@ function MOI.get(model::Optimizer, attr::MOI.SolveTimeSec)
     return valueP[]
 end
 
-function MOI.get(model::Optimizer, attr::MOI.SimplexIterations)
+function MOI.get(model::Optimizer, attr::MOI.SimplexIterations)::Int64
     _throw_if_optimize_in_progress(model, attr)
     valueP = Ref{Cdouble}()
     ret = GRBgetdblattr(model, "IterCount", valueP)
@@ -3248,20 +3248,20 @@ function MOI.get(model::Optimizer, attr::MOI.SimplexIterations)
     return valueP[]
 end
 
-function MOI.get(model::Optimizer, attr::MOI.BarrierIterations)
+function MOI.get(model::Optimizer, attr::MOI.BarrierIterations)::Int64
     _throw_if_optimize_in_progress(model, attr)
     valueP = Ref{Cint}()
     ret = GRBgetintattr(model, "BarIterCount", valueP)
     _check_ret(model, ret)
-    return Int(valueP[])
+    return valueP[]
 end
 
-function MOI.get(model::Optimizer, attr::MOI.NodeCount)
+function MOI.get(model::Optimizer, attr::MOI.NodeCount)::Int64
     _throw_if_optimize_in_progress(model, attr)
     valueP = Ref{Cdouble}()
     ret = GRBgetdblattr(model, "NodeCount", valueP)
     _check_ret(model, ret)
-    return round(Int64, valueP[])
+    return valueP[]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.RelativeGap)
@@ -3284,7 +3284,7 @@ function MOI.get(model::Optimizer, attr::MOI.DualObjectiveValue)
     return valueP[]
 end
 
-function MOI.get(model::Optimizer, attr::MOI.ResultCount)
+function MOI.get(model::Optimizer, attr::MOI.ResultCount)::Int
     _throw_if_optimize_in_progress(model, attr)
     if model.has_infeasibility_cert || model.has_unbounded_ray
         return 1
@@ -3292,7 +3292,7 @@ function MOI.get(model::Optimizer, attr::MOI.ResultCount)
     valueP = Ref{Cint}()
     ret = GRBgetintattr(model, "SolCount", valueP)
     _check_ret(model, ret)
-    return Int(valueP[])
+    return valueP[]
 end
 
 function MOI.get(model::Optimizer, ::MOI.Silent)
