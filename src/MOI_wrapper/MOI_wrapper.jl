@@ -278,6 +278,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     sos_constraint_info::Dict{Int,_ConstraintInfo}
     # VectorAffineFunction-in-Set storage.
     indicator_constraint_info::Dict{Int,_ConstraintInfo}
+    # VectorAffineFunction-in-Set storage.
+    nl_constraint_info::Dict{Int,_ConstraintInfo}
     # Note: we do not have a singlevariable_constraint_info dictionary. Instead,
     # data associated with these constraints are stored in the _VariableInfo
     # objects.
@@ -345,6 +347,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         model.quadratic_constraint_info = Dict{Int,_ConstraintInfo}()
         model.sos_constraint_info = Dict{Int,_ConstraintInfo}()
         model.indicator_constraint_info = Dict{Int,_ConstraintInfo}()
+        model.nl_constraint_info = Dict{Int,_ConstraintInfo}()
         model.callback_variable_primal = Float64[]
         MOI.empty!(model)
         finalizer(model) do m
@@ -461,6 +464,7 @@ function MOI.empty!(model::Optimizer)
     empty!(model.quadratic_constraint_info)
     empty!(model.sos_constraint_info)
     empty!(model.indicator_constraint_info)
+    empty!(model.nl_constraint_info)
     model.name_to_variable = nothing
     model.name_to_constraint_index = nothing
     model.ret_GRBoptimize = Cint(0)

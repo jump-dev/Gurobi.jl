@@ -27,4 +27,5 @@ output_ignorelist = [
 opaque_as_mutable_struct = false
 
 [codegen.macro]
+macro_mode = "aggressive"
 ignore_header_guards_with_suffixes = ["__stdcall"]

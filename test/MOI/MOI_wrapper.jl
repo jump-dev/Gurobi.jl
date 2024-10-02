@@ -977,6 +977,38 @@ function test_primal_feasible_status()
     return
 end
 
+function test_nonlinear_leq()
+    model = Gurobi.Optimizer(GRB_ENV)
+
+    x1 = MOI.add_variable(model)
+    x2 = MOI.add_variable(model)
+
+    MOI.add_constraint(model, x1, MOI.GreaterThan(-1.0))
+    MOI.add_constraint(model, x1, MOI.LessThan(1.0))
+    MOI.add_constraint(model, x2, MOI.GreaterThan(-1.0))
+    MOI.add_constraint(model, x2, MOI.LessThan(1.0))
+
+    g = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[
+            MOI.ScalarNonlinearFunction(
+                :sin,
+                Any[MOI.ScalarAffineFunction{Float64}(
+                    [MOI.ScalarAffineTerm(2.5, x)],
+                    0.0,
+                )],
+            ),
+            MOI.ScalarAffineFunction{Float64}(
+                [MOI.ScalarAffineTerm(1.0, z)],
+                0.0,
+            ),
+        ],
+    )
+    c = MOI.add_constraint(model, g, MOI.LessThan(1.0))
+
+    return MOI.optimize!(model)
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
