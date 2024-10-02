@@ -994,12 +994,12 @@ function test_nonlinear_leq()
             MOI.ScalarNonlinearFunction(
                 :sin,
                 Any[MOI.ScalarAffineFunction{Float64}(
-                    [MOI.ScalarAffineTerm(2.5, x)],
+                    [MOI.ScalarAffineTerm(2.5, x1)],
                     0.0,
                 )],
             ),
             MOI.ScalarAffineFunction{Float64}(
-                [MOI.ScalarAffineTerm(1.0, z)],
+                [MOI.ScalarAffineTerm(1.0, x2)],
                 0.0,
             ),
         ],
