@@ -591,7 +591,6 @@ function MOI.supports(
         MOI.VariableIndex,
         MOI.ScalarAffineFunction{Float64},
         MOI.ScalarQuadraticFunction{Float64},
-        MOI.ScalarNonlinearFunction,
     },
 }
     return true
@@ -1322,19 +1321,6 @@ function MOI.get(
         )
     end
     return MOI.ScalarQuadraticFunction(q_terms, terms, constant[])
-end
-
-function MOI.set(
-    model::Optimizer,
-    ::MOI.ObjectiveFunction{F},
-    f::F,
-) where {F<:MOI.ScalarNonlinearFunction}
-    c = MOI.add_constraint(model, f, MOI.EqualTo(0.0), MOI.GreaterThan(-Inf))
-    # Set objective function
-    resvar = _info(model, c).resvar
-    MOI.set(model, MOI.ObjectiveFunction{MOI.VariableIndex}(), resvar)
-    model.is_objective_set = true
-    return
 end
 
 function MOI.modify(

@@ -977,36 +977,12 @@ function test_primal_feasible_status()
     return
 end
 
-function test_nonlinear_leq()
+function test_nonlinear()
     if !Gurobi._supports_nonlinear()
         return
     end
+
     model = Gurobi.Optimizer(GRB_ENV)
-
-    x1 = MOI.add_variable(model)
-    x2 = MOI.add_variable(model)
-
-    MOI.add_constraint(model, x1, MOI.GreaterThan(-1.0))
-    MOI.add_constraint(model, x1, MOI.LessThan(1.0))
-    MOI.add_constraint(model, x2, MOI.GreaterThan(-1.0))
-    MOI.add_constraint(model, x2, MOI.LessThan(1.0))
-
-    g = MOI.ScalarNonlinearFunction(
-        :+,
-        Any[
-            MOI.ScalarNonlinearFunction(
-                :sin,
-                Any[MOI.ScalarAffineFunction{Float64}(
-                    [MOI.ScalarAffineTerm(2.5, x1)],
-                    0.0,
-                )],
-            ),
-            MOI.ScalarAffineFunction{Float64}(
-                [MOI.ScalarAffineTerm(1.0, x2)],
-                0.0,
-            ),
-        ],
-    )
 
     @test MOI.supports_constraint(
         model,
@@ -1023,17 +999,179 @@ function test_nonlinear_leq()
         MOI.ScalarNonlinearFunction,
         MOI.EqualTo{Float64},
     )
+end
 
-    MOI.set(model, MOI.ObjectiveFunction{typeof(g)}(), g)
+function test_nonlinear_constraint_sin()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+
+    x1 = MOI.add_variable(model)
+    x2 = MOI.add_variable(model)
+
+    g = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[MOI.ScalarNonlinearFunction(:sin, Any[2.5*x1]), 1.0*x2],
+    )
+
+    MOI.add_constraint(model, x1, MOI.GreaterThan(-1.0))
+    MOI.add_constraint(model, x1, MOI.LessThan(1.0))
+    MOI.add_constraint(model, x2, MOI.GreaterThan(-1.0))
+    MOI.add_constraint(model, x2, MOI.LessThan(1.0))
+
+    c = MOI.add_constraint(model, g, MOI.EqualTo(0.0))
 
     MOI.optimize!(model)
 
     x1_val = MOI.get(model, MOI.VariablePrimal(), x1)
     x2_val = MOI.get(model, MOI.VariablePrimal(), x2)
 
-    @test ≈(sin(2.5 * x1_val) + x2_val, -2.0; atol = 1e-6)
-    @test ≈(x2_val, -1.0; atol = 1e-6)
-    @test ≈(MOI.get(model, MOI.ObjectiveValue()), -2.0; atol = 1e-6)
+    @test ≈(sin(2.5 * x1_val) + x2_val, 0.0; atol = 1e-6)
+    @test MOI.get(model, MOI.RawStatusString()) ==
+          "Model was solved to optimality (subject to tolerances), and an optimal solution is available."
+end
+
+function test_nonlinear_constraint_log()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer()
+
+    MOI.set(model, MOI.Silent(), true)
+
+    x = MOI.add_variable(model)
+    t = MOI.add_variable(model)
+
+    MOI.add_constraint(model, x, MOI.LessThan(2.0))
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * t
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    g = MOI.ScalarNonlinearFunction(
+        :-,
+        Any[MOI.ScalarNonlinearFunction(:log, Any[x]), t],
+    )
+    c = MOI.add_constraint(model, g, MOI.GreaterThan(0.0))
+    MOI.optimize!(model)
+    F, S = MOI.ScalarNonlinearFunction, MOI.GreaterThan{Float64}
+    @test MOI.supports_constraint(model, F, S)
+    @test MOI.get(model, MOI.RawStatusString()) ==
+          "Model was solved to optimality (subject to tolerances), and an optimal solution is available."
+    x_val = MOI.get(model, MOI.VariablePrimal(), x)
+    t_val = MOI.get(model, MOI.VariablePrimal(), t)
+    @test ≈(x_val, 2.0; atol = 1e-6)
+    @test ≈(t_val, log(x_val); atol = 1e-6)
+    @test ≈(MOI.get(model, MOI.ObjectiveValue()), t_val; atol = 1e-6)
+    @test (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
+    @test c in MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
+    return
+end
+
+function test_nonlinear_constraint_unsupported()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    x = MOI.add_variable(model)
+    f = MOI.ScalarNonlinearFunction(:foo, Any[x])
+    @test_throws(
+        MOI.UnsupportedNonlinearOperator(:foo),
+        MOI.add_constraint(model, f, MOI.GreaterThan(0.0)),
+    )
+    return
+end
+
+function test_nonlinear_constraint_uminus()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variable(model)
+
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * x
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    g = MOI.ScalarNonlinearFunction(:-, Any[x])
+    MOI.add_constraint(model, g, MOI.GreaterThan(-2.0))
+    MOI.optimize!(model)
+
+    @test MOI.get(model, MOI.RawStatusString()) ==
+          "Model was solved to optimality (subject to tolerances), and an optimal solution is available."
+    @test ≈(MOI.get(model, MOI.VariablePrimal(), x), 2.0; atol = 1e-3)
+    @test ≈(MOI.get(model, MOI.ObjectiveValue()), 2.0; atol = 1e-3)
+    return
+end
+
+function test_nonlinear_constraint_scalar_affine_function()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x1 = MOI.add_variable(model)
+    x2 = MOI.add_variable(model)
+    x3 = MOI.add_variable(model)
+    x4 = MOI.add_variable(model)
+
+    MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
+    MOI.add_constraint(model, x2, MOI.GreaterThan(0.0))
+    MOI.add_constraint(model, x3, MOI.GreaterThan(0.0))
+    MOI.add_constraint(model, x4, MOI.GreaterThan(0.0))
+
+    f = 1.0 * x1 + 2.0 * x2 + 3.0 * x3
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+
+    g = MOI.ScalarNonlinearFunction(:+, Any[1.0*x1+2.0*x2+3.0*x3+4.0*x4])
+    MOI.add_constraint(model, g, MOI.LessThan(6.0))
+
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.RawStatusString()) ==
+          "Model was solved to optimality (subject to tolerances), and an optimal solution is available."
+    @test ≈(MOI.get(model, MOI.ObjectiveValue()), 6.0; atol = 1e-3)
+    return
+end
+
+function test_nonlinear_get_constraint_by_name()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+
+    x = MOI.add_variable(model)
+    g = MOI.ScalarNonlinearFunction(:*, Any[x, 2.0, x])
+    c = MOI.add_constraint(model, g, MOI.LessThan(3.0))
+
+    MOI.set(model, MOI.ConstraintName(), c, "c")
+    d = MOI.get(model, MOI.ConstraintIndex, "c")
+    @test d == c
+    return
+end
+
+function test_nonlinear_constraint_delete()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+
+    x = MOI.add_variable(model)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * x
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    g_bad = MOI.ScalarNonlinearFunction(:exp, Any[x])
+    c_bad = MOI.add_constraint(model, g_bad, MOI.GreaterThan(20.0))
+    g = MOI.ScalarNonlinearFunction(:*, Any[x, 2.0, x])
+    MOI.add_constraint(model, g, MOI.LessThan(3.0))
+    @test MOI.is_valid(model, c_bad)
+    MOI.delete(model, c_bad)
+    @test !MOI.is_valid(model, c_bad)
+    MOI.optimize!(model)
+    @test ≈(MOI.get(model, MOI.VariablePrimal(), x), sqrt(3 / 2); atol = 1e-3)
+    @test ≈(MOI.get(model, MOI.ObjectiveValue()), sqrt(3 / 2); atol = 1e-3)
+    return
 end
 
 end  # TestMOIWrapper

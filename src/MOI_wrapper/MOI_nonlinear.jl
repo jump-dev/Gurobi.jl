@@ -66,7 +66,6 @@ function _add_expression_tree_variable(
     data::Vector{Cdouble},
     parent::Vector{Cint},
     coeff::Float64,
-    var::MOI.VariableIndex,
     var_index::Cint,
     current_index::Cint,
     parent_index::Cint,
@@ -87,10 +86,14 @@ function _add_expression_tree_variable(
         append!(opcode, GRB_OPCODE_VARIABLE)
         append!(data, var_index)
         append!(parent, current_index)
+        current_index += Cint(2)
+        return current_index
     else
         append!(data, var_index)
         append!(opcode, GRB_OPCODE_VARIABLE)
         append!(parent, parent_index)
+        current_index += Cint(1)
+        return current_index
     end
 end
 
@@ -109,7 +112,7 @@ end
 #   1. constant * var
 #   2. +/- var
 #   3. +/- constant * var
-function _check_nonlinear_affine(expr)
+function _check_nonlinear_singlevar(expr)
     return typeof(expr) == MOI.ScalarNonlinearFunction && (
         ( # Case 1.
             expr.head == :* &&
@@ -120,7 +123,7 @@ function _check_nonlinear_affine(expr)
             length(expr.args) == 1 &&
             (
                 typeof(expr.args[1]) == MOI.VariableIndex ||
-                _check_nonlinear_affine(expr.args[1])
+                _check_nonlinear_singlevar(expr.args[1])
             )
         )
     )
@@ -147,7 +150,9 @@ function _process_nonlinear(
                 throw(MOI.UnsupportedNonlinearOperator(s.head))
             elseif s.head == :- && length(s.args) == 1  # Special handling for unary -
                 append!(opcode, GRB_OPCODE_UMINUS)
-            elseif !_check_nonlinear_affine(s) && !_check_nonlinear_constant(s)
+                append!(data, -1.0)
+                append!(parent, parent_index)
+            elseif !_check_nonlinear_singlevar(s) && !_check_nonlinear_constant(s)
                 append!(opcode, ret)
                 append!(data, -1.0)
                 append!(parent, parent_index)
@@ -162,25 +167,36 @@ function _process_nonlinear(
                 data,
                 parent,
                 1.0,
-                s,
                 c_column(model, s),
                 current_index,
                 parent_index,
             )
         elseif typeof(s) == MOI.ScalarAffineFunction{Float64}
+            if length(s.terms) > 1
+                append!(opcode, GRB_OPCODE_PLUS)
+                append!(data, -1.0)
+                append!(parent, parent_index)
+                parent_index += Cint(1)
+            end
+            if s.constant != 0.0
+                append!(opcode, GRB_OPCODE_CONSTANT)
+                append!(data, s.constant)
+                append!(parent, parent_index)
+                current_index += Cint(1)
+            end
             for term in s.terms
                 var_index = c_column(model, term.variable)
                 coeff = term.coefficient
-                _add_expression_tree_variable(
+                current_index = _add_expression_tree_variable(
                     opcode,
                     data,
                     parent,
                     coeff,
-                    term.variable,
                     var_index,
                     current_index,
                     parent_index,
                 )
+                current_index += Cint(1)
             end
         elseif typeof(s) == Float64
             _add_expression_tree_constant(opcode, data, parent, s, parent_index)
@@ -202,16 +218,9 @@ function MOI.add_constraint(
     data = Vector{Cdouble}()
     parent = Vector{Cint}()
 
-    f_with_rhs = f
     sense, rhs = _sense_and_rhs(s)
 
-    if rhs > 0
-        f_with_rhs = MOI.ScalarNonlinearFunction(:-, Any[f, rhs])
-    elseif rhs < 0
-        f_with_rhs = MOI.ScalarNonlinearFunction(:+, Any[f, rhs])
-    end
-
-    _process_nonlinear(model, f_with_rhs, opcode, data, parent)
+    _process_nonlinear(model, f, opcode, data, parent)
 
     # Add resultant variable
     vi, ci = MOI.add_constrained_variable(model, resvar_sense)
@@ -227,6 +236,7 @@ function MOI.add_constraint(
         parent,
     )
     _check_ret(model, ret)
+    # GRBwrite(model, "checkjl.lp")
     _require_update(model, model_change = true)
     model.last_constraint_index += 1
     model.nl_constraint_info[model.last_constraint_index] =
