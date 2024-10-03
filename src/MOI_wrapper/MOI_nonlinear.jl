@@ -23,6 +23,8 @@ const _OPCODE_MAP = Dict(
     :logistic => GRB_OPCODE_LOGISTIC,
 )
 
+_supports_nonlinear() = _GUROBI_VERSION >= v"12.0.0"
+
 function MOI.supports_constraint(
     ::Optimizer,
     ::Type{MOI.ScalarNonlinearFunction},
@@ -34,7 +36,7 @@ function MOI.supports_constraint(
         },
     },
 )
-    return _GUROBI_VERSION >= v"12.0.0"
+    return _supports_nonlinear()
 end
 
 function _info(
@@ -194,6 +196,7 @@ function MOI.add_constraint(
     model::Optimizer,
     f::MOI.ScalarNonlinearFunction,
     s::_SCALAR_SETS,
+    resvar_sense::_SCALAR_SETS = s,
 )
     opcode = Vector{Cint}()
     data = Vector{Cdouble}()
@@ -211,12 +214,13 @@ function MOI.add_constraint(
     _process_nonlinear(model, f_with_rhs, opcode, data, parent)
 
     # Add resultant variable
-    vi, ci = MOI.add_constrained_variable(model, s)
+    vi, ci = MOI.add_constrained_variable(model, resvar_sense)
+    resvar_index = c_column(model, vi)
 
     ret = GRBaddgenconstrNL(
         model,
         C_NULL,
-        c_column(model, vi),
+        resvar_index,
         length(opcode),
         opcode,
         data,
@@ -226,7 +230,7 @@ function MOI.add_constraint(
     _require_update(model, model_change = true)
     model.last_constraint_index += 1
     model.nl_constraint_info[model.last_constraint_index] =
-        _ConstraintInfo(length(model.nl_constraint_info) + 1, s)
+        _NLConstraintInfo(length(model.nl_constraint_info) + 1, s, vi)
     return MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,typeof(s)}(
         model.last_constraint_index,
     )
@@ -257,8 +261,6 @@ function MOI.delete(
     _update_if_necessary(model, force = true)
     return
 end
-
-
 
 # TODO: all the functions below
 

@@ -90,6 +90,18 @@ mutable struct _ConstraintInfo
     _ConstraintInfo(row::Int, set) = new(row, set, "")
 end
 
+mutable struct _NLConstraintInfo
+    row::Int
+    set::MOI.AbstractSet
+    # Storage for constraint names. Where possible, these are also stored in
+    # the Gurobi model.
+    name::String
+    resvar::MOI.VariableIndex
+    function _NLConstraintInfo(row::Int, set, resvar::MOI.VariableIndex)
+        return new(row, set, "", resvar)
+    end
+end
+
 mutable struct Env
     ptr_env::Ptr{Cvoid}
     # These fields keep track of how many models the `Env` is used for to help
@@ -279,7 +291,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     # VectorAffineFunction-in-Set storage.
     indicator_constraint_info::Dict{Int,_ConstraintInfo}
     # VectorAffineFunction-in-Set storage.
-    nl_constraint_info::Dict{Int,_ConstraintInfo}
+    nl_constraint_info::Dict{Int,_NLConstraintInfo}
     # Note: we do not have a singlevariable_constraint_info dictionary. Instead,
     # data associated with these constraints are stored in the _VariableInfo
     # objects.
@@ -347,7 +359,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         model.quadratic_constraint_info = Dict{Int,_ConstraintInfo}()
         model.sos_constraint_info = Dict{Int,_ConstraintInfo}()
         model.indicator_constraint_info = Dict{Int,_ConstraintInfo}()
-        model.nl_constraint_info = Dict{Int,_ConstraintInfo}()
+        model.nl_constraint_info = Dict{Int,_NLConstraintInfo}()
         model.callback_variable_primal = Float64[]
         MOI.empty!(model)
         finalizer(model) do m
@@ -579,6 +591,7 @@ function MOI.supports(
         MOI.VariableIndex,
         MOI.ScalarAffineFunction{Float64},
         MOI.ScalarQuadraticFunction{Float64},
+        MOI.ScalarNonlinearFunction,
     },
 }
     return true
@@ -1309,6 +1322,19 @@ function MOI.get(
         )
     end
     return MOI.ScalarQuadraticFunction(q_terms, terms, constant[])
+end
+
+function MOI.set(
+    model::Optimizer,
+    ::MOI.ObjectiveFunction{F},
+    f::F,
+) where {F<:MOI.ScalarNonlinearFunction}
+    c = MOI.add_constraint(model, f, MOI.EqualTo(0.0), MOI.GreaterThan(-Inf))
+    # Set objective function
+    resvar = _info(model, c).resvar
+    MOI.set(model, MOI.ObjectiveFunction{MOI.VariableIndex}(), resvar)
+    model.is_objective_set = true
+    return
 end
 
 function MOI.modify(
