@@ -152,7 +152,8 @@ function _process_nonlinear(
                 append!(opcode, GRB_OPCODE_UMINUS)
                 append!(data, -1.0)
                 append!(parent, parent_index)
-            elseif !_check_nonlinear_singlevar(s) && !_check_nonlinear_constant(s)
+            elseif !_check_nonlinear_singlevar(s) &&
+                   !_check_nonlinear_constant(s)
                 append!(opcode, ret)
                 append!(data, -1.0)
                 append!(parent, parent_index)
@@ -259,8 +260,12 @@ function MOI.delete(
     c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S},
 ) where {S}
     info = _info(model, c)
+    _update_if_necessary(model)
+
     ret = GRBdelgenconstrs(model, 1, Ref{Cint}(info.row - 1))
     _check_ret(model, ret)
+    # Remove resultant variable
+    MOI.delete(model, info.resvar)
     for (key, info_2) in model.nl_constraint_info
         if info_2.row > info.row
             info_2.row -= 1
@@ -268,7 +273,7 @@ function MOI.delete(
     end
     delete!(model.nl_constraint_info, c.value)
     model.name_to_constraint_index = nothing
-    _update_if_necessary(model, force = true)
+    _require_update(model, model_change = true)
     return
 end
 
