@@ -213,7 +213,6 @@ function MOI.add_constraint(
     model::Optimizer,
     f::MOI.ScalarNonlinearFunction,
     s::_SCALAR_SETS,
-    resvar_sense::_SCALAR_SETS = s,
 )
     opcode = Vector{Cint}()
     data = Vector{Cdouble}()
@@ -224,7 +223,7 @@ function MOI.add_constraint(
     _process_nonlinear(model, f, opcode, data, parent)
 
     # Add resultant variable
-    vi, ci = MOI.add_constrained_variable(model, resvar_sense)
+    vi, ci = MOI.add_constrained_variable(model, s)
     resvar_index = c_column(model, vi)
 
     ret = GRBaddgenconstrNL(
@@ -262,37 +261,48 @@ function MOI.delete(
     info = _info(model, c)
     _update_if_necessary(model)
 
-    ret = GRBdelgenconstrs(model, 1, Ref{Cint}(info.row - 1))
+    ret = GRBdelgenconstrs(model, 1, [Cint(info.row - 1)])
     _check_ret(model, ret)
-    # Remove resultant variable
-    MOI.delete(model, info.resvar)
-    for (key, info_2) in model.nl_constraint_info
+    for (_, info_2) in model.nl_constraint_info
         if info_2.row > info.row
             info_2.row -= 1
         end
     end
     delete!(model.nl_constraint_info, c.value)
     model.name_to_constraint_index = nothing
+    # Remove resultant variable
+    MOI.delete(model, info.resvar)
     _require_update(model, model_change = true)
     return
 end
 
-# TODO: all the functions below
-
-function MOI.get(
+function MOI.delete(
     model::Optimizer,
-    ::MOI.ConstraintSet,
-    c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S},
+    cs::Vector{<:MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S}},
 ) where {S}
-    throw("not implemented")
-end
+    rows_to_delete = sort!([Cint(_info(model, c).row - 1) for c in cs])
+    println(rows_to_delete)
+    _update_if_necessary(model)
+    ret = GRBdelgenconstrs(model, length(rows_to_delete), rows_to_delete)
+    _check_ret(model, ret)
 
-function MOI.get(
-    model::Optimizer,
-    ::MOI.ConstraintFunction,
-    c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S},
-) where {S}
-    throw("not implemented")
+    for (_, info) in model.nl_constraint_info
+        info.row -= searchsortedlast(rows_to_delete, info.row - 1)
+    end
+
+    model.name_to_constraint_index = nothing
+
+    # Delete resultant variables
+    resvars = [_info(model, c).resvar for c in cs]
+    MOI.delete(model, resvars)
+
+    cs_values = sort!(getfield.(cs, :value))
+    filter!(model.nl_constraint_info) do pair
+        return isempty(searchsorted(cs_values, pair.first))
+    end
+
+    _require_update(model, model_change = true)
+    return
 end
 
 function MOI.get(
@@ -309,9 +319,19 @@ function MOI.set(
     c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S},
     name::String,
 ) where {S}
-    throw("not implemented")
-    # info = _info(model, c)
-    # info.name = name
-    # model.name_to_constraint_index = nothing
+    _update_if_necessary(model, force = true)
+    info = _info(model, c)
+    info.name = name
+    if !isempty(name)
+        ret = GRBsetstrattrelement(
+            model,
+            "GenConstrName",
+            Cint(info.row - 1),
+            name,
+        )
+        _check_ret(model, ret)
+        _require_update(model, attribute_change = true)
+    end
+    model.name_to_constraint_index = nothing
     return
 end

@@ -1174,6 +1174,30 @@ function test_nonlinear_constraint_delete()
     return
 end
 
+function test_nonlinear_constraint_vector_delete()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+
+    x = MOI.add_variable(model)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * x
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    g_bad = MOI.ScalarNonlinearFunction(:exp, Any[x])
+    c_bad = MOI.add_constraint(model, g_bad, MOI.GreaterThan(20.0))
+    g = MOI.ScalarNonlinearFunction(:*, Any[x, 2.0, x])
+    MOI.add_constraint(model, g, MOI.LessThan(3.0))
+    @test MOI.is_valid(model, c_bad)
+    MOI.delete(model, [c_bad])
+    @test !MOI.is_valid(model, c_bad)
+    MOI.optimize!(model)
+    @test ≈(MOI.get(model, MOI.VariablePrimal(), x), sqrt(3 / 2); atol = 1e-3)
+    @test ≈(MOI.get(model, MOI.ObjectiveValue()), sqrt(3 / 2); atol = 1e-3)
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()

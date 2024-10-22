@@ -2327,6 +2327,11 @@ function _rebuild_name_to_constraint_index(model::Optimizer)
         model.sos_constraint_info,
         MOI.VectorOfVariables,
     )
+    _rebuild_name_to_constraint_index_util(
+        model,
+        model.nl_constraint_info,
+        MOI.ScalarNonlinearFunction,
+    )
     return
 end
 
