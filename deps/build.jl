@@ -26,13 +26,8 @@ function write_depsfile(path)
     return
 end
 
-const ALIASES = [
-    "gurobi110",
-    "gurobi100",
-    "gurobi95",
-    "gurobi91",
-    "gurobi90"
-]
+const ALIASES =
+    ["gurobi120", "gurobi110", "gurobi100", "gurobi95", "gurobi91", "gurobi90"]
 
 function _try_local_install()
     paths_to_try = copy(ALIASES)
