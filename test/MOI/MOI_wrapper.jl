@@ -1007,6 +1007,8 @@ function test_nonlinear_constraint_sin()
     end
     model = Gurobi.Optimizer(GRB_ENV)
 
+    MOI.set(model, MOI.Silent(), true)
+
     x1 = MOI.add_variable(model)
     x2 = MOI.add_variable(model)
 
@@ -1036,7 +1038,7 @@ function test_nonlinear_constraint_log()
     if !Gurobi._supports_nonlinear()
         return
     end
-    model = Gurobi.Optimizer()
+    model = Gurobi.Optimizer(GRB_ENV)
 
     MOI.set(model, MOI.Silent(), true)
 

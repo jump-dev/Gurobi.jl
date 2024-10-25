@@ -3505,6 +3505,22 @@ function MOI.get(
     return sort!(indices, by = x -> x.value)
 end
 
+function MOI.get(
+    model::Optimizer,
+    ::MOI.ListOfConstraintIndices{MOI.ScalarNonlinearFunction,S},
+) where {S}
+    indices = MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S}[]
+    for (key, info) in model.nl_constraint_info
+        if typeof(info.set) == S
+            push!(
+                indices,
+                MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S}(key),
+            )
+        end
+    end
+    return sort!(indices, by = x -> x.value)
+end
+
 function MOI.get(model::Optimizer, ::MOI.ListOfConstraintTypesPresent)
     constraints = Set{Tuple{Type,Type}}()
     for info in values(model.variable_info)
@@ -3550,6 +3566,9 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraintTypesPresent)
     end
     for info in values(model.sos_constraint_info)
         push!(constraints, (MOI.VectorOfVariables, typeof(info.set)))
+    end
+    for info in values(model.nl_constraint_info)
+        push!(constraints, (MOI.ScalarNonlinearFunction, typeof(info.set)))
     end
     return collect(constraints)
 end
