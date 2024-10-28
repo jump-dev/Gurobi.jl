@@ -977,6 +977,45 @@ function test_primal_feasible_status()
     return
 end
 
+function test_ModelName_too_long()
+    model = Gurobi.Optimizer(GRB_ENV)
+    @test_throws(
+        MOI.SetAttributeNotAllowed{MOI.Name},
+        MOI.set(model, MOI.Name(), "a"^256),
+    )
+    name = "a"^255
+    MOI.set(model, MOI.Name(), name)
+    @test MOI.get(model, MOI.Name()) == name
+    return
+end
+
+function test_VarName_too_long()
+    model = Gurobi.Optimizer(GRB_ENV)
+    x = MOI.add_variable(model)
+    name = "a"^256
+    MOI.set(model, MOI.VariableName(), x, name)
+    @test MOI.get(model, MOI.VariableName(), x) == name
+    MOI.set(model, MOI.VariableName(), x, "x")
+    @test MOI.get(model, MOI.VariableName(), x) == "x"
+    MOI.set(model, MOI.VariableName(), x, "")
+    @test MOI.get(model, MOI.VariableName(), x) == ""
+    return
+end
+
+function test_ConstrName_too_long()
+    model = Gurobi.Optimizer(GRB_ENV)
+    x = MOI.add_variable(model)
+    c = MOI.add_constraint(model, 1.0 * x, MOI.EqualTo(2.0))
+    name = "a"^256
+    MOI.set(model, MOI.ConstraintName(), c, name)
+    @test MOI.get(model, MOI.ConstraintName(), c) == name
+    MOI.set(model, MOI.ConstraintName(), c, "c")
+    @test MOI.get(model, MOI.ConstraintName(), c) == "c"
+    MOI.set(model, MOI.ConstraintName(), c, "")
+    @test MOI.get(model, MOI.ConstraintName(), c) == ""
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()

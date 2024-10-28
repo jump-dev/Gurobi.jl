@@ -183,12 +183,12 @@ function MOI.set(
     _update_if_necessary(model, check_attribute_change = false)
     info = _info(model, c)
     info.name = name
-    if !isempty(name)
+    if length(name) <= 255
         row = Cint(_info(model, c).row - 1)
         ret = GRBsetstrattrelement(model, "GenConstrName", row, name)
         _check_ret(model, ret)
+        _require_update(model, attribute_change = true)
     end
-    _require_update(model, attribute_change = true)
     return
 end
 
