@@ -981,9 +981,9 @@ function test_ModelName_too_long()
     model = Gurobi.Optimizer(GRB_ENV)
     @test_throws(
         MOI.SetAttributeNotAllowed{MOI.Name},
-        MOI.set(model, MOI.Name(), "a"^256),
+        MOI.set(model, MOI.Name(), "a"^(GRB_MAX_NAMELEN + 1)),
     )
-    name = "a"^255
+    name = "a"^GRB_MAX_NAMELEN
     MOI.set(model, MOI.Name(), name)
     @test MOI.get(model, MOI.Name()) == name
     return

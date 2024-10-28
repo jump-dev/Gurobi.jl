@@ -1101,8 +1101,8 @@ function MOI.set(
 )
     info = _info(model, v)
     info.name = name
-    if length(name) <= 255
-        # Gurobi has a maximum name limit of 255 characters.
+    if length(name) <= GRB_MAX_NAMELEN
+        # Gurobi has a maximum name limit of GRB_MAX_NAMELEN characters.
         col = c_column(model, v)
         ret = GRBsetstrattrelement(model, "VarName", col, name)
         _check_ret(model, ret)
@@ -2260,8 +2260,8 @@ function MOI.set(
 )
     info = _info(model, c)
     info.name = name
-    if length(name) <= 255
-        # Gurobi has a maximum name limit of 255 characters.
+    if length(name) <= GRB_MAX_NAMELEN
+        # Gurobi has a maximum name limit of GRB_MAX_NAMELEN characters.
         row = Cint(info.row - 1)
         ret = GRBsetstrattrelement(model, "ConstrName", row, name)
         _check_ret(model, ret)
@@ -3356,7 +3356,7 @@ end
 function MOI.set(model::Optimizer, attr::MOI.Name, name::String)
     ret = GRBsetstrattr(model, "ModelName", name)
     if ret == GRB_ERROR_INVALID_ARGUMENT
-        msg = "Name too long (maximum name length is 255 characters)"
+        msg = "Name too long (maximum name length is $GRB_MAX_NAMELEN characters)"
         throw(MOI.SetAttributeNotAllowed(attr, msg))
     end
     _check_ret(model, ret)
@@ -4455,7 +4455,7 @@ function MOI.set(
     info = _info(model, c)
     info.name = name
     _update_if_necessary(model)
-    if length(name) <= 255
+    if length(name) <= GRB_MAX_NAMELEN
         ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
         _check_ret(model, ret)
         _require_update(model; attribute_change = true)

@@ -183,7 +183,7 @@ function MOI.set(
     _update_if_necessary(model, check_attribute_change = false)
     info = _info(model, c)
     info.name = name
-    if length(name) <= 255
+    if length(name) <= GRB_MAX_NAMELEN
         row = Cint(_info(model, c).row - 1)
         ret = GRBsetstrattrelement(model, "GenConstrName", row, name)
         _check_ret(model, ret)
