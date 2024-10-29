@@ -1211,6 +1211,64 @@ function test_nonlinear_constraint_vector_delete()
     return
 end
 
+function test_nonlinear_pow2()
+
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+
+    # max x + y
+    # s.t x^2 + y^2 <= 1  # Use NL POW(2) operator
+    # x, y >= 0
+    #
+    # -> x = y = 1/sqrt(2)
+
+    x = MOI.add_variable(model)
+    y = MOI.add_variable(model)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = one(Float64) * x + one(Float64) * y
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    f1 = MOI.ScalarNonlinearFunction(:^, Any[x, 2])
+    f2 = MOI.ScalarNonlinearFunction(:^, Any[y, 2])
+    f3 = MOI.ScalarNonlinearFunction(:+, Any[f1, f2])
+    g = MOI.ScalarNonlinearFunction(:sqrt, Any[f3])
+    c = MOI.add_constraint(model, g, MOI.LessThan(1.0))
+    MOI.optimize!(model)
+    @test ≈(MOI.get(model, MOI.ObjectiveValue()), 2 / sqrt(2); atol = 1e-3)
+
+end
+
+function test_nonlinear_scalarquadraticfunction()
+
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+
+    # max x + y
+    # s.t x^2 + y^2 <= 1  # Use ScalarQuadraticFunction
+    # x, y >= 0
+    #
+    # -> x = y = 1/sqrt(2)
+
+    x = MOI.add_variable(model)
+    y = MOI.add_variable(model)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = one(Float64) * x + one(Float64) * y
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    f1 = MOI.ScalarNonlinearFunction(:*, Any[x, y])
+    f2 = MOI.ScalarNonlinearFunction(:*, Any[y, y])
+    f3 = MOI.ScalarNonlinearFunction(:+, Any[f1, f2])
+    g = MOI.ScalarNonlinearFunction(:sqrt, Any[f3])
+    c = MOI.add_constraint(model, g, MOI.LessThan(1.0))
+    MOI.optimize!(model)
+    @test ≈(MOI.get(model, MOI.ObjectiveValue()), 2 / sqrt(2); atol = 1e-3)
+
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
