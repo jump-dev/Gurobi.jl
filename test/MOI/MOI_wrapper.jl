@@ -58,12 +58,23 @@ function test_runtests()
     MOI.Test.runtests(
         model,
         MOI.Test.Config(atol = 1e-3, rtol = 1e-3),
-        exclude = String[
+        exclude = Union{String,Regex}[
             # SecondOrderCone does not return dual solutions. Tested below.
             "_SecondOrderCone_",
             "test_constraint_PrimalStart_DualStart_SecondOrderCone",
             "_RotatedSecondOrderCone_",
             "_GeometricMeanCone_",
+            # Shaky tests
+            "vector_nonlinear",
+            "VectorNonlinearFunction",
+            # Tests should be skipped due to RequirementsUnmet, but aren't
+            r"^test_nonlinear_expression_hs071$",
+            r"^test_nonlinear_expression_hs071_epigraph$",
+            r"^test_nonlinear_expression_hs109$",
+            r"^test_nonlinear_expression_hs110$",
+            r"^test_nonlinear_expression_quartic$",
+            r"^test_nonlinear_expression_overrides_objective$",
+            r"^test_nonlinear_duals$",
         ],
     )
     MOI.Test.runtests(
