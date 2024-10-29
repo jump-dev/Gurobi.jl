@@ -988,7 +988,6 @@ function test_primal_feasible_status()
     return
 end
 
-<<<<<<< HEAD
 function test_nonlinear()
     if !Gurobi._supports_nonlinear()
         return
