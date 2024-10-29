@@ -4,3 +4,4 @@ ignore:
   - 'src/gen95'
   - 'src/gen100'
   - 'src/gen110'
+  - 'src/gen120'
