@@ -14,7 +14,7 @@ using Test
 const GRB_ENV = Gurobi.Env(output_flag = 0)
 
 @testset "MathOptInterface Tests" begin
-    for file in readdir("MOI")
+    for file in filter(endswith(".jl"), readdir("MOI"))
         include(joinpath("MOI", file))
     end
 end
