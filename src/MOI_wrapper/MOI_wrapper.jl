@@ -720,6 +720,25 @@ function MOI.get(model::Optimizer, ::MOI.TimeLimitSec)
     return limit == GRB_INFINITY ? nothing : limit
 end
 
+### SolutionLimit
+
+MOI.supports(::Optimizer, ::MOI.SolutionLimit) = true
+
+function MOI.set(
+    model::Optimizer,
+    ::MOI.SolutionLimit,
+    limit::Union{Integer,Nothing},
+)
+    int_limit = convert(Int64, something(limit, GRB_MAXINT))
+    MOI.set(model, MOI.RawOptimizerAttribute("SolutionLimit"), int_limit)
+    return
+end
+
+function MOI.get(model::Optimizer, ::MOI.SolutionLimit)
+    limit = MOI.get(model, MOI.RawOptimizerAttribute("SolutionLimit"))
+    return limit == GRB_MAXINT ? nothing : limit
+end
+
 MOI.supports_incremental_interface(::Optimizer) = true
 
 function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
