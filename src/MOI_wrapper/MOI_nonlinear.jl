@@ -4,26 +4,30 @@
 # Use of this source code is governed by an MIT-style license that can be found
 # in the LICENSE.md file or at https://opensource.org/licenses/MIT.
 
-const _OPCODE_MAP = Dict(
-    :+ => GRB_OPCODE_PLUS,
-    :- => GRB_OPCODE_MINUS,
-    :* => GRB_OPCODE_MULTIPLY,
-    :/ => GRB_OPCODE_DIVIDE,
-    # GRB_OPCODE_UMINUS        6
-    # GRB_OPCODE_SQUARE        7
-    :sqrt => GRB_OPCODE_SQRT,
-    :sin => GRB_OPCODE_SIN,
-    :cos => GRB_OPCODE_COS,
-    :tan => GRB_OPCODE_TAN,
-    :^ => GRB_OPCODE_POW,
-    :exp => GRB_OPCODE_EXP,
-    :log => GRB_OPCODE_LOG,
-    :log2 => GRB_OPCODE_LOG2,
-    :log10 => GRB_OPCODE_LOG10,
-    :logistic => GRB_OPCODE_LOGISTIC,
-)
-
 _supports_nonlinear() = _GUROBI_VERSION >= v"12.0.0"
+
+if _supports_nonlinear()
+    const _OPCODE_MAP = Dict(
+        :+ => GRB_OPCODE_PLUS,
+        :- => GRB_OPCODE_MINUS,
+        :* => GRB_OPCODE_MULTIPLY,
+        :/ => GRB_OPCODE_DIVIDE,
+        # GRB_OPCODE_UMINUS        6
+        # GRB_OPCODE_SQUARE        7
+        :sqrt => GRB_OPCODE_SQRT,
+        :sin => GRB_OPCODE_SIN,
+        :cos => GRB_OPCODE_COS,
+        :tan => GRB_OPCODE_TAN,
+        :^ => GRB_OPCODE_POW,
+        :exp => GRB_OPCODE_EXP,
+        :log => GRB_OPCODE_LOG,
+        :log2 => GRB_OPCODE_LOG2,
+        :log10 => GRB_OPCODE_LOG10,
+        :logistic => GRB_OPCODE_LOGISTIC,
+    )
+else
+    const _OPCODE_MAP = Dict()
+end
 
 function MOI.supports_constraint(
     ::Optimizer,
