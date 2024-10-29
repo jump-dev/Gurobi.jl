@@ -64,24 +64,24 @@ elseif _is_patch(_GUROBI_VERSION, v"12.0")
 else
     error(
         """
-  You have installed version $_GUROBI_VERSION of Gurobi, which is not
-  supported by Gurobi.jl. We require Gurobi version 9.0 or 9.1 or 9.5
-  or 10.0 or 11.0 or 12.0.
+        You have installed version $_GUROBI_VERSION of Gurobi, which is not
+        supported by Gurobi.jl. We require Gurobi version 9.0 or 9.1 or 9.5
+        or 10.0 or 11.0 or 12.0.
 
-  After installing a supported version of Gurobi, run:
+        After installing a supported version of Gurobi, run:
 
-      import Pkg
-      Pkg.rm("Gurobi")
-      Pkg.add("Gurobi")
+            import Pkg
+            Pkg.rm("Gurobi")
+            Pkg.add("Gurobi")
 
-  Make sure you set the environment variable `GUROBI_HOME` following
-  the instructions in the Gurobi.jl README, which is available at
-  https://github.com/jump-dev/Gurobi.jl.
+        Make sure you set the environment variable `GUROBI_HOME` following
+        the instructions in the Gurobi.jl README, which is available at
+        https://github.com/jump-dev/Gurobi.jl.
 
-  If you have a newer version of Gurobi installed, changes may need to be made
-  to the Julia code. Please open an issue at
-  https://github.com/jump-dev/Gurobi.jl.
-  """,
+        If you have a newer version of Gurobi installed, changes may need to be made
+        to the Julia code. Please open an issue at
+        https://github.com/jump-dev/Gurobi.jl.
+        """,
     )
 end
 
