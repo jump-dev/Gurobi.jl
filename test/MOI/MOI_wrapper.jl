@@ -1212,7 +1212,6 @@ function test_nonlinear_constraint_vector_delete()
 end
 
 function test_nonlinear_pow2()
-
     if !Gurobi._supports_nonlinear()
         return
     end
@@ -1237,11 +1236,9 @@ function test_nonlinear_pow2()
     c = MOI.add_constraint(model, g, MOI.LessThan(1.0))
     MOI.optimize!(model)
     @test ≈(MOI.get(model, MOI.ObjectiveValue()), 2 / sqrt(2); atol = 1e-3)
-
 end
 
 function test_nonlinear_scalarquadraticfunction()
-
     if !Gurobi._supports_nonlinear()
         return
     end
@@ -1266,7 +1263,6 @@ function test_nonlinear_scalarquadraticfunction()
     c = MOI.add_constraint(model, g, MOI.LessThan(1.0))
     MOI.optimize!(model)
     @test ≈(MOI.get(model, MOI.ObjectiveValue()), 2 / sqrt(2); atol = 1e-3)
-
 end
 
 function test_ModelName_too_long()

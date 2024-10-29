@@ -202,7 +202,13 @@ function _process_nonlinear(
         elseif typeof(s) == Float64
             _add_expression_tree_constant(opcode, data, parent, s, parent_index)
         elseif typeof(s) == Int64
-            _add_expression_tree_constant(opcode, data, parent, convert(Float64, s), parent_index)
+            _add_expression_tree_constant(
+                opcode,
+                data,
+                parent,
+                convert(Float64, s),
+                parent_index,
+            )
         else
             throw(MOI.UnsupportedAttribute(s))
         end
