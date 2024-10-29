@@ -37,7 +37,7 @@ Free Gurobi licenses are available for [academics and students](https://www.guro
 
 ## Installation
 
-To use Gurobi, you need a license, which you can obtain from from [gurobi.com](https://www.gurobi.com).
+To use Gurobi, you need a license, which you can obtain from [gurobi.com](https://www.gurobi.com).
 
 Once you have a license, follow Gurobi's instructions to
 [retrieve and set up a Gurobi license](https://support.gurobi.com/hc/en-us/articles/12872879801105-How-do-I-retrieve-and-set-up-a-Gurobi-license).

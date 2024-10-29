@@ -736,6 +736,25 @@ function MOI.get(model::Optimizer, ::MOI.TimeLimitSec)
     return limit == GRB_INFINITY ? nothing : limit
 end
 
+### SolutionLimit
+
+MOI.supports(::Optimizer, ::MOI.SolutionLimit) = true
+
+function MOI.set(
+    model::Optimizer,
+    ::MOI.SolutionLimit,
+    limit::Union{Integer,Nothing},
+)
+    int_limit = convert(Int64, something(limit, GRB_MAXINT))
+    MOI.set(model, MOI.RawOptimizerAttribute("SolutionLimit"), int_limit)
+    return
+end
+
+function MOI.get(model::Optimizer, ::MOI.SolutionLimit)
+    limit = MOI.get(model, MOI.RawOptimizerAttribute("SolutionLimit"))
+    return limit == GRB_MAXINT ? nothing : limit
+end
+
 MOI.supports_incremental_interface(::Optimizer) = true
 
 function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
@@ -1117,9 +1136,13 @@ function MOI.set(
 )
     info = _info(model, v)
     info.name = name
-    ret = GRBsetstrattrelement(model, "VarName", Cint(info.column) - 1, name)
-    _check_ret(model, ret)
-    _require_update(model, attribute_change = true)
+    if length(name) <= GRB_MAX_NAMELEN
+        # Gurobi has a maximum name limit of GRB_MAX_NAMELEN characters.
+        col = c_column(model, v)
+        ret = GRBsetstrattrelement(model, "VarName", col, name)
+        _check_ret(model, ret)
+        _require_update(model, attribute_change = true)
+    end
     model.name_to_variable = nothing
     return
 end
@@ -2272,9 +2295,10 @@ function MOI.set(
 )
     info = _info(model, c)
     info.name = name
-    if !isempty(name)
-        ret =
-            GRBsetstrattrelement(model, "ConstrName", Cint(info.row - 1), name)
+    if length(name) <= GRB_MAX_NAMELEN
+        # Gurobi has a maximum name limit of GRB_MAX_NAMELEN characters.
+        row = Cint(info.row - 1)
+        ret = GRBsetstrattrelement(model, "ConstrName", row, name)
         _check_ret(model, ret)
         _require_update(model, attribute_change = true)
     end
@@ -3261,7 +3285,7 @@ function MOI.get(model::Optimizer, attr::MOI.SolveTimeSec)
     return valueP[]
 end
 
-function MOI.get(model::Optimizer, attr::MOI.SimplexIterations)
+function MOI.get(model::Optimizer, attr::MOI.SimplexIterations)::Int64
     _throw_if_optimize_in_progress(model, attr)
     valueP = Ref{Cdouble}()
     ret = GRBgetdblattr(model, "IterCount", valueP)
@@ -3269,20 +3293,20 @@ function MOI.get(model::Optimizer, attr::MOI.SimplexIterations)
     return valueP[]
 end
 
-function MOI.get(model::Optimizer, attr::MOI.BarrierIterations)
+function MOI.get(model::Optimizer, attr::MOI.BarrierIterations)::Int64
     _throw_if_optimize_in_progress(model, attr)
     valueP = Ref{Cint}()
     ret = GRBgetintattr(model, "BarIterCount", valueP)
     _check_ret(model, ret)
-    return Int(valueP[])
+    return valueP[]
 end
 
-function MOI.get(model::Optimizer, attr::MOI.NodeCount)
+function MOI.get(model::Optimizer, attr::MOI.NodeCount)::Int64
     _throw_if_optimize_in_progress(model, attr)
     valueP = Ref{Cdouble}()
     ret = GRBgetdblattr(model, "NodeCount", valueP)
     _check_ret(model, ret)
-    return round(Int64, valueP[])
+    return valueP[]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.RelativeGap)
@@ -3305,7 +3329,7 @@ function MOI.get(model::Optimizer, attr::MOI.DualObjectiveValue)
     return valueP[]
 end
 
-function MOI.get(model::Optimizer, attr::MOI.ResultCount)
+function MOI.get(model::Optimizer, attr::MOI.ResultCount)::Int
     _throw_if_optimize_in_progress(model, attr)
     if model.has_infeasibility_cert || model.has_unbounded_ray
         return 1
@@ -3313,7 +3337,7 @@ function MOI.get(model::Optimizer, attr::MOI.ResultCount)
     valueP = Ref{Cint}()
     ret = GRBgetintattr(model, "SolCount", valueP)
     _check_ret(model, ret)
-    return Int(valueP[])
+    return valueP[]
 end
 
 function MOI.get(model::Optimizer, ::MOI.Silent)
@@ -3369,8 +3393,12 @@ function MOI.get(model::Optimizer, ::MOI.Name)
     return unsafe_string(valueP[])
 end
 
-function MOI.set(model::Optimizer, ::MOI.Name, name::String)
+function MOI.set(model::Optimizer, attr::MOI.Name, name::String)
     ret = GRBsetstrattr(model, "ModelName", name)
+    if ret == GRB_ERROR_INVALID_ARGUMENT
+        msg = "Name too long (maximum name length is $GRB_MAX_NAMELEN characters)"
+        throw(MOI.SetAttributeNotAllowed(attr, msg))
+    end
     _check_ret(model, ret)
     _require_update(model, attribute_change = true)
     return
@@ -4484,21 +4512,13 @@ function MOI.set(
     name::String,
 )
     info = _info(model, c)
-    if !isempty(info.name) && model.name_to_constraint_index !== nothing
-        delete!(model.name_to_constraint_index, info.name)
-    end
-    _update_if_necessary(model)
-    ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
-    _check_ret(model, ret)
-    _require_update(model, attribute_change = true)
     info.name = name
-    if model.name_to_constraint_index === nothing || isempty(name)
-        return
+    _update_if_necessary(model)
+    if length(name) <= GRB_MAX_NAMELEN
+        ret = GRBsetstrattrelement(model, "QCName", Cint(info.row - 1), name)
+        _check_ret(model, ret)
+        _require_update(model; attribute_change = true)
     end
-    if haskey(model.name_to_constraint_index, name)
-        model.name_to_constraint_index = nothing
-    else
-        model.name_to_constraint_index[c] = name
-    end
+    model.name_to_constraint_index = nothing
     return
 end
