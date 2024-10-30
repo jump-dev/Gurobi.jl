@@ -75,7 +75,7 @@ function _add_expression_tree_variable(
     current_index::Cint,
     parent_index::Cint,
 )
-    if coeff > 1.0
+    if !isone(coeff)
         append!(opcode, GRB_OPCODE_MULTIPLY)
         append!(data, -1.0)
         append!(parent, parent_index)
@@ -101,7 +101,9 @@ function _add_expression_tree_variable(
 end
 
 # Check if a nonlinear is actually just a constant
-function _check_nonlinear_constant(expr)
+_check_nonlinear_constant(::Any) = false
+
+function _check_nonlinear_constant(expr::MOI.ScalarNonlinearFunction)
     return (
         expr.head in (:+, :-) &&
         length(expr.args) == 1 &&
