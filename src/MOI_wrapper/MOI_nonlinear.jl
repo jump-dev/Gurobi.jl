@@ -45,8 +45,8 @@ end
 
 function _info(
     model::Optimizer,
-    c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S},
-) where {S}
+    c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction},
+)
     if haskey(model.nl_constraint_info, c.value)
         return model.nl_constraint_info[c.value]
     end
@@ -62,7 +62,8 @@ function _add_expression_tree_constant(
 )
     append!(opcode, GRB_OPCODE_CONSTANT)
     append!(data, coeff)
-    return append!(parent, index)
+    append!(parent, index)
+    return
 end
 
 function _add_expression_tree_variable(
@@ -78,7 +79,6 @@ function _add_expression_tree_variable(
         append!(opcode, GRB_OPCODE_MULTIPLY)
         append!(data, -1.0)
         append!(parent, parent_index)
-
         _add_expression_tree_constant(
             opcode,
             data,
@@ -86,7 +86,6 @@ function _add_expression_tree_variable(
             coeff,
             current_index,
         )
-
         append!(opcode, GRB_OPCODE_VARIABLE)
         append!(data, var_index)
         append!(parent, current_index)
@@ -104,10 +103,9 @@ end
 # Check if a nonlinear is actually just a constant
 function _check_nonlinear_constant(expr)
     return (
-        typeof(expr) == MOI.ScalarNonlinearFunction &&
-        expr.head in [:+, :-] &&
+        expr.head in (:+, :-) &&
         length(expr.args) == 1 &&
-        typeof(expr.args[1]) == Float64
+        expr.args[1] isa Float64
     )
 end
 
@@ -116,17 +114,19 @@ end
 #   1. constant * var
 #   2. +/- var
 #   3. +/- constant * var
-function _check_nonlinear_singlevar(expr)
-    return typeof(expr) == MOI.ScalarNonlinearFunction && (
+_check_nonlinear_singlevar(::Any) = false
+
+function _check_nonlinear_singlevar(expr::MOI.ScalarNonlinearFunction)
+    return (
         ( # Case 1.
             expr.head == :* &&
             length(expr.args) == 2 &&
-            typeof(expr.args[2]) == MOI.VariableIndex
+            expr.args[2] isa MOI.VariableIndex
         ) || ( # Cases 2. and 3.
-            expr.head in [:+, :-] &&
+            expr.head in (:+, :-) &&
             length(expr.args) == 1 &&
             (
-                typeof(expr.args[1]) == MOI.VariableIndex ||
+                expr.args[1] isa MOI.VariableIndex ||
                 _check_nonlinear_singlevar(expr.args[1])
             )
         )
@@ -140,15 +140,12 @@ function _process_nonlinear(
     data::Vector{Cdouble},
     parent::Vector{Cint},
 )
-    # TODO: use type hints here instead of Any
     stack = Vector{Tuple{Any,Cint}}([(f, Cint(-1))])
     current_index = Cint(-1)
-
-    while length(stack) != 0
+    while !isempty(stack)
         current_index += Cint(1)
         s, parent_index = pop!(stack)
-
-        if typeof(s) == MOI.ScalarNonlinearFunction
+        if s isa MOI.ScalarNonlinearFunction
             ret = get(_OPCODE_MAP, s.head, nothing)
             if ret === nothing
                 throw(MOI.UnsupportedNonlinearOperator(s.head))
@@ -162,11 +159,10 @@ function _process_nonlinear(
                 append!(data, -1.0)
                 append!(parent, parent_index)
             end
-
             for expr in reverse(s.args)
                 push!(stack, (expr, current_index))
             end
-        elseif typeof(s) == MOI.VariableIndex
+        elseif s isa MOI.VariableIndex
             _add_expression_tree_variable(
                 opcode,
                 data,
@@ -176,14 +172,14 @@ function _process_nonlinear(
                 current_index,
                 parent_index,
             )
-        elseif typeof(s) == MOI.ScalarAffineFunction{Float64}
+        elseif s isa MOI.ScalarAffineFunction{Float64}
             if length(s.terms) > 1
                 append!(opcode, GRB_OPCODE_PLUS)
                 append!(data, -1.0)
                 append!(parent, parent_index)
                 parent_index += Cint(1)
             end
-            if s.constant != 0.0
+            if !iszero(s.constant)
                 append!(opcode, GRB_OPCODE_CONSTANT)
                 append!(data, s.constant)
                 append!(parent, parent_index)
@@ -203,9 +199,9 @@ function _process_nonlinear(
                 )
                 current_index += Cint(1)
             end
-        elseif typeof(s) == Float64
+        elseif s isa Float64
             _add_expression_tree_constant(opcode, data, parent, s, parent_index)
-        elseif typeof(s) == Int64
+        elseif s isa Int
             _add_expression_tree_constant(
                 opcode,
                 data,
@@ -217,7 +213,6 @@ function _process_nonlinear(
             throw(MOI.UnsupportedAttribute(s))
         end
     end
-
     return
 end
 
@@ -226,18 +221,14 @@ function MOI.add_constraint(
     f::MOI.ScalarNonlinearFunction,
     s::_SCALAR_SETS,
 )
-    opcode = Vector{Cint}()
-    data = Vector{Cdouble}()
-    parent = Vector{Cint}()
-
+    opcode = Cint[]
+    data = Cdouble[]
+    parent = Cint[]
     sense, rhs = _sense_and_rhs(s)
-
     _process_nonlinear(model, f, opcode, data, parent)
-
     # Add resultant variable
     vi, ci = MOI.add_constrained_variable(model, s)
     resvar_index = c_column(model, vi)
-
     ret = GRBaddgenconstrNL(
         model,
         C_NULL,
@@ -248,7 +239,6 @@ function MOI.add_constraint(
         parent,
     )
     _check_ret(model, ret)
-    # GRBwrite(model, "checkjl.lp")
     _require_update(model, model_change = true)
     model.last_constraint_index += 1
     model.nl_constraint_info[model.last_constraint_index] =
@@ -263,7 +253,7 @@ function MOI.is_valid(
     c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S},
 ) where {S}
     info = get(model.nl_constraint_info, c.value, nothing)
-    return info !== nothing && typeof(info.set) == S
+    return info !== nothing && info.set isa S
 end
 
 function MOI.delete(
@@ -272,8 +262,7 @@ function MOI.delete(
 ) where {S}
     info = _info(model, c)
     _update_if_necessary(model)
-
-    ret = GRBdelgenconstrs(model, 1, [Cint(info.row - 1)])
+    ret = GRBdelgenconstrs(model, 1, Ref(Cint(info.row - 1)))
     _check_ret(model, ret)
     for (_, info_2) in model.nl_constraint_info
         if info_2.row > info.row
@@ -290,29 +279,23 @@ end
 
 function MOI.delete(
     model::Optimizer,
-    cs::Vector{<:MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S}},
-) where {S}
+    cs::Vector{<:MOI.ConstraintIndex{MOI.ScalarNonlinearFunction}},
+)
     rows_to_delete = sort!([Cint(_info(model, c).row - 1) for c in cs])
-    println(rows_to_delete)
     _update_if_necessary(model)
     ret = GRBdelgenconstrs(model, length(rows_to_delete), rows_to_delete)
     _check_ret(model, ret)
-
     for (_, info) in model.nl_constraint_info
         info.row -= searchsortedlast(rows_to_delete, info.row - 1)
     end
-
     model.name_to_constraint_index = nothing
-
     # Delete resultant variables
     resvars = [_info(model, c).resvar for c in cs]
     MOI.delete(model, resvars)
-
     cs_values = sort!(getfield.(cs, :value))
     filter!(model.nl_constraint_info) do pair
         return isempty(searchsorted(cs_values, pair.first))
     end
-
     _require_update(model, model_change = true)
     return
 end
@@ -320,21 +303,21 @@ end
 function MOI.get(
     model::Optimizer,
     ::MOI.ConstraintName,
-    c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S},
-) where {S}
+    c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction},
+)
     return _info(model, c).name
 end
 
 function MOI.set(
     model::Optimizer,
     ::MOI.ConstraintName,
-    c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S},
+    c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction},
     name::String,
-) where {S}
+)
     _update_if_necessary(model, force = true)
     info = _info(model, c)
     info.name = name
-    if !isempty(name)
+    if length(name) <= GRB_MAX_NAMELEN
         ret = GRBsetstrattrelement(
             model,
             "GenConstrName",
