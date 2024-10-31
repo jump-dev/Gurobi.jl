@@ -992,9 +992,7 @@ function test_nonlinear()
     if !Gurobi._supports_nonlinear()
         return
     end
-
     model = Gurobi.Optimizer(GRB_ENV)
-
     @test MOI.supports_constraint(
         model,
         MOI.ScalarNonlinearFunction,
@@ -1010,6 +1008,7 @@ function test_nonlinear()
         MOI.ScalarNonlinearFunction,
         MOI.EqualTo{Float64},
     )
+    return
 end
 
 function test_nonlinear_constraint_sin()
@@ -1017,32 +1016,25 @@ function test_nonlinear_constraint_sin()
         return
     end
     model = Gurobi.Optimizer(GRB_ENV)
-
     MOI.set(model, MOI.Silent(), true)
-
     x1 = MOI.add_variable(model)
     x2 = MOI.add_variable(model)
-
     g = MOI.ScalarNonlinearFunction(
         :+,
         Any[MOI.ScalarNonlinearFunction(:sin, Any[2.5*x1]), 1.0*x2],
     )
-
     MOI.add_constraint(model, x1, MOI.GreaterThan(-1.0))
     MOI.add_constraint(model, x1, MOI.LessThan(1.0))
     MOI.add_constraint(model, x2, MOI.GreaterThan(-1.0))
     MOI.add_constraint(model, x2, MOI.LessThan(1.0))
-
     c = MOI.add_constraint(model, g, MOI.EqualTo(0.0))
-
     MOI.optimize!(model)
-
     x1_val = MOI.get(model, MOI.VariablePrimal(), x1)
     x2_val = MOI.get(model, MOI.VariablePrimal(), x2)
-
     @test ≈(sin(2.5 * x1_val) + x2_val, 0.0; atol = 1e-6)
     @test MOI.get(model, MOI.RawStatusString()) ==
           "Model was solved to optimality (subject to tolerances), and an optimal solution is available."
+    return
 end
 
 function test_nonlinear_constraint_log()
@@ -1050,12 +1042,9 @@ function test_nonlinear_constraint_log()
         return
     end
     model = Gurobi.Optimizer(GRB_ENV)
-
     MOI.set(model, MOI.Silent(), true)
-
     x = MOI.add_variable(model)
     t = MOI.add_variable(model)
-
     MOI.add_constraint(model, x, MOI.LessThan(2.0))
     MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
     f = 1.0 * t
@@ -1101,14 +1090,12 @@ function test_nonlinear_constraint_uminus()
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variable(model)
-
     MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
     f = 1.0 * x
     MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
     g = MOI.ScalarNonlinearFunction(:-, Any[x])
     MOI.add_constraint(model, g, MOI.GreaterThan(-2.0))
     MOI.optimize!(model)
-
     @test MOI.get(model, MOI.RawStatusString()) ==
           "Model was solved to optimality (subject to tolerances), and an optimal solution is available."
     @test ≈(MOI.get(model, MOI.VariablePrimal(), x), 2.0; atol = 1e-3)
@@ -1126,19 +1113,15 @@ function test_nonlinear_constraint_scalar_affine_function()
     x2 = MOI.add_variable(model)
     x3 = MOI.add_variable(model)
     x4 = MOI.add_variable(model)
-
     MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
     MOI.add_constraint(model, x2, MOI.GreaterThan(0.0))
     MOI.add_constraint(model, x3, MOI.GreaterThan(0.0))
     MOI.add_constraint(model, x4, MOI.GreaterThan(0.0))
-
     f = 1.0 * x1 + 2.0 * x2 + 3.0 * x3
     MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
     MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
-
     g = MOI.ScalarNonlinearFunction(:+, Any[1.0*x1+2.0*x2+3.0*x3+4.0*x4])
     MOI.add_constraint(model, g, MOI.LessThan(6.0))
-
     MOI.optimize!(model)
     @test MOI.get(model, MOI.RawStatusString()) ==
           "Model was solved to optimality (subject to tolerances), and an optimal solution is available."
@@ -1152,11 +1135,9 @@ function test_nonlinear_get_constraint_by_name()
     end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
-
     x = MOI.add_variable(model)
     g = MOI.ScalarNonlinearFunction(:*, Any[x, 2.0, x])
     c = MOI.add_constraint(model, g, MOI.LessThan(3.0))
-
     MOI.set(model, MOI.ConstraintName(), c, "c")
     d = MOI.get(model, MOI.ConstraintIndex, "c")
     @test d == c
@@ -1169,7 +1150,6 @@ function test_nonlinear_constraint_delete()
     end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
-
     x = MOI.add_variable(model)
     MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
     f = 1.0 * x
@@ -1193,7 +1173,6 @@ function test_nonlinear_constraint_vector_delete()
     end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
-
     x = MOI.add_variable(model)
     MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
     f = 1.0 * x
@@ -1217,17 +1196,15 @@ function test_nonlinear_pow2()
     end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
-
     # max x + y
-    # s.t x^2 + y^2 <= 1  # Use NL POW(2) operator
+    # s.t sqrt(^(x, 2) + ^(y, 2)) <= 1  # Use NL POW(2) operator
     # x, y >= 0
     #
     # -> x = y = 1/sqrt(2)
-
     x = MOI.add_variable(model)
     y = MOI.add_variable(model)
     MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
-    f = one(Float64) * x + one(Float64) * y
+    f = 1.0 * x + 1.0 * y
     MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
     f1 = MOI.ScalarNonlinearFunction(:^, Any[x, 2])
     f2 = MOI.ScalarNonlinearFunction(:^, Any[y, 2])
@@ -1236,6 +1213,7 @@ function test_nonlinear_pow2()
     c = MOI.add_constraint(model, g, MOI.LessThan(1.0))
     MOI.optimize!(model)
     @test ≈(MOI.get(model, MOI.ObjectiveValue()), 2 / sqrt(2); atol = 1e-3)
+    return
 end
 
 function test_nonlinear_scalarquadraticfunction()
@@ -1244,25 +1222,24 @@ function test_nonlinear_scalarquadraticfunction()
     end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
-
     # max x + y
-    # s.t x^2 + y^2 <= 1  # Use ScalarQuadraticFunction
+    # s.t sqrt(*(x, x) + *(y, y)) <= 1
     # x, y >= 0
     #
     # -> x = y = 1/sqrt(2)
-
     x = MOI.add_variable(model)
     y = MOI.add_variable(model)
     MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
-    f = one(Float64) * x + one(Float64) * y
+    f = 1.0 * x + 1.0 * y
     MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
-    f1 = MOI.ScalarNonlinearFunction(:*, Any[x, y])
+    f1 = MOI.ScalarNonlinearFunction(:*, Any[x, x])
     f2 = MOI.ScalarNonlinearFunction(:*, Any[y, y])
     f3 = MOI.ScalarNonlinearFunction(:+, Any[f1, f2])
     g = MOI.ScalarNonlinearFunction(:sqrt, Any[f3])
     c = MOI.add_constraint(model, g, MOI.LessThan(1.0))
     MOI.optimize!(model)
     @test ≈(MOI.get(model, MOI.ObjectiveValue()), 2 / sqrt(2); atol = 1e-3)
+    return
 end
 
 function test_ModelName_too_long()
