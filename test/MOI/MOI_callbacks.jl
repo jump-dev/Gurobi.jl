@@ -472,9 +472,9 @@ function test_CallbackFunction_callback_LazyConstraint()
     @test Gurobi.GRB_CB_MIPSOL in cb_calls
     attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
     @test Gurobi.CallbackFunction() in attrs
-    MOI.set(model, MOI.CallbackFunction(), nothing)
+    MOI.set(model, Gurobi.CallbackFunction(), nothing)
     attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
-    @test !(MOI.CallbackFunction() in attrs)
+    @test !(Gurobi.CallbackFunction() in attrs)
     return
 end
 
