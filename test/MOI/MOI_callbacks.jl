@@ -124,6 +124,9 @@ function test_lazy_constraint_callback()
     @test MOI.get(model, MOI.VariablePrimal(), y) == 2
     attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
     @test MOI.LazyConstraintCallback() in attrs
+    MOI.set(model, MOI.LazyConstraintCallback(), nothing)
+    attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
+    @test !(MOI.LazyConstraintCallback() in attrs)
     return
 end
 
@@ -254,6 +257,9 @@ function test_user_cut_callback()
     @test user_cut_submitted
     attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
     @test MOI.UserCutCallback() in attrs
+    MOI.set(model, MOI.UserCutCallback(), nothing)
+    attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
+    @test !(MOI.UserCutCallback() in attrs)
     return
 end
 
@@ -343,6 +349,9 @@ function test_heuristic_callback()
     @test solution_rejected
     attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
     @test MOI.HeuristicCallback() in attrs
+    MOI.set(model, MOI.HeuristicCallback(), nothing)
+    attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
+    @test !(MOI.HeuristicCallback() in attrs)
     return
 end
 
@@ -463,6 +472,9 @@ function test_CallbackFunction_callback_LazyConstraint()
     @test Gurobi.GRB_CB_MIPSOL in cb_calls
     attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
     @test Gurobi.CallbackFunction() in attrs
+    MOI.set(model, MOI.CallbackFunction(), nothing)
+    attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
+    @test !(MOI.CallbackFunction() in attrs)
     return
 end
 
