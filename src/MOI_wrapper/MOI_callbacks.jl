@@ -87,7 +87,16 @@ function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
     _update_if_necessary(model)
     return
 end
+
 MOI.supports(::Optimizer, ::CallbackFunction) = true
+
+function MOI.set(model::Optimizer, ::CallbackFunction, ::Nothing)
+    ret = GRBsetcallbackfunc(model, C_NULL, C_NULL)
+    _check_ret(model, ret)
+    model.generic_callback = nothing
+    model.has_generic_callback = false
+    return
+end
 
 """
     load_callback_variable_primal(cb_data, cb_where)
@@ -187,7 +196,13 @@ function MOI.set(model::Optimizer, ::MOI.LazyConstraintCallback, cb::Function)
     model.lazy_callback = cb
     return
 end
+
 MOI.supports(::Optimizer, ::MOI.LazyConstraintCallback) = true
+
+function MOI.set(model::Optimizer, ::MOI.LazyConstraintCallback, ::Nothing)
+    model.lazy_callback = nothing
+    return
+end
 
 function MOI.submit(
     model::Optimizer,
@@ -223,6 +238,7 @@ function MOI.submit(
     _check_ret(model, ret)
     return
 end
+
 MOI.supports(::Optimizer, ::MOI.LazyConstraint{CallbackData}) = true
 
 # ==============================================================================
@@ -233,7 +249,13 @@ function MOI.set(model::Optimizer, ::MOI.UserCutCallback, cb::Function)
     model.user_cut_callback = cb
     return
 end
+
 MOI.supports(::Optimizer, ::MOI.UserCutCallback) = true
+
+function MOI.set(model::Optimizer, ::MOI.UserCutCallback, ::Nothing)
+    model.user_cut_callback = nothing
+    return
+end
 
 function MOI.submit(
     model::Optimizer,
@@ -269,6 +291,7 @@ function MOI.submit(
     _check_ret(model, ret)
     return
 end
+
 MOI.supports(::Optimizer, ::MOI.UserCut{CallbackData}) = true
 
 # ==============================================================================
@@ -279,7 +302,13 @@ function MOI.set(model::Optimizer, ::MOI.HeuristicCallback, cb::Function)
     model.heuristic_callback = cb
     return
 end
+
 MOI.supports(::Optimizer, ::MOI.HeuristicCallback) = true
+
+function MOI.set(model::Optimizer, ::MOI.HeuristicCallback, ::Nothing)
+    model.heuristic_callback = nothing
+    return
+end
 
 function MOI.submit(
     model::Optimizer,
@@ -310,4 +339,5 @@ function MOI.submit(
     # later in the optimization process.
     return MOI.HEURISTIC_SOLUTION_UNKNOWN
 end
+
 MOI.supports(::Optimizer, ::MOI.HeuristicSolution{CallbackData}) = true
