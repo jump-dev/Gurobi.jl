@@ -779,6 +779,18 @@ function MOI.get(model::Optimizer, ::MOI.ListOfModelAttributesSet)
     if MOI.get(model, MOI.Name()) != ""
         push!(attributes, MOI.Name())
     end
+    if model.has_generic_callback
+        push!(attributes, CallbackFunction())
+    end
+    if model.lazy_callback !== nothing
+        push!(attributes, MOI.LazyConstraintCallback())
+    end
+    if model.user_cut_callback !== nothing
+        push!(attributes, MOI.UserCutCallback())
+    end
+    if model.heuristic_callback !== nothing
+        push!(attributes, MOI.HeuristicCallback())
+    end
     return attributes
 end
 
@@ -2702,10 +2714,10 @@ end
 function MOI.optimize!(model::Optimizer)
     _update_if_necessary(model, force = true)
     # Initialize callbacks if necessary.
-    has_null_callback = false
+    set_temporary_callback = false
     if _check_moi_callback_validity(model)
         MOI.set(model, CallbackFunction(), _default_moi_callback(model))
-        model.has_generic_callback = false
+        set_temporary_callback = true
     elseif model.enable_interrupts && !model.has_generic_callback
         # From the docstring of disable_sigint, "External functions that do not
         # call julia code or julia runtime automatically disable sigint during
@@ -2715,7 +2727,7 @@ function MOI.optimize!(model::Optimizer)
         # https://github.com/JuliaLang/julia/issues/2622 --- set a null
         # callback.
         MOI.set(model, CallbackFunction(), (x, y) -> nothing)
-        has_null_callback = true
+        set_temporary_callback = true
     end
 
     # Catch [CTRL+C], even when Julia is run from a script not in interactive
@@ -2737,10 +2749,10 @@ function MOI.optimize!(model::Optimizer)
     model.has_unbounded_ray =
         MOI.get(model, MOI.PrimalStatus()) == MOI.INFEASIBILITY_CERTIFICATE
 
-    if has_null_callback
+    if set_temporary_callback
         # See https://github.com/jump-dev/Gurobi.jl/issues/395 - avoid error
         # from _check_moi_callback_validity upon next optimize! call.
-        model.has_generic_callback = false
+        MOI.set(model, CallbackFunction(), nothing)
     end
     return
 end
