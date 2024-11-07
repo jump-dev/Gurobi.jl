@@ -9,7 +9,7 @@ Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 
 [compat]
-Gurobi_jll = "~9.5, ~10.0, ~11.0"
+Gurobi_jll = "~9.5, ~10.0, ~11.0, ~12.0"
 Libdl = "<0.0.1, 1.6"
 MathOptInterface = "1.21"
 Random = "<0.0.1, 1.6"
