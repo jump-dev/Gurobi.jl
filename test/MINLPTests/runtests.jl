@@ -6,7 +6,7 @@
 
 using Gurobi
 using MINLPTests
-using Tests
+using Test
 
 @testset "MINLPTests" begin
     MINLPTests.test_nlp_cvx_expr(
