@@ -100,41 +100,6 @@ function _add_expression_tree_variable(
     end
 end
 
-# Check if a nonlinear is actually just a constant
-_check_nonlinear_constant(::Any) = false
-
-function _check_nonlinear_constant(expr::MOI.ScalarNonlinearFunction)
-    return (
-        expr.head in (:+, :-) &&
-        length(expr.args) == 1 &&
-        expr.args[1] isa Float64
-    )
-end
-
-# Check if a nonlinear is actually just an affine expression
-# Cases:
-#   1. constant * var
-#   2. +/- var
-#   3. +/- constant * var
-_check_nonlinear_singlevar(::Any) = false
-
-function _check_nonlinear_singlevar(expr::MOI.ScalarNonlinearFunction)
-    return (
-        ( # Case 1.
-            expr.head == :* &&
-            length(expr.args) == 2 &&
-            expr.args[2] isa MOI.VariableIndex
-        ) || ( # Cases 2. and 3.
-            expr.head in (:+, :-) &&
-            length(expr.args) == 1 &&
-            (
-                expr.args[1] isa MOI.VariableIndex ||
-                _check_nonlinear_singlevar(expr.args[1])
-            )
-        )
-    )
-end
-
 function _process_nonlinear(
     model::Optimizer,
     f,
@@ -155,8 +120,7 @@ function _process_nonlinear(
                 append!(opcode, GRB_OPCODE_UMINUS)
                 append!(data, -1.0)
                 append!(parent, parent_index)
-            elseif !_check_nonlinear_singlevar(s) &&
-                   !_check_nonlinear_constant(s)
+            else
                 append!(opcode, ret)
                 append!(data, -1.0)
                 append!(parent, parent_index)
