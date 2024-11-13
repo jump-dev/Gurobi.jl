@@ -1,0 +1,44 @@
+name: MINLPTests
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['1']
+        os: [ubuntu-latest]
+        arch: ['x64']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+      - uses: julia-actions/cache@v1
+      - shell: julia --project=. --color=yes {0}
+        run: |
+          import Pkg
+          Pkg.add(; name = "Gurobi_jll", version = "12.0.0")
+        env:
+          GUROBI_JL_SKIP_LIB_CHECK: "true"
+          GUROBI_JLL_VERSION: ${{ matrix.jll_version }}
+      - uses: julia-actions/julia-buildpkg@v1
+        env:
+          WLSLICENSE: ${{ secrets.WLSLICENSE }}
+      - uses: julia-actions/julia-buildpkg@v1
+      - name:
+        shell: julia --color=yes {0}
+        run: |
+          path = joinpath(ENV["GITHUB_WORKSPACE"], "test", "MINLPTests")
+          cd(path)
+          using Pkg
+          Pkg.activate(".")
+          Pkg.instantiate()
+          Pkg.add(PackageSpec(path=ENV["GITHUB_WORKSPACE"]))
+          include(joinpath(path, "runtests.jl"))
