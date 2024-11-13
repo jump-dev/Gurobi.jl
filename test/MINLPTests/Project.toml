@@ -1,0 +1,5 @@
+[deps]
+MINLPTests = "ee0a3090-8ee9-5cdb-b8cb-8eeba3165522"
+
+[compat]
+MINLPTests = "0.6.1"
