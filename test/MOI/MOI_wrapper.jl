@@ -1216,7 +1216,8 @@ function test_nonlinear_pow2()
     return
 end
 
-function test_nonlinear_scalarquadraticfunction()
+function test_nonlinear_quadratic_1()
+    # Present products as ScalarNonlinearFunctions
     if !Gurobi._supports_nonlinear()
         return
     end
@@ -1234,6 +1235,87 @@ function test_nonlinear_scalarquadraticfunction()
     MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
     f1 = MOI.ScalarNonlinearFunction(:*, Any[x, x])
     f2 = MOI.ScalarNonlinearFunction(:*, Any[y, y])
+    f3 = MOI.ScalarNonlinearFunction(:+, Any[f1, f2])
+    g = MOI.ScalarNonlinearFunction(:sqrt, Any[f3])
+    c = MOI.add_constraint(model, g, MOI.LessThan(1.0))
+    MOI.optimize!(model)
+    @test ≈(MOI.get(model, MOI.ObjectiveValue()), 2 / sqrt(2); atol = 1e-3)
+    return
+end
+
+function test_nonlinear_quadratic_2()
+    # Present products as ScalarAffineTerms nested in ScalarNonlinearFunctions
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    # max x + y
+    # s.t sqrt(*(x, x) + *(y, y)) <= 1
+    # x, y >= 0
+    #
+    # -> x = y = 1/sqrt(2)
+    x = MOI.add_variable(model)
+    y = MOI.add_variable(model)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * x + 1.0 * y
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    f1 = MOI.ScalarNonlinearFunction(:*, Any[1.0*x, x])
+    f2 = MOI.ScalarNonlinearFunction(:*, Any[1.0*y, y])
+    f3 = MOI.ScalarNonlinearFunction(:+, Any[f1, f2])
+    g = MOI.ScalarNonlinearFunction(:sqrt, Any[f3])
+    c = MOI.add_constraint(model, g, MOI.LessThan(1.0))
+    MOI.optimize!(model)
+    @test ≈(MOI.get(model, MOI.ObjectiveValue()), 2 / sqrt(2); atol = 1e-3)
+    return
+end
+
+function test_nonlinear_quadratic_3()
+    # Present products as ScalarQuadraticTerms
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    # max x + y
+    # s.t sqrt(*(x, x) + *(y, y)) <= 1
+    # x, y >= 0
+    #
+    # -> x = y = 1/sqrt(2)
+    x = MOI.add_variable(model)
+    y = MOI.add_variable(model)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * x + 1.0 * y
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    f1 = MOI.ScalarQuadraticTerm{Float64}(1.0, x, x)
+    f2 = MOI.ScalarQuadraticTerm{Float64}(1.0, y, y)
+    f3 = MOI.ScalarNonlinearFunction(:+, Any[f1, f2])
+    g = MOI.ScalarNonlinearFunction(:sqrt, Any[f3])
+    c = MOI.add_constraint(model, g, MOI.LessThan(1.0))
+    MOI.optimize!(model)
+    @test ≈(MOI.get(model, MOI.ObjectiveValue()), 2 / sqrt(2); atol = 1e-3)
+    return
+end
+
+function test_nonlinear_quadratic_4()
+    # Present products as ScalarQuadraticFunctions (complete with 2x factor ...)
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    # max x + y
+    # s.t sqrt(*(x, x) + *(y, y)) <= 1
+    # x, y >= 0
+    #
+    # -> x = y = 1/sqrt(2)
+    x = MOI.add_variable(model)
+    y = MOI.add_variable(model)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * x + 1.0 * y
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    f1 = 1.0 * x * x
+    f2 = 1.0 * y * y
     f3 = MOI.ScalarNonlinearFunction(:+, Any[f1, f2])
     g = MOI.ScalarNonlinearFunction(:sqrt, Any[f3])
     c = MOI.add_constraint(model, g, MOI.LessThan(1.0))
