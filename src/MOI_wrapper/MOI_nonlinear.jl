@@ -53,86 +53,237 @@ function _info(
     return throw(MOI.InvalidIndex(c))
 end
 
-function _add_expression_tree_constant(
+function _add_expression_tree_node(
+    model::Optimizer,
+    stack::Vector{Tuple{Any,Cint}},
     opcode::Vector{Cint},
     data::Vector{Cdouble},
     parent::Vector{Cint},
-    coeff::Float64,
-    index::Cint,
-)
-    append!(opcode, GRB_OPCODE_CONSTANT)
-    append!(data, coeff)
-    append!(parent, index)
-    return
-end
-
-function _add_expression_tree_variable(
-    opcode::Vector{Cint},
-    data::Vector{Cdouble},
-    parent::Vector{Cint},
-    coeff::Float64,
-    var_index::Cint,
-    current_index::Cint,
+    s::MOI.ScalarNonlinearFunction,
     parent_index::Cint,
 )
-    if !isone(coeff)
-        append!(opcode, GRB_OPCODE_MULTIPLY)
-        append!(data, -1.0)
-        append!(parent, parent_index)
-        _add_expression_tree_constant(
-            opcode,
-            data,
-            parent,
-            coeff,
-            current_index,
-        )
-        append!(opcode, GRB_OPCODE_VARIABLE)
-        append!(data, var_index)
-        append!(parent, current_index)
-        current_index += Cint(2)
-        return current_index
-    else
-        append!(data, var_index)
-        append!(opcode, GRB_OPCODE_VARIABLE)
-        append!(parent, parent_index)
-        current_index += Cint(1)
-        return current_index
+    # Append an operator to opcode/data/parent arrays and push new children onto
+    # the stack
+    current_opcode = get(_OPCODE_MAP, s.head, nothing)
+    if current_opcode === nothing
+        throw(MOI.UnsupportedNonlinearOperator(s.head))
+    elseif current_opcode == GRB_OPCODE_MINUS
+        # MINUS opcode is binary only
+        if length(s.args) == 1
+            current_opcode = GRB_OPCODE_UMINUS
+        else
+            @assert length(s.args) == 2
+        end
+    end
+    append!(opcode, current_opcode)
+    append!(data, -1.0)
+    append!(parent, parent_index)
+    # Children all have the same parent (the entry just added)
+    for expr in reverse(s.args)
+        push!(stack, (expr, length(opcode) - 1))
     end
 end
 
-# Check if a nonlinear is actually just a constant
-_check_nonlinear_constant(::Any) = false
+function _add_expression_tree_node(
+    model::Optimizer,
+    stack::Vector{Tuple{Any,Cint}},
+    opcode::Vector{Cint},
+    data::Vector{Cdouble},
+    parent::Vector{Cint},
+    s::MOI.VariableIndex,
+    parent_index::Cint,
+)
+    # Variable leaf node: just append to the arrays, nothing new goes on the stack.
+    append!(opcode, GRB_OPCODE_VARIABLE)
+    append!(data, c_column(model, s))
+    return append!(parent, parent_index)
+end
 
-function _check_nonlinear_constant(expr::MOI.ScalarNonlinearFunction)
-    return (
-        expr.head in (:+, :-) &&
-        length(expr.args) == 1 &&
-        expr.args[1] isa Float64
+function _add_expression_tree_node(
+    model::Optimizer,
+    stack::Vector{Tuple{Any,Cint}},
+    opcode::Vector{Cint},
+    data::Vector{Cdouble},
+    parent::Vector{Cint},
+    s::Union{Float64,Int},
+    parent_index::Cint,
+)
+    # Constant leaf node: just append to the arrays, nothing new goes on the stack.
+    append!(opcode, GRB_OPCODE_CONSTANT)
+    append!(data, s)
+    return append!(parent, parent_index)
+end
+
+function _add_expression_tree_node(
+    model::Optimizer,
+    stack::Vector{Tuple{Any,Cint}},
+    opcode::Vector{Cint},
+    data::Vector{Cdouble},
+    parent::Vector{Cint},
+    term::MOI.ScalarAffineTerm{Float64},
+    parent_index::Cint,
+)
+    # Add a binary MULTIPLY node with a constant and a variable as children
+    append!(opcode, GRB_OPCODE_MULTIPLY)
+    append!(data, -1.0)
+    append!(parent, parent_index)
+    multiply_parent_index::Cint = length(opcode) - 1
+    _add_expression_tree_node(
+        model,
+        stack,
+        opcode,
+        data,
+        parent,
+        term.coefficient,
+        multiply_parent_index,
+    )
+    return _add_expression_tree_node(
+        model,
+        stack,
+        opcode,
+        data,
+        parent,
+        term.variable,
+        multiply_parent_index,
     )
 end
 
-# Check if a nonlinear is actually just an affine expression
-# Cases:
-#   1. constant * var
-#   2. +/- var
-#   3. +/- constant * var
-_check_nonlinear_singlevar(::Any) = false
-
-function _check_nonlinear_singlevar(expr::MOI.ScalarNonlinearFunction)
-    return (
-        ( # Case 1.
-            expr.head == :* &&
-            length(expr.args) == 2 &&
-            expr.args[2] isa MOI.VariableIndex
-        ) || ( # Cases 2. and 3.
-            expr.head in (:+, :-) &&
-            length(expr.args) == 1 &&
-            (
-                expr.args[1] isa MOI.VariableIndex ||
-                _check_nonlinear_singlevar(expr.args[1])
-            )
+function _add_expression_tree_node(
+    model::Optimizer,
+    stack::Vector{Tuple{Any,Cint}},
+    opcode::Vector{Cint},
+    data::Vector{Cdouble},
+    parent::Vector{Cint},
+    s::MOI.ScalarAffineFunction{Float64},
+    parent_index::Cint,
+)
+    # Add an N-ary PLUS node with all terms as children. Nothing new goes on the
+    # stack, the expression is expanded in-place.
+    append!(opcode, GRB_OPCODE_PLUS)
+    append!(data, -1.0)
+    append!(parent, parent_index)
+    plus_parent_index::Cint = length(opcode) - 1
+    if !iszero(s.constant)
+        _add_expression_tree_node(
+            model,
+            stack,
+            opcode,
+            data,
+            parent,
+            s.constant,
+            plus_parent_index,
         )
+    end
+    for term in s.terms
+        _add_expression_tree_node(
+            model,
+            stack,
+            opcode,
+            data,
+            parent,
+            term,
+            plus_parent_index,
+        )
+    end
+end
+
+function _add_expression_tree_node(
+    model::Optimizer,
+    stack::Vector{Tuple{Any,Cint}},
+    opcode::Vector{Cint},
+    data::Vector{Cdouble},
+    parent::Vector{Cint},
+    term::MOI.ScalarQuadraticTerm{Float64},
+    parent_index::Cint,
+)
+    # Add a binary MULTIPLY node with a constant and two variables as children
+    append!(opcode, GRB_OPCODE_MULTIPLY)
+    append!(data, -1.0)
+    append!(parent, parent_index)
+    multiply_parent_index::Cint = length(opcode) - 1
+    _add_expression_tree_node(
+        model,
+        stack,
+        opcode,
+        data,
+        parent,
+        term.coefficient,
+        multiply_parent_index,
     )
+    _add_expression_tree_node(
+        model,
+        stack,
+        opcode,
+        data,
+        parent,
+        term.variable_1,
+        multiply_parent_index,
+    )
+    return _add_expression_tree_node(
+        model,
+        stack,
+        opcode,
+        data,
+        parent,
+        term.variable_2,
+        multiply_parent_index,
+    )
+end
+
+function _add_expression_tree_node(
+    model::Optimizer,
+    stack::Vector{Tuple{Any,Cint}},
+    opcode::Vector{Cint},
+    data::Vector{Cdouble},
+    parent::Vector{Cint},
+    s::MOI.ScalarQuadraticFunction{Float64},
+    parent_index::Cint,
+)
+    # Add an N-ary PLUS node with all terms as children. Nothing new goes on the
+    # stack, the expression is expanded in-place.
+    append!(opcode, GRB_OPCODE_PLUS)
+    append!(data, -1.0)
+    append!(parent, parent_index)
+    plus_parent_index::Cint = length(opcode) - 1
+    if !iszero(s.constant)
+        _add_expression_tree_node(
+            model,
+            stack,
+            opcode,
+            data,
+            parent,
+            s.constant,
+            plus_parent_index,
+        )
+    end
+    for term in s.affine_terms
+        _add_expression_tree_node(
+            model,
+            stack,
+            opcode,
+            data,
+            parent,
+            term,
+            plus_parent_index,
+        )
+    end
+    for term in s.quadratic_terms
+        # https://jump.dev/MathOptInterface.jl/stable/reference/standard_form
+        # ScalarQuadraticFunction stores ScalarQuadraticTerms multiplied by 2
+        _add_expression_tree_node(
+            model,
+            stack,
+            opcode,
+            data,
+            parent,
+            MOI.ScalarQuadraticTerm{Float64}(
+                term.coefficient * 0.5,
+                term.variable_1,
+                term.variable_2,
+            ),
+            plus_parent_index,
+        )
+    end
 end
 
 function _process_nonlinear(
@@ -143,77 +294,17 @@ function _process_nonlinear(
     parent::Vector{Cint},
 )
     stack = Vector{Tuple{Any,Cint}}([(f, Cint(-1))])
-    current_index = Cint(-1)
     while !isempty(stack)
-        current_index += Cint(1)
         s, parent_index = pop!(stack)
-        if s isa MOI.ScalarNonlinearFunction
-            ret = get(_OPCODE_MAP, s.head, nothing)
-            if ret === nothing
-                throw(MOI.UnsupportedNonlinearOperator(s.head))
-            elseif s.head == :- && length(s.args) == 1  # Special handling for unary -
-                append!(opcode, GRB_OPCODE_UMINUS)
-                append!(data, -1.0)
-                append!(parent, parent_index)
-            elseif !_check_nonlinear_singlevar(s) &&
-                   !_check_nonlinear_constant(s)
-                append!(opcode, ret)
-                append!(data, -1.0)
-                append!(parent, parent_index)
-            end
-            for expr in reverse(s.args)
-                push!(stack, (expr, current_index))
-            end
-        elseif s isa MOI.VariableIndex
-            _add_expression_tree_variable(
-                opcode,
-                data,
-                parent,
-                1.0,
-                c_column(model, s),
-                current_index,
-                parent_index,
-            )
-        elseif s isa MOI.ScalarAffineFunction{Float64}
-            if length(s.terms) > 1
-                append!(opcode, GRB_OPCODE_PLUS)
-                append!(data, -1.0)
-                append!(parent, parent_index)
-                parent_index += Cint(1)
-            end
-            if !iszero(s.constant)
-                append!(opcode, GRB_OPCODE_CONSTANT)
-                append!(data, s.constant)
-                append!(parent, parent_index)
-                current_index += Cint(1)
-            end
-            for term in s.terms
-                var_index = c_column(model, term.variable)
-                coeff = term.coefficient
-                current_index = _add_expression_tree_variable(
-                    opcode,
-                    data,
-                    parent,
-                    coeff,
-                    var_index,
-                    current_index,
-                    parent_index,
-                )
-                current_index += Cint(1)
-            end
-        elseif s isa Float64
-            _add_expression_tree_constant(opcode, data, parent, s, parent_index)
-        elseif s isa Int
-            _add_expression_tree_constant(
-                opcode,
-                data,
-                parent,
-                convert(Float64, s),
-                parent_index,
-            )
-        else
-            throw(MOI.UnsupportedAttribute(s))
-        end
+        parent_index = _add_expression_tree_node(
+            model,
+            stack,
+            opcode,
+            data,
+            parent,
+            s,
+            parent_index,
+        )
     end
     return
 end
