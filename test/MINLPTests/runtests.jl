@@ -18,7 +18,7 @@ using Test
         optimizer;
         termination_target = MINLPTests.TERMINATION_TARGET_GLOBAL,
         primal_target = MINLPTests.PRIMAL_TARGET_GLOBAL,
-        objective_tol = tol,
+        objective_tol = 1e-6,
         primal_tol = tol,
         dual_tol = tol,
     )
@@ -26,7 +26,7 @@ using Test
         optimizer;
         termination_target = MINLPTests.TERMINATION_TARGET_GLOBAL,
         primal_target = MINLPTests.PRIMAL_TARGET_GLOBAL,
-        objective_tol = tol,
+        objective_tol = 1e-6,
         primal_tol = tol,
         dual_tol = tol,
     )
@@ -34,7 +34,7 @@ using Test
         optimizer;
         termination_target = MINLPTests.TERMINATION_TARGET_GLOBAL,
         primal_target = MINLPTests.PRIMAL_TARGET_GLOBAL,
-        objective_tol = tol,
+        objective_tol = 1e-6,
         primal_tol = tol,
         dual_tol = tol,
     )
