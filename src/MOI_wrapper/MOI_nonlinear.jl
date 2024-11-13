@@ -82,6 +82,7 @@ function _add_expression_tree_node(
     for expr in reverse(s.args)
         push!(stack, (expr, length(opcode) - 1))
     end
+    return
 end
 
 function _add_expression_tree_node(
@@ -96,7 +97,8 @@ function _add_expression_tree_node(
     # Variable leaf node: just append to the arrays, nothing new goes on the stack.
     append!(opcode, GRB_OPCODE_VARIABLE)
     append!(data, c_column(model, s))
-    return append!(parent, parent_index)
+    append!(parent, parent_index)
+    return
 end
 
 function _add_expression_tree_node(
@@ -111,7 +113,8 @@ function _add_expression_tree_node(
     # Constant leaf node: just append to the arrays, nothing new goes on the stack.
     append!(opcode, GRB_OPCODE_CONSTANT)
     append!(data, s)
-    return append!(parent, parent_index)
+    append!(parent, parent_index)
+    return
 end
 
 function _add_expression_tree_node(
@@ -127,7 +130,7 @@ function _add_expression_tree_node(
     append!(opcode, GRB_OPCODE_MULTIPLY)
     append!(data, -1.0)
     append!(parent, parent_index)
-    multiply_parent_index::Cint = length(opcode) - 1
+    multiply_parent_index = Cint(length(opcode) - 1)
     _add_expression_tree_node(
         model,
         stack,
@@ -137,7 +140,7 @@ function _add_expression_tree_node(
         term.coefficient,
         multiply_parent_index,
     )
-    return _add_expression_tree_node(
+    _add_expression_tree_node(
         model,
         stack,
         opcode,
@@ -146,6 +149,7 @@ function _add_expression_tree_node(
         term.variable,
         multiply_parent_index,
     )
+    return
 end
 
 function _add_expression_tree_node(
@@ -162,7 +166,7 @@ function _add_expression_tree_node(
     append!(opcode, GRB_OPCODE_PLUS)
     append!(data, -1.0)
     append!(parent, parent_index)
-    plus_parent_index::Cint = length(opcode) - 1
+    plus_parent_index = Cint(length(opcode) - 1)
     if !iszero(s.constant)
         _add_expression_tree_node(
             model,
@@ -185,6 +189,7 @@ function _add_expression_tree_node(
             plus_parent_index,
         )
     end
+    return
 end
 
 function _add_expression_tree_node(
@@ -200,7 +205,7 @@ function _add_expression_tree_node(
     append!(opcode, GRB_OPCODE_MULTIPLY)
     append!(data, -1.0)
     append!(parent, parent_index)
-    multiply_parent_index::Cint = length(opcode) - 1
+    multiply_parent_index = Cint(length(opcode) - 1)
     _add_expression_tree_node(
         model,
         stack,
@@ -219,7 +224,7 @@ function _add_expression_tree_node(
         term.variable_1,
         multiply_parent_index,
     )
-    return _add_expression_tree_node(
+    _add_expression_tree_node(
         model,
         stack,
         opcode,
@@ -228,6 +233,7 @@ function _add_expression_tree_node(
         term.variable_2,
         multiply_parent_index,
     )
+    return
 end
 
 function _add_expression_tree_node(
@@ -244,7 +250,7 @@ function _add_expression_tree_node(
     append!(opcode, GRB_OPCODE_PLUS)
     append!(data, -1.0)
     append!(parent, parent_index)
-    plus_parent_index::Cint = length(opcode) - 1
+    plus_parent_index = Cint(length(opcode) - 1)
     if !iszero(s.constant)
         _add_expression_tree_node(
             model,
@@ -277,13 +283,14 @@ function _add_expression_tree_node(
             data,
             parent,
             MOI.ScalarQuadraticTerm{Float64}(
-                term.coefficient * 0.5,
+                0.5 * term.coefficient,
                 term.variable_1,
                 term.variable_2,
             ),
             plus_parent_index,
         )
     end
+    return
 end
 
 function _process_nonlinear(
@@ -293,7 +300,7 @@ function _process_nonlinear(
     data::Vector{Cdouble},
     parent::Vector{Cint},
 )
-    stack = Vector{Tuple{Any,Cint}}([(f, Cint(-1))])
+    stack = Tuple{Any,Cint}[(f, Cint(-1))]
     while !isempty(stack)
         s, parent_index = pop!(stack)
         parent_index = _add_expression_tree_node(
@@ -351,8 +358,8 @@ end
 
 function MOI.delete(
     model::Optimizer,
-    c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S},
-) where {S}
+    c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction},
+)
     info = _info(model, c)
     _update_if_necessary(model)
     ret = GRBdelgenconstrs(model, 1, Ref(Cint(info.row - 1)))

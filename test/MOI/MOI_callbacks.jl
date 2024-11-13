@@ -10,6 +10,8 @@ using Gurobi
 using Random
 using Test
 
+import MathOptInterface as MOI
+
 function runtests()
     for name in names(@__MODULE__; all = true)
         if startswith("$(name)", "test_")
@@ -20,8 +22,6 @@ function runtests()
     end
     return
 end
-
-const MOI = Gurobi.MOI
 
 const GRB_ENV =
     isdefined(Main, :GRB_ENV) ? Main.GRB_ENV : Gurobi.Env(output_flag = 0)
@@ -122,6 +122,12 @@ function test_lazy_constraint_callback()
     @test lazy_called
     @test MOI.get(model, MOI.VariablePrimal(), x) == 1
     @test MOI.get(model, MOI.VariablePrimal(), y) == 2
+    attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
+    @test MOI.LazyConstraintCallback() in attrs
+    MOI.set(model, MOI.LazyConstraintCallback(), nothing)
+    attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
+    @test !(MOI.LazyConstraintCallback() in attrs)
+    return
 end
 
 function test_lazy_constraint_callback_fractional()
@@ -148,6 +154,7 @@ function test_lazy_constraint_callback_fractional()
     MOI.optimize!(model)
     @test lazy_called_integer
     @test lazy_called_fractional
+    return
 end
 
 function test_lazy_constraint_callback_OptimizeInProgress()
@@ -170,7 +177,8 @@ function test_lazy_constraint_callback_OptimizeInProgress()
             )
         end,
     )
-    return MOI.optimize!(model)
+    MOI.optimize!(model)
+    return
 end
 
 function test_lazy_constraint_callback_UserCut()
@@ -193,6 +201,7 @@ function test_lazy_constraint_callback_UserCut()
         MOI.InvalidCallbackUsage(MOI.LazyConstraintCallback(), MOI.UserCut(cb)),
         MOI.optimize!(model)
     )
+    return
 end
 
 function test_lazy_constraint_callback_HeuristicSolution()
@@ -213,6 +222,7 @@ function test_lazy_constraint_callback_HeuristicSolution()
         ),
         MOI.optimize!(model)
     )
+    return
 end
 
 function test_user_cut_callback()
@@ -245,6 +255,12 @@ function test_user_cut_callback()
     @test MOI.supports(model, MOI.UserCutCallback())
     MOI.optimize!(model)
     @test user_cut_submitted
+    attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
+    @test MOI.UserCutCallback() in attrs
+    MOI.set(model, MOI.UserCutCallback(), nothing)
+    attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
+    @test !(MOI.UserCutCallback() in attrs)
+    return
 end
 
 function test_user_cut_callback_LazyConstraint()
@@ -267,6 +283,7 @@ function test_user_cut_callback_LazyConstraint()
         MOI.InvalidCallbackUsage(MOI.UserCutCallback(), MOI.LazyConstraint(cb)),
         MOI.optimize!(model)
     )
+    return
 end
 
 function test_user_cut_callback_HeuristicSolution()
@@ -287,6 +304,7 @@ function test_user_cut_callback_HeuristicSolution()
         ),
         MOI.optimize!(model)
     )
+    return
 end
 
 function test_heuristic_callback()
@@ -329,6 +347,12 @@ function test_heuristic_callback()
     MOI.optimize!(model)
     @test solution_accepted
     @test solution_rejected
+    attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
+    @test MOI.HeuristicCallback() in attrs
+    MOI.set(model, MOI.HeuristicCallback(), nothing)
+    attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
+    @test !(MOI.HeuristicCallback() in attrs)
+    return
 end
 
 function test_heuristic_callback_LazyConstraint()
@@ -354,6 +378,7 @@ function test_heuristic_callback_LazyConstraint()
         ),
         MOI.optimize!(model)
     )
+    return
 end
 
 function test_heuristic_callback_UserCut()
@@ -376,6 +401,7 @@ function test_heuristic_callback_UserCut()
         MOI.InvalidCallbackUsage(MOI.HeuristicCallback(), MOI.UserCut(cb)),
         MOI.optimize!(model)
     )
+    return
 end
 
 function test_CallbackFunction_callback_OptimizeInProgress()
@@ -399,7 +425,8 @@ function test_CallbackFunction_callback_OptimizeInProgress()
         end,
     )
     @test MOI.supports(model, Gurobi.CallbackFunction())
-    return MOI.optimize!(model)
+    MOI.optimize!(model)
+    return
 end
 
 function test_CallbackFunction_callback_LazyConstraint()
@@ -443,6 +470,12 @@ function test_CallbackFunction_callback_LazyConstraint()
     @test Gurobi.GRB_CB_MESSAGE in cb_calls
     @test Gurobi.GRB_CB_PRESOLVE in cb_calls
     @test Gurobi.GRB_CB_MIPSOL in cb_calls
+    attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
+    @test Gurobi.CallbackFunction() in attrs
+    MOI.set(model, Gurobi.CallbackFunction(), nothing)
+    attrs = MOI.get(model, MOI.ListOfModelAttributesSet())
+    @test !(Gurobi.CallbackFunction() in attrs)
+    return
 end
 
 function test_CallbackFunction_callback_UserCut()
@@ -490,6 +523,7 @@ function test_CallbackFunction_callback_UserCut()
     MOI.optimize!(model)
     @test user_cut_submitted
     @test Gurobi.GRB_CB_MIPNODE in cb_calls
+    return
 end
 
 function test_CallbackFunction_callback_HeuristicSolution()
@@ -548,6 +582,7 @@ function test_CallbackFunction_callback_HeuristicSolution()
     @test solution_rejected
     @test solution_unknown
     @test Gurobi.GRB_CB_MIPNODE in cb_calls
+    return
 end
 
 function test_CallbackFunction_CallbackNodeStatus()
@@ -565,6 +600,7 @@ function test_CallbackFunction_CallbackNodeStatus()
     )
     MOI.optimize!(model)
     @test unknown_reached
+    return
 end
 
 function test_CallbackFunction_broadcast()
@@ -584,6 +620,7 @@ function test_CallbackFunction_broadcast()
     MOI.optimize!(model)
     @test length(solutions) > 0
     @test length(solutions[1]) == length(x)
+    return
 end
 
 end  # module TestCallbacks
