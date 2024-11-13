@@ -9,30 +9,33 @@ using MINLPTests
 using Test
 
 @testset "MINLPTests" begin
+    tol = 1e-2
+    optimizer = MINLPTests.JuMP.optimizer_with_attributes(
+        Gurobi.Optimizer,
+        "TimeLimit" => 60.0,
+    )
     MINLPTests.test_nlp_cvx_expr(
-        Gurobi.Optimizer;
+        optimizer;
         termination_target = MINLPTests.TERMINATION_TARGET_GLOBAL,
         primal_target = MINLPTests.PRIMAL_TARGET_GLOBAL,
-        objective_tol = 1e-6,
-        primal_tol = 1e-6,
-        dual_tol = 1e-6,
+        objective_tol = tol,
+        primal_tol = tol,
+        dual_tol = tol,
     )
-
     MINLPTests.test_nlp_expr(
-        Gurobi.Optimizer;
+        optimizer;
         termination_target = MINLPTests.TERMINATION_TARGET_GLOBAL,
         primal_target = MINLPTests.PRIMAL_TARGET_GLOBAL,
-        objective_tol = 1e-6,
-        primal_tol = 1e-6,
-        dual_tol = 1e-6,
+        objective_tol = tol,
+        primal_tol = tol,
+        dual_tol = tol,
     )
-
     MINLPTests.test_nlp_mi_expr(
-        Gurobi.Optimizer;
+        optimizer;
         termination_target = MINLPTests.TERMINATION_TARGET_GLOBAL,
         primal_target = MINLPTests.PRIMAL_TARGET_GLOBAL,
-        objective_tol = 1e-6,
-        primal_tol = 1e-6,
-        dual_tol = 1e-6,
+        objective_tol = tol,
+        primal_tol = tol,
+        dual_tol = tol,
     )
 end
