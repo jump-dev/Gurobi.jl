@@ -67,14 +67,6 @@ function test_runtests()
             # Shaky tests
             "vector_nonlinear",
             "VectorNonlinearFunction",
-            # Tests should be skipped due to RequirementsUnmet, but aren't
-            r"^test_nonlinear_expression_hs071$",
-            r"^test_nonlinear_expression_hs071_epigraph$",
-            r"^test_nonlinear_expression_hs109$",
-            r"^test_nonlinear_expression_hs110$",
-            r"^test_nonlinear_expression_quartic$",
-            r"^test_nonlinear_expression_overrides_objective$",
-            r"^test_nonlinear_duals$",
         ],
     )
     MOI.Test.runtests(
