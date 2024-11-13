@@ -90,6 +90,18 @@ mutable struct _ConstraintInfo
     _ConstraintInfo(row::Int, set) = new(row, set, "")
 end
 
+mutable struct _NLConstraintInfo
+    row::Int
+    set::MOI.AbstractSet
+    # Storage for constraint names. Where possible, these are also stored in
+    # the Gurobi model.
+    name::String
+    resvar::MOI.VariableIndex
+    function _NLConstraintInfo(row::Int, set, resvar::MOI.VariableIndex)
+        return new(row, set, "", resvar)
+    end
+end
+
 mutable struct Env
     ptr_env::Ptr{Cvoid}
     # These fields keep track of how many models the `Env` is used for to help
@@ -278,6 +290,8 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     sos_constraint_info::Dict{Int,_ConstraintInfo}
     # VectorAffineFunction-in-Set storage.
     indicator_constraint_info::Dict{Int,_ConstraintInfo}
+    # VectorAffineFunction-in-Set storage.
+    nl_constraint_info::Dict{Int,_NLConstraintInfo}
     # Note: we do not have a singlevariable_constraint_info dictionary. Instead,
     # data associated with these constraints are stored in the _VariableInfo
     # objects.
@@ -345,6 +359,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
         model.quadratic_constraint_info = Dict{Int,_ConstraintInfo}()
         model.sos_constraint_info = Dict{Int,_ConstraintInfo}()
         model.indicator_constraint_info = Dict{Int,_ConstraintInfo}()
+        model.nl_constraint_info = Dict{Int,_NLConstraintInfo}()
         model.callback_variable_primal = Float64[]
         MOI.empty!(model)
         finalizer(model) do m
@@ -461,6 +476,7 @@ function MOI.empty!(model::Optimizer)
     empty!(model.quadratic_constraint_info)
     empty!(model.sos_constraint_info)
     empty!(model.indicator_constraint_info)
+    empty!(model.nl_constraint_info)
     model.name_to_variable = nothing
     model.name_to_constraint_index = nothing
     model.ret_GRBoptimize = Cint(0)
@@ -2347,6 +2363,11 @@ function _rebuild_name_to_constraint_index(model::Optimizer)
         model.sos_constraint_info,
         MOI.VectorOfVariables,
     )
+    _rebuild_name_to_constraint_index_util(
+        model,
+        model.nl_constraint_info,
+        MOI.ScalarNonlinearFunction,
+    )
     return
 end
 
@@ -3524,6 +3545,22 @@ function MOI.get(
     return sort!(indices, by = x -> x.value)
 end
 
+function MOI.get(
+    model::Optimizer,
+    ::MOI.ListOfConstraintIndices{MOI.ScalarNonlinearFunction,S},
+) where {S}
+    indices = MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S}[]
+    for (key, info) in model.nl_constraint_info
+        if typeof(info.set) == S
+            push!(
+                indices,
+                MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,S}(key),
+            )
+        end
+    end
+    return sort!(indices, by = x -> x.value)
+end
+
 function MOI.get(model::Optimizer, ::MOI.ListOfConstraintTypesPresent)
     constraints = Set{Tuple{Type,Type}}()
     for info in values(model.variable_info)
@@ -3569,6 +3606,9 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraintTypesPresent)
     end
     for info in values(model.sos_constraint_info)
         push!(constraints, (MOI.VectorOfVariables, typeof(info.set)))
+    end
+    for info in values(model.nl_constraint_info)
+        push!(constraints, (MOI.ScalarNonlinearFunction, typeof(info.set)))
     end
     return collect(constraints)
 end
