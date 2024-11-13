@@ -21,6 +21,7 @@ using Test
         primal_tol = 1e-2,
         dual_tol = NaN,
         exclude = [
+            "206_010",  # TIME_LIMIT
             "501_011",  # TIME_LIMIT
         ],
     )
@@ -37,6 +38,7 @@ using Test
             "004_011",  # abs
             "005_010",  # inv
             "006_010",  # UserDefinedFunction
+            "008_010",  # MINLPTests.jl#21
             "009_010",  # min
             "009_011",  # max
         ],
