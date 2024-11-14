@@ -3416,9 +3416,16 @@ function MOI.set(model::Optimizer, attr::MOI.Name, name::String)
     return
 end
 
-MOI.get(model::Optimizer, ::MOI.NumberOfVariables) = length(model.variable_info)
+function MOI.get(model::Optimizer, ::MOI.NumberOfVariables)
+    return length(model.variable_info) - length(model.nl_constraint_info)
+end
+
 function MOI.get(model::Optimizer, ::MOI.ListOfVariableIndices)
-    return sort!(collect(keys(model.variable_info)), by = x -> x.value)
+    nl_resvar = Set(v.resvar for v in model.nl_constraint_info)
+    variables = MOI.VariableIndex[k.value for k in keys(model.variable_info)]
+    filter!(x -> x in nl_resvar, variables)
+    sort!(variables; by = x -> x.value)
+    return variables
 end
 
 MOI.get(model::Optimizer, ::MOI.RawSolver) = model

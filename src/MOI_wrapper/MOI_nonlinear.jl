@@ -324,15 +324,30 @@ function MOI.add_constraint(
     opcode = Cint[]
     data = Cdouble[]
     parent = Cint[]
-    sense, rhs = _sense_and_rhs(s)
     _process_nonlinear(model, f, opcode, data, parent)
-    # Add resultant variable
-    vi, ci = MOI.add_constrained_variable(model, s)
-    resvar_index = c_column(model, vi)
+    # Add resultant variable. We don't use MOI.add_constrained_variable because
+    # we don't want it to show up in the bound constraints, etc.
+    #
+    # We do add it to model.variable_info, but these get filtered out from
+    # ListOfVariableIndices etc.
+    vi = CleverDicts.add_item(
+        model.variable_info,
+        _VariableInfo(MOI.VariableIndex(0), 0),
+    )
+    info = _info(model, vi)
+    # Now, set `.index` and `.column`.
+    info.index = vi
+    info.column = _get_next_column(model)
+    lb, ub = _bounds(s)
+    lb = something(lb, -Inf)
+    ub = something(ub, Inf)
+    ret =
+        GRBaddvar(model, 0, C_NULL, C_NULL, 0.0, lb, ub, GRB_CONTINUOUS, "")
+    _check_ret(model, ret)
     ret = GRBaddgenconstrNL(
         model,
         C_NULL,
-        resvar_index,
+        c_column(model, vi),
         length(opcode),
         opcode,
         data,
