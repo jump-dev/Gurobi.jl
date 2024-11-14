@@ -3421,7 +3421,7 @@ function MOI.get(model::Optimizer, ::MOI.NumberOfVariables)
 end
 
 function MOI.get(model::Optimizer, ::MOI.ListOfVariableIndices)
-    nl_resvar = Set(v.resvar for v in model.nl_constraint_info)
+    nl_resvar = Set(v.resvar for v in values(model.nl_constraint_info))
     variables = MOI.VariableIndex[k.value for k in keys(model.variable_info)]
     filter!(x -> x in nl_resvar, variables)
     sort!(variables; by = x -> x.value)
