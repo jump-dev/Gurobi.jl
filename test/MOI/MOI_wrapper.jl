@@ -589,6 +589,72 @@ function test_add_constrained_variables()
     return
 end
 
+function test_add_constrained_variable_greaterthan()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    set = MOI.GreaterThan{Float64}(1.2)
+    vi, ci = MOI.add_constrained_variable(model, set)
+    @test MOI.get(model, MOI.NumberOfVariables()) == 1
+    @test MOI.get(model, MOI.ListOfConstraintTypesPresent()) ==
+          [(MOI.VariableIndex, MOI.GreaterThan{Float64})]
+    @test MOI.get(model, MOI.ConstraintFunction(), ci) == vi
+    @test MOI.get(model, MOI.ConstraintSet(), ci) == set
+    # Force update and check correct bounds on the Gurobi model
+    MOI.optimize!(model)
+    valueP = Ref{Cdouble}()
+    ret = Gurobi.GRBgetdblattrelement(model, "LB", 0, valueP)
+    @test ret == 0
+    @test valueP[] == 1.2
+    ret = Gurobi.GRBgetdblattrelement(model, "UB", 0, valueP)
+    @test ret == 0
+    @test valueP[] >= -1e30
+    return
+end
+
+function test_add_constrained_variable_lessthan()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    set = MOI.LessThan{Float64}(3.4)
+    vi, ci = MOI.add_constrained_variable(model, set)
+    @test MOI.get(model, MOI.NumberOfVariables()) == 1
+    @test MOI.get(model, MOI.ListOfConstraintTypesPresent()) ==
+          [(MOI.VariableIndex, MOI.LessThan{Float64})]
+    @test MOI.get(model, MOI.ConstraintFunction(), ci) == vi
+    @test MOI.get(model, MOI.ConstraintSet(), ci) == set
+    # Force update and check correct bounds on the Gurobi model
+    MOI.optimize!(model)
+    valueP = Ref{Cdouble}()
+    ret = Gurobi.GRBgetdblattrelement(model, "LB", 0, valueP)
+    @test ret == 0
+    @test valueP[] <= -1e30
+    ret = Gurobi.GRBgetdblattrelement(model, "UB", 0, valueP)
+    @test ret == 0
+    @test valueP[] == 3.4
+    return
+end
+
+function test_add_constrained_variable_equalto()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    set = MOI.EqualTo{Float64}(5.2)
+    vi, ci = MOI.add_constrained_variable(model, set)
+    @test MOI.get(model, MOI.NumberOfVariables()) == 1
+    @test MOI.get(model, MOI.ListOfConstraintTypesPresent()) ==
+          [(MOI.VariableIndex, MOI.EqualTo{Float64})]
+    @test MOI.get(model, MOI.ConstraintFunction(), ci) == vi
+    @test MOI.get(model, MOI.ConstraintSet(), ci) == set
+    # Force update and check correct bounds on the Gurobi model
+    MOI.optimize!(model)
+    valueP = Ref{Cdouble}()
+    ret = Gurobi.GRBgetdblattrelement(model, "LB", 0, valueP)
+    @test ret == 0
+    @test valueP[] == 5.2
+    ret = Gurobi.GRBgetdblattrelement(model, "UB", 0, valueP)
+    @test ret == 0
+    @test valueP[] == 5.2
+    return
+end
+
 function _is_binary(x; atol = 1e-6)
     return isapprox(x, 0; atol = atol) || isapprox(x, 1; atol = atol)
 end
