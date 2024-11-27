@@ -566,6 +566,12 @@ function _update_if_necessary(
                 var_info.column,
             )
         end
+        for nl_info in values(model.nl_constraint_info)
+            nl_info.resvar_index -= searchsortedlast(
+                model.columns_deleted_since_last_update,
+                nl_info.resvar_index,
+            )
+        end
         model.next_column -= length(model.columns_deleted_since_last_update)
         empty!(model.columns_deleted_since_last_update)
         ret = GRBupdatemodel(model)
