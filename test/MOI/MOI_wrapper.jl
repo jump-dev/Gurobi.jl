@@ -1384,6 +1384,7 @@ function test_delete_nonlinear_index()
     # is correctly adjusted.
     MOI.delete(model, c1)
     MOI.delete(model, c2)
+    return
 end
 
 end  # TestMOIWrapper
