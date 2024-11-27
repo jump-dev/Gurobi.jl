@@ -1362,6 +1362,30 @@ function test_ConstrName_too_long()
     return
 end
 
+function test_delete_nonlinear_index()
+    model = Gurobi.Optimizer(GRB_ENV)
+    x1 = MOI.add_variable(model)
+    x2 = MOI.add_variable(model)
+    MOI.add_constraint(model, x1, MOI.GreaterThan(-1.0))
+    MOI.add_constraint(model, x1, MOI.LessThan(1.0))
+    MOI.add_constraint(model, x2, MOI.GreaterThan(-1.0))
+    MOI.add_constraint(model, x2, MOI.LessThan(1.0))
+    g1 = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[MOI.ScalarNonlinearFunction(:sin, Any[2.5*x1]), 1.0*x2],
+    )
+    g2 = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[MOI.ScalarNonlinearFunction(:cos, Any[2.5*x1]), 1.0*x2],
+    )
+    c1 = MOI.add_constraint(model, g1, MOI.EqualTo(0.0))
+    c2 = MOI.add_constraint(model, g2, MOI.EqualTo(0.0))
+    # Delete in order: tests that the resvar index of the first constraint
+    # is correctly adjusted.
+    MOI.delete(model, c1)
+    MOI.delete(model, c2)
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
