@@ -96,9 +96,9 @@ mutable struct _NLConstraintInfo
     # Storage for constraint names. Where possible, these are also stored in
     # the Gurobi model.
     name::String
-    resvar::MOI.VariableIndex
-    function _NLConstraintInfo(row::Int, set, resvar::MOI.VariableIndex)
-        return new(row, set, "", resvar)
+    resvar_index::Int
+    function _NLConstraintInfo(row::Int, set, resvar_index::Int)
+        return new(row, set, "", resvar_index)
     end
 end
 
