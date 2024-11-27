@@ -65,15 +65,14 @@ function test_runtests()
             "_RotatedSecondOrderCone_",
             "_GeometricMeanCone_",
             # Shaky tests
-            "vector_nonlinear",
-            "VectorNonlinearFunction",
-            # Tests should be skipped due to RequirementsUnmet, but aren't
-            r"^test_nonlinear_expression_hs071$",
-            r"^test_nonlinear_expression_hs071_epigraph$",
+            "_multiobjective_vector_nonlinear",
+            # Timeouts
             r"^test_nonlinear_expression_hs109$",
             r"^test_nonlinear_expression_hs110$",
+            # MOI.get(MOI.ObjectiveValue()) fails for NL objectives
             r"^test_nonlinear_expression_quartic$",
             r"^test_nonlinear_expression_overrides_objective$",
+            # Nonlinear duals not computed
             r"^test_nonlinear_duals$",
         ],
     )
