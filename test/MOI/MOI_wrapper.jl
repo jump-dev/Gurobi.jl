@@ -1363,6 +1363,9 @@ function test_ConstrName_too_long()
 end
 
 function test_delete_nonlinear_index()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
     model = Gurobi.Optimizer(GRB_ENV)
     x1 = MOI.add_variable(model)
     x2 = MOI.add_variable(model)
