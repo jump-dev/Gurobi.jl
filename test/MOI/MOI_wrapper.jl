@@ -1476,7 +1476,11 @@ function test_scalar_quadratic_function_with_off_diag_in_scalar_nonlinear()
 end
 
 function test_multiple_solution_nonlinear_objective()
-    model = MOI.Bridges.full_bridge_optimizer(Gurobi.Optimizer(), Float64)
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model =
+        MOI.Bridges.full_bridge_optimizer(Gurobi.Optimizer(GRB_ENV), Float64)
     N = 30
     x = MOI.add_variables(model, N)
     MOI.add_constraints(model, x, MOI.ZeroOne())
