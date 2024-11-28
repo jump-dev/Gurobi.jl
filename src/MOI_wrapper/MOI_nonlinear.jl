@@ -206,15 +206,24 @@ function _add_expression_tree_node(
     append!(data, -1.0)
     append!(parent, parent_index)
     multiply_parent_index = Cint(length(opcode) - 1)
-    _add_expression_tree_node(
-        model,
-        stack,
-        opcode,
-        data,
-        parent,
-        term.coefficient,
-        multiply_parent_index,
-    )
+    # https://jump.dev/MathOptInterface.jl/stable/reference/standard_form
+    # ScalarQuadraticFunction stores diagonal ScalarQuadraticTerms multiplied by
+    # 2
+    coeff = term.coefficient
+    if term.variable_1 == term.variable_2
+        coeff /= 2
+    end
+    if !isone(coeff)
+        _add_expression_tree_node(
+            model,
+            stack,
+            opcode,
+            data,
+            parent,
+            coeff,
+            multiply_parent_index,
+        )
+    end
     _add_expression_tree_node(
         model,
         stack,
@@ -274,19 +283,13 @@ function _add_expression_tree_node(
         )
     end
     for term in s.quadratic_terms
-        # https://jump.dev/MathOptInterface.jl/stable/reference/standard_form
-        # ScalarQuadraticFunction stores ScalarQuadraticTerms multiplied by 2
         _add_expression_tree_node(
             model,
             stack,
             opcode,
             data,
             parent,
-            MOI.ScalarQuadraticTerm{Float64}(
-                0.5 * term.coefficient,
-                term.variable_1,
-                term.variable_2,
-            ),
+            term,
             plus_parent_index,
         )
     end

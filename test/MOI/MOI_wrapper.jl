@@ -1352,8 +1352,8 @@ function test_nonlinear_quadratic_3()
     MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
     f = 1.0 * x + 1.0 * y
     MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
-    f1 = MOI.ScalarQuadraticTerm{Float64}(1.0, x, x)
-    f2 = MOI.ScalarQuadraticTerm{Float64}(1.0, y, y)
+    f1 = MOI.ScalarQuadraticTerm{Float64}(2.0, x, x)
+    f2 = MOI.ScalarQuadraticTerm{Float64}(2.0, y, y)
     f3 = MOI.ScalarNonlinearFunction(:+, Any[f1, f2])
     g = MOI.ScalarNonlinearFunction(:sqrt, Any[f3])
     c = MOI.add_constraint(model, g, MOI.LessThan(1.0))
@@ -1453,6 +1453,28 @@ function test_delete_nonlinear_index()
     # is correctly adjusted.
     MOI.delete(model, c1)
     MOI.delete(model, c2)
+    return
+end
+
+function test_scalar_quadratic_function_with_off_diag_in_scalar_nonlinear()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    for (a, b, status) in [
+        (1.0, 2.0, MOI.OPTIMAL),
+        (1.0, 3.0, MOI.INFEASIBLE),
+        (2.0, 3.0, MOI.OPTIMAL),
+        (2.0, 4.0, MOI.INFEASIBLE),
+    ]
+        model = Gurobi.Optimizer(GRB_ENV)
+        MOI.set(model, MOI.Silent(), true)
+        x, _ = MOI.add_constrained_variable(model, MOI.EqualTo(2.0))
+        y, _ = MOI.add_constrained_variable(model, MOI.EqualTo(3.0))
+        f = MOI.ScalarNonlinearFunction(:sqrt, Any[a*x*y])
+        MOI.add_constraint(model, f, MOI.GreaterThan(b))
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.TerminationStatus()) == status
+    end
     return
 end
 
