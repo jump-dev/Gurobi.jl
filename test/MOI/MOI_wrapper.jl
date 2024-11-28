@@ -65,15 +65,14 @@ function test_runtests()
             "_RotatedSecondOrderCone_",
             "_GeometricMeanCone_",
             # Shaky tests
-            "vector_nonlinear",
-            "VectorNonlinearFunction",
-            # Tests should be skipped due to RequirementsUnmet, but aren't
-            r"^test_nonlinear_expression_hs071$",
-            r"^test_nonlinear_expression_hs071_epigraph$",
+            "_multiobjective_vector_nonlinear",
+            # Timeouts
             r"^test_nonlinear_expression_hs109$",
             r"^test_nonlinear_expression_hs110$",
+            # MOI.get(MOI.ObjectiveValue()) fails for NL objectives
             r"^test_nonlinear_expression_quartic$",
             r"^test_nonlinear_expression_overrides_objective$",
+            # Nonlinear duals not computed
             r"^test_nonlinear_duals$",
         ],
     )
@@ -587,6 +586,72 @@ function test_add_constrained_variables()
           [(MOI.VariableIndex, MOI.Interval{Float64})]
     @test MOI.get(model, MOI.ConstraintFunction(), ci) == vi
     @test MOI.get(model, MOI.ConstraintSet(), ci) == set
+    return
+end
+
+function test_add_constrained_variable_greaterthan()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    set = MOI.GreaterThan{Float64}(1.2)
+    vi, ci = MOI.add_constrained_variable(model, set)
+    @test MOI.get(model, MOI.NumberOfVariables()) == 1
+    @test MOI.get(model, MOI.ListOfConstraintTypesPresent()) ==
+          [(MOI.VariableIndex, MOI.GreaterThan{Float64})]
+    @test MOI.get(model, MOI.ConstraintFunction(), ci) == vi
+    @test MOI.get(model, MOI.ConstraintSet(), ci) == set
+    # Force update and check correct bounds on the Gurobi model
+    MOI.optimize!(model)
+    valueP = Ref{Cdouble}()
+    ret = Gurobi.GRBgetdblattrelement(model, "LB", 0, valueP)
+    @test ret == 0
+    @test valueP[] == 1.2
+    ret = Gurobi.GRBgetdblattrelement(model, "UB", 0, valueP)
+    @test ret == 0
+    @test valueP[] >= -1e30
+    return
+end
+
+function test_add_constrained_variable_lessthan()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    set = MOI.LessThan{Float64}(3.4)
+    vi, ci = MOI.add_constrained_variable(model, set)
+    @test MOI.get(model, MOI.NumberOfVariables()) == 1
+    @test MOI.get(model, MOI.ListOfConstraintTypesPresent()) ==
+          [(MOI.VariableIndex, MOI.LessThan{Float64})]
+    @test MOI.get(model, MOI.ConstraintFunction(), ci) == vi
+    @test MOI.get(model, MOI.ConstraintSet(), ci) == set
+    # Force update and check correct bounds on the Gurobi model
+    MOI.optimize!(model)
+    valueP = Ref{Cdouble}()
+    ret = Gurobi.GRBgetdblattrelement(model, "LB", 0, valueP)
+    @test ret == 0
+    @test valueP[] <= -1e30
+    ret = Gurobi.GRBgetdblattrelement(model, "UB", 0, valueP)
+    @test ret == 0
+    @test valueP[] == 3.4
+    return
+end
+
+function test_add_constrained_variable_equalto()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    set = MOI.EqualTo{Float64}(5.2)
+    vi, ci = MOI.add_constrained_variable(model, set)
+    @test MOI.get(model, MOI.NumberOfVariables()) == 1
+    @test MOI.get(model, MOI.ListOfConstraintTypesPresent()) ==
+          [(MOI.VariableIndex, MOI.EqualTo{Float64})]
+    @test MOI.get(model, MOI.ConstraintFunction(), ci) == vi
+    @test MOI.get(model, MOI.ConstraintSet(), ci) == set
+    # Force update and check correct bounds on the Gurobi model
+    MOI.optimize!(model)
+    valueP = Ref{Cdouble}()
+    ret = Gurobi.GRBgetdblattrelement(model, "LB", 0, valueP)
+    @test ret == 0
+    @test valueP[] == 5.2
+    ret = Gurobi.GRBgetdblattrelement(model, "UB", 0, valueP)
+    @test ret == 0
+    @test valueP[] == 5.2
     return
 end
 
@@ -1360,6 +1425,34 @@ function test_ConstrName_too_long()
     @test MOI.get(model, MOI.ConstraintName(), c) == "c"
     MOI.set(model, MOI.ConstraintName(), c, "")
     @test MOI.get(model, MOI.ConstraintName(), c) == ""
+    return
+end
+
+function test_delete_nonlinear_index()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    x1 = MOI.add_variable(model)
+    x2 = MOI.add_variable(model)
+    MOI.add_constraint(model, x1, MOI.GreaterThan(-1.0))
+    MOI.add_constraint(model, x1, MOI.LessThan(1.0))
+    MOI.add_constraint(model, x2, MOI.GreaterThan(-1.0))
+    MOI.add_constraint(model, x2, MOI.LessThan(1.0))
+    g1 = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[MOI.ScalarNonlinearFunction(:sin, Any[2.5*x1]), 1.0*x2],
+    )
+    g2 = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[MOI.ScalarNonlinearFunction(:cos, Any[2.5*x1]), 1.0*x2],
+    )
+    c1 = MOI.add_constraint(model, g1, MOI.EqualTo(0.0))
+    c2 = MOI.add_constraint(model, g2, MOI.EqualTo(0.0))
+    # Delete in order: tests that the resvar index of the first constraint
+    # is correctly adjusted.
+    MOI.delete(model, c1)
+    MOI.delete(model, c2)
     return
 end
 
