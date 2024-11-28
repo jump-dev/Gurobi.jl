@@ -470,5 +470,4 @@ function MOI.get(
     ret = GRBgetdblattrelement(model, key, Cint(info.resvar_index - 1), valueP)
     _check_ret(model, ret)
     return valueP[]
-    return
 end
