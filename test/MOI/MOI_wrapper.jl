@@ -1456,6 +1456,21 @@ function test_delete_nonlinear_index()
     return
 end
 
+function test_scalar_quadratic_function_with_off_diag_in_scalar_nonlinear()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x, _ = MOI.add_constrained_variable(model, MOI.EqualTo(2.0))
+    y, _ = MOI.add_constrained_variable(model, MOI.EqualTo(3.0))
+    f = MOI.ScalarNonlinearFunction(:sqrt, Any[1.0 * x * y])
+    MOI.add_constraint(model, f, MOI.GreaterThan(2.0))
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
