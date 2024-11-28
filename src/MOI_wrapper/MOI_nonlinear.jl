@@ -448,3 +448,27 @@ function MOI.set(
     model.name_to_constraint_index = nothing
     return
 end
+
+function MOI.get(
+    model::Optimizer,
+    attr::MOI.ConstraintPrimal,
+    c::MOI.ConstraintIndex{MOI.ScalarNonlinearFunction},
+)
+    _throw_if_optimize_in_progress(model, attr)
+    MOI.check_result_index_bounds(model, attr)
+    info = _info(model, c)
+    key = "X"
+    if attr.result_index > 1
+        MOI.set(
+            model,
+            MOI.RawOptimizerAttribute("SolutionNumber"),
+            attr.result_index - 1,
+        )
+        key = "Xn"
+    end
+    valueP = Ref{Cdouble}()
+    ret = GRBgetdblattrelement(model, key, Cint(info.resvar_index - 1), valueP)
+    _check_ret(model, ret)
+    return valueP[]
+    return
+end

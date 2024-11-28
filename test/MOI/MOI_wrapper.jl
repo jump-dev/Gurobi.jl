@@ -69,9 +69,6 @@ function test_runtests()
             # Timeouts
             r"^test_nonlinear_expression_hs109$",
             r"^test_nonlinear_expression_hs110$",
-            # MOI.get(MOI.ObjectiveValue()) fails for NL objectives
-            r"^test_nonlinear_expression_quartic$",
-            r"^test_nonlinear_expression_overrides_objective$",
             # Nonlinear duals not computed
             r"^test_nonlinear_duals$",
         ],
@@ -1474,6 +1471,35 @@ function test_scalar_quadratic_function_with_off_diag_in_scalar_nonlinear()
         MOI.add_constraint(model, f, MOI.GreaterThan(b))
         MOI.optimize!(model)
         @test MOI.get(model, MOI.TerminationStatus()) == status
+    end
+    return
+end
+
+function test_multiple_solution_nonlinear_objective()
+    model = MOI.Bridges.full_bridge_optimizer(Gurobi.Optimizer(), Float64)
+    N = 30
+    x = MOI.add_variables(model, N)
+    MOI.add_constraints(model, x, MOI.ZeroOne())
+    MOI.set.(model, MOI.VariablePrimalStart(), x, 0.0)
+    item_weights = sin.(1:N)
+    MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(item_weights, x), 0.0),
+        MOI.LessThan(10.0),
+    )
+    f = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[MOI.ScalarNonlinearFunction(:exp, Any[x[i]]) for i in 1:N],
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    count = MOI.get(model, MOI.ResultCount())
+    @test count > 1
+    for i in 1:count
+        x_val = MOI.get.(model, MOI.VariablePrimal(i), x)
+        obj_val = MOI.get(model, MOI.ObjectiveValue(i))
+        @test isapprox(obj_val, sum(exp.(x_val)); atol = 1e-6)
     end
     return
 end
