@@ -1508,6 +1508,20 @@ function test_multiple_solution_nonlinear_objective()
     return
 end
 
+function test_Env()
+    err = ErrorException(
+        "Gurobi Error 10022: Failed to connect to localhost port 61000 after 0 ms: Could not connect to server (code 7, command POST http://localhost:1234/api/v1/cluster/jobs)",
+    )
+    @test_throws err Gurobi.Env("localhost:1234")
+    @test_throws err Gurobi.Env("localhost:1234", "password")
+    @test_throws err Gurobi.Env("localhost:1234", "password"; started = false)
+    env = Gurobi.Env(; output_flag = 2, memory_limit = 1)
+    p = Ref{Cdouble}()
+    @test GRBgetdblparam(env, "MemLimit", p) == 0
+    @test p[] == 1.0
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
