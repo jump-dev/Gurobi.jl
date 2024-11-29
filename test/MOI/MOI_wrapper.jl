@@ -1519,7 +1519,7 @@ function test_Env()
     end
     test_err(() ->Gurobi.Env("localhost:1234"))
     test_err(() -> Gurobi.Env("localhost:1234", "password"))
-    test_err(() -> Gurobi.Env("localhost:1234", "password"; started = false))
+    test_err(() -> Gurobi.Env("localhost:1234", "password"; started = true))
     env = Gurobi.Env(; output_flag = 2, memory_limit = 1)
     p = Ref{Cdouble}()
     @test GRBgetdblparam(env, "MemLimit", p) == 0
