@@ -102,6 +102,36 @@ mutable struct _NLConstraintInfo
     end
 end
 
+"""
+    Env(
+        params::Dict{String,Any} = Dict{String,Any}();
+        started::Bool = true,
+    )
+
+Create a new Gurobi environment object.
+
+Optionally pass a `params` dictionary which sets parameters for the created
+environment before starting.
+
+## kwargs
+
+The extra keyword argument `started` delays starting the environment if set to
+`false`.
+
+## Example
+
+```julia
+using JuMP, Gurobi
+const GRB_ENV = Gurobi.Env(
+    Dict(
+        "ComputeServer" => "localhost:61000",
+        "OutputFlag" => 0,
+    );
+    started = true,
+)
+model = Model(() -> Gurobi.Optimizer(GRB_ENV))
+```
+"""
 mutable struct Env
     ptr_env::Ptr{Cvoid}
     # These fields keep track of how many models the `Env` is used for to help
@@ -110,24 +140,17 @@ mutable struct Env
     finalize_called::Bool
     attached_models::Int
 
-    function Env(;
+    function Env(
+        params::Union{Nothing,Dict{String,Any}} = nothing;
+        started::Bool = true,
+        # These kwargs are provided for legacy backwards compatibility
         output_flag::Int = 1,
         memory_limit::Union{Nothing,Real} = nothing,
-        started::Bool = true,
     )
         a = Ref{Ptr{Cvoid}}()
         ret = GRBemptyenv(a)
         env = new(a[], false, 0)
         _check_ret(env, ret)
-        ret = GRBsetintparam(env.ptr_env, GRB_INT_PAR_OUTPUTFLAG, output_flag)
-        _check_ret(env, ret)
-        if _GUROBI_VERSION >= v"9.5.0" && memory_limit !== nothing
-            ret = GRBsetdblparam(env, GRB_DBL_PAR_MEMLIMIT, memory_limit)
-            _check_ret(env, ret)
-        end
-        if started
-            ret = GRBstartenv(env.ptr_env)
-        end
         finalizer(env) do e
             e.finalize_called = true
             if e.attached_models == 0
@@ -135,9 +158,23 @@ mutable struct Env
                 GRBfreeenv(e.ptr_env)
                 e.ptr_env = C_NULL
             end
+            return
         end
-        # Even if the loadenv fails, the pointer is still valid.
-        _check_ret(env, ret)
+        if params === nothing
+            # These two parameters are provided for backwards compability
+            _set_param(env.ptr_env, GRB_INT_PAR_OUTPUTFLAG, 1)
+            if _GUROBI_VERSION >= v"9.5.0" && memory_limit !== nothing
+                _set_param(env.ptr_env, GRB_DBL_PAR_MEMLIMIT, memory_limit)
+            end
+        else
+            for (param_name, value) in params
+                _set_param(env.ptr_env, param_name, value)
+            end
+        end
+        if started
+            ret = GRBstartenv(env.ptr_env)
+            _check_ret(env, ret)
+        end
         return env
     end
 end
@@ -170,22 +207,11 @@ function Env(
     server_password::Union{String,Nothing} = nothing;
     started::Bool = true,
 )
-    env = Env(; started = false)
-    ret = GRBsetstrparam(env.ptr_env, GRB_STR_PAR_COMPUTESERVER, server_address)
-    _check_ret(env, ret)
+    params = Dict{String,Any}(GRB_STR_PAR_COMPUTESERVER => server_address)
     if server_password !== nothing
-        ret = GRBsetstrparam(
-            env.ptr_env,
-            GRB_STR_PAR_SERVERPASSWORD,
-            server_password,
-        )
-        _check_ret(env, ret)
+        params[GRB_STR_PAR_SERVERPASSWORD] = server_password
     end
-    if started
-        ret = GRBstartenv(env.ptr_env)
-        _check_ret(env, ret)
-    end
-    return env
+    return Env(params; started)
 end
 
 Base.cconvert(::Type{Ptr{Cvoid}}, x::Env) = x
@@ -685,6 +711,11 @@ function MOI.set(model::Optimizer, raw::MOI.RawOptimizerAttribute, value)
     env = GRBgetenv(model)
     param = raw.name
     model.params[param] = value
+    _set_param(env, param, value)
+    return
+end
+
+function _set_param(env, param::String, value)
     param_type = GRBgetparamtype(env, param)
     ret = if param_type == -1
         throw(MOI.UnsupportedAttribute(MOI.RawOptimizerAttribute(param)))
