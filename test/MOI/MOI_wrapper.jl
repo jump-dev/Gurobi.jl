@@ -1517,7 +1517,7 @@ function test_Env()
             @test occursin("Gurobi Error 10022:", err.msg)
         end
     end
-    test_err(() ->Gurobi.Env("localhost:1234"))
+    test_err(() -> Gurobi.Env("localhost:1234"))
     test_err(() -> Gurobi.Env("localhost:1234", "password"))
     test_err(() -> Gurobi.Env("localhost:1234", "password"; started = true))
     env = Gurobi.Env(; output_flag = 2, memory_limit = 1)
