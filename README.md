@@ -285,7 +285,22 @@ end
 # Note the need for GRB_ENV_REF[] not GRB_ENV_REF
 create_optimizer() = Gurobi.Optimizer(GRB_ENV_REF[])
 
-end
+end  # MyModule
+```
+
+## Pass parameters to an Environment
+
+To set parameters in an environment before the environment is started, pass a
+`Dict{String,Any}` that maps parameter names to values:
+
+```julia
+env = Gurobi.Env(
+    Dict{String,Any}(
+        "CSAppName" => "some name",
+        "CSManager" => "some url",
+        "CSPriority" => 10,
+    ),
+)
 ```
 
 ## Accessing Gurobi-specific attributes
@@ -368,7 +383,7 @@ optimize!(model)
 See the [Gurobi documentation](https://www.gurobi.com/documentation/current/refman/cb_codes.html)
 for other information that can be queried with `GRBcbget`.
 
-### Common Performance Pitfall with JuMP
+## Common Performance Pitfall with JuMP
 
 Gurobi's API works differently than most solvers. Any changes to the model are
 not applied immediately, but instead go sit in a internal buffer (making any
