@@ -9,7 +9,22 @@ module Gurobi
 # deps.jl file is always built via `Pkg.build`, even if we didn't find a local
 # install and we want to use the artifact instead. This is so Gurobi.jl will be
 # recompiled if we update the file. See issue #438 for more details.
-include(joinpath(dirname(@__FILE__), "..", "deps", "deps.jl"))
+const _DEPS_FILE = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
+
+if isfile(_DEPS_FILE)
+    include(_DEPS_FILE)
+else
+    error(
+        """
+        Gurobi.jl is not installed correctly. Please run the following code and
+        then restart Julia:
+        ```
+        import Pkg
+        Pkg.build("Gurobi")
+        ```
+        """,
+    )
+end
 
 if isdefined(@__MODULE__, :libgurobi)
     # deps.jl must define a local installation.
