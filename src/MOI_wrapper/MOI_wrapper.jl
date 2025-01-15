@@ -3970,7 +3970,7 @@ function _ensure_conflict_computed(model::Optimizer)
 end
 
 function _is_feasible(model::Optimizer)
-    return MOI.get(model, ConflictStatus()) == GRB_INFEASIBLE
+    return MOI.get(model, ConflictStatus()) == GRB_ERROR_IIS_NOT_INFEASIBLE
 end
 
 """
@@ -4098,6 +4098,22 @@ function MOI.get(
         Cint(_info(model, index).row - 1),
         p,
     )
+    _check_ret(model, ret)
+    return p[] > 0 ? MOI.IN_CONFLICT : MOI.NOT_IN_CONFLICT
+end
+
+function MOI.get(
+    model::Optimizer,
+    ::MOI.ConstraintConflictStatus,
+    index::MOI.ConstraintIndex{MOI.VectorOfVariables,S},
+) where {S<:Union{MOI.SOS1,MOI.SOS2}}
+    _ensure_conflict_computed(model)
+    if _is_feasible(model)
+        return MOI.NOT_IN_CONFLICT
+    end
+    p = Ref{Cint}(0)
+    row = Cint(_info(model, index).row - 1)
+    ret = GRBgetintattrelement(model, "IISSOS", row, p)
     _check_ret(model, ret)
     return p[] > 0 ? MOI.IN_CONFLICT : MOI.NOT_IN_CONFLICT
 end
