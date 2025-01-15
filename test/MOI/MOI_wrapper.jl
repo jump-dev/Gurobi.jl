@@ -1527,6 +1527,19 @@ function test_Env()
     return
 end
 
+function test_SOS1_no_conflict()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    set = MOI.SOS1([1.0, 2.0])
+    c1 = MOI.add_constraint(model, MOI.VectorOfVariables(x), set)
+    MOI.optimize!(model)
+    MOI.compute_conflict!(model)
+    @test MOI.get(model, MOI.ConstraintConflictStatus(), c1) ==
+          MOI.NOT_IN_CONFLICT
+    return
+end
+
 function test_SOS1_in_conflict()
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
