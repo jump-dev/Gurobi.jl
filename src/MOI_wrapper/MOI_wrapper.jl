@@ -3970,7 +3970,7 @@ function _ensure_conflict_computed(model::Optimizer)
 end
 
 function _is_feasible(model::Optimizer)
-    return MOI.get(model, ConflictStatus()) == GRB_INFEASIBLE
+    return MOI.get(model, ConflictStatus()) == GRB_ERROR_IIS_NOT_INFEASIBLE
 end
 
 """
