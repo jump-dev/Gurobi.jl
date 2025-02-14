@@ -401,7 +401,7 @@ This often means the JuMP program was structured in such a way that Gurobi.jl
 ends up calling `GRBupdatemodel` in each iteration of a loop.
 
 Usually, it is possible (and easy) to restructure the JuMP program in a way it
-stays ssolver-agnostic and has a close-to-ideal performance with Gurobi.
+stays solver-agnostic and has a close-to-ideal performance with Gurobi.
 
 To guide such restructuring it is good to keep in mind the following bits of
 information:
