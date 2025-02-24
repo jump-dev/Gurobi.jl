@@ -29,8 +29,7 @@ end
 if isdefined(@__MODULE__, :libgurobi)
     # deps.jl must define a local installation.
 elseif Sys.islinux() || Sys.isapple() || Sys.iswindows()
-    import Gurobi_jll
-    const libgurobi = Gurobi_jll.libgurobi
+    import Gurobi_jll: libgurobi
 else
     error(
         "Unsupported platform: Use a manual installation by setting " *
