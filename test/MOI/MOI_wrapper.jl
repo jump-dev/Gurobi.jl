@@ -1588,8 +1588,8 @@ function test_write_to_file()
     filename = joinpath(dir, "model.lp")
     MOI.write_to_file(model, filename)
     contents = read(filename, String)
-    @test occursin("obj:", contents)
-    @test occursin("bounds", contents)
+    @test occursin("Minimize", contents)
+    @test occursin("Bounds", contents)
     return
 end
 
