@@ -26,6 +26,17 @@ Gurobi’s [Community Forum](https://support.gurobi.com/hc/en-us/community/topic
 
 If you have a reproducible example of a bug, please [open a GitHub issue](https://github.com/jump-dev/Gurobi.jl/issues/new).
 
+### MPS files for support
+
+To create an MPS file for Gurobi's support team, do:
+```julia
+using JuMP, Gurobi
+model = Model(Gurobi.Optimizer)
+# ... construct model ...
+optimize!(model)
+GRBwrite(unsafe_backend(model), "model.mps")
+```
+
 ## License
 
 `Gurobi.jl` is licensed under the [MIT License](https://github.com/jump-dev/Gurobi.jl/blob/master/LICENSE.md).
