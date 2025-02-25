@@ -116,10 +116,18 @@ import PrecompileTools
 
 PrecompileTools.@setup_workload begin
     PrecompileTools.@compile_workload begin
-        if libgurobi != "__skipped_installation__"
+        env = try
+            Env()
+        catch
+            nothing
+        end
+        if env !== nothing
             model = MOI.Utilities.CachingOptimizer(
                 MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
-                MOI.instantiate(Gurobi.Optimizer; with_bridge_type = Float64),
+                MOI.instantiate(
+                    () -> Gurobi.Optimizer(env);
+                    with_bridge_type = Float64,
+                ),
             )
             MOI.set(model, MOI.Silent(), true)
             x = MOI.add_variables(model, 3)
