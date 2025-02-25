@@ -1573,6 +1573,26 @@ function test_SOS2_not_in_conflict()
     return
 end
 
+function test_write_to_file()
+    dir = mktempdir()
+    model = Gurobi.Optimizer(GRB_ENV)
+    x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(1.0))
+    MOI.set(model, MOI.VariableName(), x, "x")
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    f = 1.0 * x + 2.0
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    filename = joinpath(dir, "model.mps")
+    MOI.write_to_file(model, filename)
+    contents = read(filename, String)
+    @test occursin("ENDATA", contents)
+    filename = joinpath(dir, "model.lp")
+    MOI.write_to_file(model, filename)
+    contents = read(filename, String)
+    @test occursin("Minimize", contents)
+    @test occursin("Bounds", contents)
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()

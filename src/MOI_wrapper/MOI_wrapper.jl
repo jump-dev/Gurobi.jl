@@ -4587,3 +4587,9 @@ function MOI.set(
     model.name_to_constraint_index = nothing
     return
 end
+
+function MOI.write_to_file(model::Optimizer, filename::String)
+    ret = GRBwrite(model, filename)
+    _check_ret(model, ret)
+    return
+end
