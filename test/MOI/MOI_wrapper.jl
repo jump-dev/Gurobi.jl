@@ -1593,6 +1593,12 @@ function test_write_to_file()
     return
 end
 
+function test_precompile()
+    # Just test that this does not error.
+    Gurobi._precompile_(GRB_ENV)
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
