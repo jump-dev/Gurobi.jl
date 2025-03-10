@@ -77,7 +77,13 @@ Pkg.add("Gurobi")
 
 In addition to installing the Gurobi.jl package, this will also download and
 install the Gurobi binaries from [Gurobi_jll.jl](https://github.com/jump-dev/Gurobi_jll.jl).
-You do not need to install Gurobi separately.
+**You do not need to install the Gurobi binaries separately.**
+
+To install a particular version of Gurobi, install the corresponding version of
+[Gurobi_jll.jl](https://github.com/jump-dev/Gurobi_jll.jl). For example:
+```julia
+import Pkg; Pkg.pkg"add Gurobi_jll@11.0.3"
+```
 
 ### Manual installation
 
@@ -105,6 +111,16 @@ Pkg.build("Gurobi")
 To change the location of a manual install, change the value of `GUROBI_HOME`,
 re-run `Pkg.build("Gurobi")`, and then re-start Julia for the change to take
 effect.
+
+### Gurobi Error 10009: Version number is XX.X, license is for version XX.X
+
+This error occurs when Gurobi cannot find a valid license for the version that
+is running.
+
+If you intended to manually install and use and older version of Gurobi, but it
+reports that the `Version number is` a newer version, this means that your
+manual installation did not work and we have automatically installed the latest
+default version. Double check the [Manual installation](@ref) instructions.
 
 ## Use with JuMP
 
@@ -462,18 +478,5 @@ end
 You need to set the NonConvex parameter:
 ```julia
 model = Model(Gurobi.Optimizer)
-set_optimizer_attribute(model, "NonConvex", 2)
-```
-
-### Gurobi Error 1009: Version number is XX.X, license is for version XX.X
-
-Make sure that your license is correct for your Gurobi version. See the
-[Gurobi documentation](https://support.gurobi.com/hc/en-us/articles/360034784572-How-do-I-check-for-a-valid-license-file-)
-for details.
-
-Once you are sure that the license and Gurobi versions match, re-install
-Gurobi.jl by running:
-```julia
-import Pkg
-Pkg.build("Gurobi")
+set_attribute(model, "NonConvex", 2)
 ```
