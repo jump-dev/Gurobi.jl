@@ -2794,6 +2794,7 @@ function MOI.optimize!(model::Optimizer)
     Base.exit_on_sigint(false)
     disable_sigint() do
         model.ret_GRBoptimize = GRBoptimize(model)
+        return
     end
     _check_ret_GRBoptimize(model)
     if !isinteractive()
