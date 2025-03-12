@@ -2791,13 +2791,14 @@ function MOI.optimize!(model::Optimizer)
     # Catch [CTRL+C], even when Julia is run from a script not in interactive
     # mode. If `true`, then a script would call `atexit` without throwing the
     # `InterruptException`. `false` is the default in interactive mode.
-    #
-    # TODO(odow): Julia 1.5 exposes `Base.exit_on_sigint(::Bool)`.
-    ccall(:jl_exit_on_sigint, Cvoid, (Cint,), false)
-    model.ret_GRBoptimize = GRBoptimize(model)
+    Base.exit_on_sigint(false)
+    disable_sigint() do
+        model.ret_GRBoptimize = GRBoptimize(model)
+        return
+    end
     _check_ret_GRBoptimize(model)
     if !isinteractive()
-        ccall(:jl_exit_on_sigint, Cvoid, (Cint,), true)
+        Base.exit_on_sigint(true)
     end
 
     # Post-optimize caching to speed up the checks in VariablePrimal and
