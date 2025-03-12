@@ -32,12 +32,15 @@ function _gurobi_callback_wrapper(
     cb_where::Cint,
     p_user_data::Ptr{Cvoid},
 )
-    user_data = unsafe_pointer_to_objref(p_user_data)::_CallbackUserData
     try
-        user_data.callback(
-            CallbackData(user_data.model, cb_data, cb_where),
-            cb_where,
-        )
+        reenable_sigint() do
+            user_data = unsafe_pointer_to_objref(p_user_data)::_CallbackUserData
+            user_data.callback(
+                CallbackData(user_data.model, cb_data, cb_where),
+                cb_where,
+            )
+            return
+        end
     catch ex
         GRBterminate(p_model)
         if !(ex isa InterruptException)
