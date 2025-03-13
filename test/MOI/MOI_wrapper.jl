@@ -1600,6 +1600,9 @@ function test_precompile()
 end
 
 function test_multiple_solutions_when_dual_infeasible()
+    if Gurobi._GUROBI_VERSION < v"11"
+        return
+    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
