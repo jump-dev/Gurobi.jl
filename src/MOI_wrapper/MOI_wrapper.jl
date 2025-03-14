@@ -2923,12 +2923,8 @@ function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
     _throw_if_optimize_in_progress(model, attr)
     term = MOI.get(model, MOI.TerminationStatus())
     if term == MOI.DUAL_INFEASIBLE || term == MOI.INFEASIBLE_OR_UNBOUNDED
-        if attr.result_index != 1
-            return MOI.NO_SOLUTION
-        elseif _has_primal_ray(model)
+        if attr.result_index == 1 && _has_primal_ray(model)
             return MOI.INFEASIBILITY_CERTIFICATE
-        else
-            return MOI.NO_SOLUTION
         end
     end
     # Check SolCount explicitly instead of ResultCount to avoid returning 1 when

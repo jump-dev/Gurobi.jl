@@ -1599,6 +1599,25 @@ function test_precompile()
     return
 end
 
+function test_multiple_solutions_when_dual_infeasible()
+    if Gurobi._GUROBI_VERSION < v"11"
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
+    y = MOI.add_variable(model)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    f = 0.25 * y * y - 1.0 * x * y - 1.0 * y + 1.0
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.DUAL_INFEASIBLE
+    for i in MOI.get(model, MOI.ResultCount())
+        @test MOI.get(model, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+    end
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
