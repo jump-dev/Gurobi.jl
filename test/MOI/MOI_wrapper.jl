@@ -1618,7 +1618,10 @@ function test_multiple_solutions_when_dual_infeasible()
     return
 end
 
-function test_objbound_errors_when_GRB_INFIINTY()
+function test_objbound_errors_when_GRB_INFINITY()
+    if Gurobi._GUROBI_VERSION < v"11"
+        return
+    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
