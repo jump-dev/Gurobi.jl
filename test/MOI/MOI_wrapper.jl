@@ -1608,12 +1608,12 @@ function test_multiple_solutions_when_dual_infeasible()
     x, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
     y = MOI.add_variable(model)
     MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    f = 0.25 * y * y - 1.0 * x * y - 1.0 * y + 1.0
+    f = 1.0 * x * y - 1.0 * y * y
     MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
     MOI.optimize!(model)
     @test MOI.get(model, MOI.TerminationStatus()) == MOI.DUAL_INFEASIBLE
-    for i in MOI.get(model, MOI.ResultCount())
-        @test MOI.get(model, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+    for i in 1:MOI.get(model, MOI.ResultCount())
+        @test MOI.get(model, MOI.PrimalStatus(i)) == MOI.FEASIBLE_POINT
     end
     return
 end
