@@ -3320,6 +3320,9 @@ function MOI.get(model::Optimizer, attr::MOI.ObjectiveBound)
     valueP = Ref{Cdouble}()
     ret = GRBgetdblattr(model, "ObjBound", valueP)
     _check_ret(model, ret)
+    if valueP[] == GRB_INFINITY
+        throw(MOI.GetAttributeNotAllowed((attr)))
+    end
     return valueP[]
 end
 

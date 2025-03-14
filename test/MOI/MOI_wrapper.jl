@@ -1618,6 +1618,23 @@ function test_multiple_solutions_when_dual_infeasible()
     return
 end
 
+function test_objbound_errors_when_GRB_INFIINTY()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
+    y = MOI.add_variable(model)
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    f = 1.0 * x * y - 1.0 * y * y
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.DUAL_INFEASIBLE
+    @test_throws(
+        MOI.GetAttributeNotAllowed{MOI.ObjectiveBound},
+        MOI.get(model, MOI.ObjectiveBound()),
+    )
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
