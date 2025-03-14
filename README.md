@@ -120,7 +120,7 @@ is running.
 If you intended to manually install and use and older version of Gurobi, but it
 reports that the `Version number is` a newer version, this means that your
 manual installation did not work and we have automatically installed the latest
-default version. Double check the [Manual installation](@ref) instructions.
+default version. Double check the "Manual installation" instructions above.
 
 ## Use with JuMP
 
