@@ -3369,13 +3369,7 @@ end
 function MOI.get(model::Optimizer, attr::MOI.DualObjectiveValue)
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
-    if model.has_infeasibility_cert
-        return MOI.Utilities.get_fallback(model, attr, Float64)
-    end
-    valueP = Ref{Cdouble}()
-    ret = GRBgetdblattr(model, "ObjBound", valueP)
-    _check_ret(model, ret)
-    return valueP[]
+    return MOI.Utilities.get_fallback(model, attr, Float64)
 end
 
 function MOI.get(model::Optimizer, attr::MOI.ResultCount)::Int
