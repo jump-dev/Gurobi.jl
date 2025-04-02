@@ -963,6 +963,9 @@ function test_delete_indicator()
             MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.EqualTo(1.0 * i)),
         )
     end
+    F = MOI.VectorAffineFunction{Float64}
+    S = MOI.Indicator{MOI.ACTIVATE_ON_ONE,MOI.EqualTo{Float64}}
+    @test (F, S) in MOI.set(model, MOI.ListOfConstraintTypesPresent())
     f = MOI.get(model, MOI.ConstraintFunction(), c[2])
     MOI.delete(model, c[1])
     MOI.delete(model, c[3])
