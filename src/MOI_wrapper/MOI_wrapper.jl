@@ -3641,6 +3641,12 @@ function MOI.get(model::Optimizer, ::MOI.ListOfConstraintTypesPresent)
     for info in values(model.nl_constraint_info)
         push!(constraints, (MOI.ScalarNonlinearFunction, typeof(info.set)))
     end
+    for info in values(model.indicator_constraint_info)
+        push!(
+            constraints,
+            (MOI.VectorAffineFunction{Float64}, typeof(info.set)),
+        )
+    end
     return collect(constraints)
 end
 
