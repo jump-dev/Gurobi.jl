@@ -31,17 +31,16 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v1
+      - uses: julia-actions/cache@v2
+      - name: Install Gurobi license
+        run: echo "${{ secrets.GUROBI_LICENSE }}" > ~/gurobi.lic
       - shell: julia --project=. --color=yes {0}
         run: |
           import Pkg
           Pkg.add(; name = "Gurobi_jll", version = ENV["GUROBI_JLL_VERSION"])
         env:
-          GUROBI_JL_SKIP_LIB_CHECK: "true"
           GUROBI_JLL_VERSION: ${{ matrix.jll_version }}
       - uses: julia-actions/julia-buildpkg@v1
-        env:
-          WLSLICENSE: ${{ secrets.WLSLICENSE }}
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v4
