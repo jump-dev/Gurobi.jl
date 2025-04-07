@@ -24,7 +24,7 @@ jobs:
       - shell: julia --project=. --color=yes {0}
         run: |
           import Pkg
-          Pkg.add(; name = "Gurobi_jll", version = "12.0.0")
+          Pkg.add(; name = "Gurobi_jll", version = "12.0.1")
       - uses: julia-actions/julia-buildpkg@v1
       - shell: julia --color=yes {0}
         run: |

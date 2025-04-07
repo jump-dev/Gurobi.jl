@@ -19,12 +19,12 @@ jobs:
         os: [ubuntu-latest, macOS-latest, windows-latest]
         arch: [x64]
         # v9.5.2 does not support the web license service
-        jll_version: ['10.0.3', '11.0.1', '12.0.0']
+        jll_version: ['10.0.3', '11.0.1', '12.0.1']
         include:
          - version: '1'
            os: macos-14
            arch: aarch64
-           jll_version: '11.0.1'
+           jll_version: '12.0.1'
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
@@ -32,14 +32,14 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
-      - name: Install Gurobi license
+      - shell: bash
         run: echo "${{ secrets.GUROBI_LICENSE }}" > ~/gurobi.lic
       - shell: julia --project=. --color=yes {0}
+        env:
+          GUROBI_JLL_VERSION: ${{ matrix.jll_version }}
         run: |
           import Pkg
           Pkg.add(; name = "Gurobi_jll", version = ENV["GUROBI_JLL_VERSION"])
-        env:
-          GUROBI_JLL_VERSION: ${{ matrix.jll_version }}
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
