@@ -184,10 +184,6 @@ elseif get(ENV, "GUROBI_JL_USE_GUROBI_JLL", "true") == "false"
     end
 else
     # We're using the artifact
-    if haskey(ENV, "WLSLICENSE")  # This is used by CI
-        home = Sys.iswindows() ? ENV["USERPROFILE"] : ENV["HOME"]
-        write(joinpath(home, "gurobi.lic"), ENV["WLSLICENSE"])
-    end
     open(DEPS_FILE, "w") do io
         println(io, "# No libgurobi constant; we're using the Artifact.")
     end

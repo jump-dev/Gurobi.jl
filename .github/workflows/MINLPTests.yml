@@ -4,41 +4,34 @@ on:
     branches: [master]
   pull_request:
     types: [opened, synchronize, reopened]
+# needed to allow julia-actions/cache to delete old caches that it has created
+permissions:
+  actions: write
+  contents: read
 jobs:
   test:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        version: ['1']
-        os: [ubuntu-latest]
-        arch: ['x64']
+    name: Julia 1 - ${{ github.event_name }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: ${{ matrix.version }}
-          arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v1
+          version: '1'
+          arch: 'x64'
+      - uses: julia-actions/cache@v2
+      - shell: bash
+        run: echo "${{ secrets.GUROBI_LICENSE }}" > ~/gurobi.lic
       - shell: julia --project=. --color=yes {0}
         run: |
           import Pkg
-          Pkg.add(; name = "Gurobi_jll", version = "12.0.0")
-        env:
-          GUROBI_JL_SKIP_LIB_CHECK: "true"
-          GUROBI_JLL_VERSION: ${{ matrix.jll_version }}
+          Pkg.add(; name = "Gurobi_jll", version = "12.0.1")
       - uses: julia-actions/julia-buildpkg@v1
-        env:
-          WLSLICENSE: ${{ secrets.WLSLICENSE }}
-      - uses: julia-actions/julia-buildpkg@v1
-      - name:
-        shell: julia --color=yes {0}
+      - shell: julia --color=yes {0}
         run: |
           path = joinpath(ENV["GITHUB_WORKSPACE"], "test", "MINLPTests")
           cd(path)
           using Pkg
           Pkg.activate(".")
           Pkg.instantiate()
-          Pkg.add(PackageSpec(path=ENV["GITHUB_WORKSPACE"]))
+          Pkg.add(Pkg.PackageSpec(; path = ENV["GITHUB_WORKSPACE"]))
           include(joinpath(path, "runtests.jl"))
