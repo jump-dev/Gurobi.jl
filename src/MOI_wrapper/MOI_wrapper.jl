@@ -1201,7 +1201,11 @@ end
 ###
 
 function _zero_objective(model::Optimizer)
-    num_vars = length(model.variable_info)
+    _update_if_necessary(model)
+    pInt = Ref{Cint}(0)
+    ret = GRBgetintattr(model, "NumVars", pInt)
+    _check_ret(model, ret)
+    num_vars = pInt[]
     obj = zeros(Float64, num_vars)
     ret = GRBdelq(model)
     _check_ret(model, ret)
@@ -1275,7 +1279,11 @@ function MOI.set(
         ret = GRBdelq(model)
         _check_ret(model, ret)
     end
-    num_vars = length(model.variable_info)
+    _update_if_necessary(model)
+    pInt = Ref{Cint}(0)
+    ret = GRBgetintattr(model, "NumVars", pInt)
+    _check_ret(model, ret)
+    num_vars = pInt[]
     obj = zeros(Float64, num_vars)
     for term in f.terms
         obj[column(model, term.variable)] += term.coefficient
@@ -1292,9 +1300,13 @@ end
 
 function _get_affine_objective(model::Optimizer; is_multiobjective::Bool)
     _update_if_necessary(model)
-    dest = zeros(length(model.variable_info))
+    pInt = Ref{Cint}(0)
+    ret = GRBgetintattr(model, "NumVars", pInt)
+    _check_ret(model, ret)
+    num_vars = pInt[]
+    dest = zeros(num_vars)
     name = is_multiobjective ? "ObjN" : "Obj"
-    ret = GRBgetdblattrarray(model, name, 0, length(dest), dest)
+    ret = GRBgetdblattrarray(model, name, 0, num_vars, dest)
     _check_ret(model, ret)
     terms = MOI.ScalarAffineTerm{Float64}[]
     for (index, info) in model.variable_info
@@ -1330,7 +1342,11 @@ function MOI.set(
     affine_indices, affine_coefficients, I, J, V =
         _indices_and_coefficients(model, f)
     # We need to zero out any existing linear objective.
-    obj = zeros(length(model.variable_info))
+    _update_if_necessary(model)
+    pInt = Ref{Cint}(0)
+    ret = GRBgetintattr(model, "NumVars", pInt)
+    _check_ret(model, ret)
+    obj = zeros(pInt[])
     for (i, c) in zip(affine_indices, affine_coefficients)
         obj[i+1] = c
     end
@@ -1354,8 +1370,12 @@ function MOI.get(
     ::MOI.ObjectiveFunction{MOI.ScalarQuadraticFunction{Float64}},
 )
     _update_if_necessary(model)
-    dest = zeros(length(model.variable_info))
-    ret = GRBgetdblattrarray(model, "Obj", 0, length(dest), dest)
+    pInt = Ref{Cint}(0)
+    ret = GRBgetintattr(model, "NumVars", pInt)
+    _check_ret(model, ret)
+    num_vars = pInt[]
+    dest = zeros(num_vars)
+    ret = GRBgetdblattrarray(model, "Obj", 0, num_vars, dest)
     _check_ret(model, ret)
     terms = MOI.ScalarAffineTerm{Float64}[]
     for (index, info) in model.variable_info
@@ -3448,6 +3468,7 @@ function MOI.set(model::Optimizer, attr::MOI.Name, name::String)
 end
 
 MOI.get(model::Optimizer, ::MOI.NumberOfVariables) = length(model.variable_info)
+
 function MOI.get(model::Optimizer, ::MOI.ListOfVariableIndices)
     return sort!(collect(keys(model.variable_info)), by = x -> x.value)
 end

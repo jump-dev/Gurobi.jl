@@ -1641,6 +1641,23 @@ function test_objbound_errors_when_GRB_INFINITY()
     return
 end
 
+function test_set_nonlinear_objective_twice()
+    if !Gurobi._supports_nonlinear()
+        return
+    end
+    model =
+        MOI.Bridges.full_bridge_optimizer(Gurobi.Optimizer(GRB_ENV), Float64)
+    MOI.set(model, MOI.Silent(), true)
+    x, _ = MOI.add_constrained_variable(model, MOI.Interval(2.0, 3.0))
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    f = MOI.ScalarNonlinearFunction(:exp, Any[x])
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.ObjectiveValue()), exp(2.0); atol = 1e-4)
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
