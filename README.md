@@ -89,7 +89,7 @@ import Pkg; Pkg.pkg"add Gurobi_jll@11.0.3"
 
 To opt-out of using the `Gurobi_jll` binaries, set the `GUROBI_HOME` environment
 variable to point to your local installation and set the
-`GUROBI_JL_USE_GUROBI_JLL` environment variable to `"false"`, then run
+`GUROBI_JL_USE_GUROBI_JLL` environment variable to `false`, then run
 `Pkg.add` and `Pkg.build`:
 
 ```julia
