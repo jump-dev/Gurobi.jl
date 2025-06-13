@@ -271,9 +271,10 @@ optimize!(model)
 
 ## Reusing the same Gurobi environment for multiple solves
 
-When using this package via other packages such as [JuMP.jl](https://github.com/jump-dev/JuMP.jl),
-the default behavior is to obtain a new Gurobi license token every time a model
-is created. If you are using Gurobi in a setting where the number of concurrent
+The default behavior of `Gurobi.Optimizer()` is to create a new Gurobi
+environment (and license token) for each model.
+
+If you are using Gurobi in a setting where the number of concurrent
 Gurobi uses is limited (for example, ["Single-Use" or "Floating-Use" licenses](http://www.gurobi.com/products/licensing-pricing/licensing-overview)),
 you might instead prefer to obtain a single license token that is shared by all
 models that your program solves.
@@ -291,6 +292,13 @@ model_1 = Model(() -> Gurobi.Optimizer(GRB_ENV))
 model_2 = direct_model(Gurobi.Optimizer(GRB_ENV))
 set_attribute(model_2, "OutputFlag", 0)
 ```
+
+### Environments are not thread-safe
+
+`Gurobi.Env` are NOT thread-safe. If two models both use the same environment
+you must not solve them simultaneously on different threads.
+
+### Environments inside a module
 
 If you create a module with a `Gurobi.Env` as a module-level constant, use an
 `__init__` function to ensure that a new environment is created each time the
@@ -315,7 +323,7 @@ create_optimizer() = Gurobi.Optimizer(GRB_ENV_REF[])
 end  # MyModule
 ```
 
-## Pass parameters to an Environment
+### Pass parameters to an Environment
 
 To set parameters in an environment before the environment is started, pass a
 `Dict{String,Any}` that maps parameter names to values:
