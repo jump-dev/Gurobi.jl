@@ -623,6 +623,63 @@ function test_CallbackFunction_broadcast()
     return
 end
 
+function test_Callback_MINLP()
+    if Gurobi._GUROBI_VERSION < v"12"
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.RawOptimizerAttribute("OutputFlag"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Cuts"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Presolve"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("PreCrush"), 0)
+    MOI.set(model, MOI.RawOptimizerAttribute("Heuristics"), 0)
+    y, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
+    MOI.add_constraint(
+        model,
+        MOI.ScalarNonlinearFunction(:exp, Any[y]),
+        MOI.EqualTo(exp(0.5)),
+    )
+    N = 30
+    x = MOI.add_variables(model, N)
+    MOI.add_constraints(model, x, MOI.ZeroOne())
+    MOI.set.(model, MOI.VariablePrimalStart(), x, 0.0)
+    Random.seed!(1)
+    item_weights, item_values = rand(N), rand(N)
+    MOI.add_constraint(
+        model,
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(item_weights, x), 0.0),
+        MOI.LessThan(10.0),
+    )
+    MOI.set(
+        model,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(item_values, x), 0.0),
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    solutions = Any[]
+    MOI.set(
+        model,
+        Gurobi.CallbackFunction(),
+        (cb_data, cb_where) -> begin
+            if cb_where == Gurobi.GRB_CB_MIPSOL
+                Gurobi.load_callback_variable_primal(cb_data, cb_where)
+                ret = (
+                    MOI.get.(model, MOI.CallbackVariablePrimal(cb_data), x),
+                    MOI.get(model, MOI.CallbackVariablePrimal(cb_data), y),
+                )
+                push!(solutions, ret)
+            end
+        end,
+    )
+    MOI.optimize!(model)
+    @test length(solutions) > 0
+    for (x_sol, y_sol) in solutions
+        @test item_weights' * x_sol <= 10.0 + 1e-4
+        @test isapprox(y_sol, 0.5; atol = 1e-4)
+    end
+    return
+end
+
 end  # module TestCallbacks
 
 TestCallbacks.runtests()

@@ -108,10 +108,9 @@ Load the solution during a callback so that it can be accessed using
 `MOI.CallbackVariablePrimal`.
 """
 function load_callback_variable_primal(cb_data::CallbackData, cb_where::Cint)
-    resize!(
-        cb_data.model.callback_variable_primal,
-        length(cb_data.model.variable_info),
-    )
+    pInt = Ref{Cint}(0)
+    ret = GRBgetintattr(cb_data.model, "NumVars", pInt)
+    resize!(cb_data.model.callback_variable_primal, pInt[])
     if cb_where == GRB_CB_MIPNODE
         ret = GRBcbget(
             cb_data,
