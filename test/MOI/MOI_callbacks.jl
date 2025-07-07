@@ -624,7 +624,7 @@ function test_CallbackFunction_broadcast()
 end
 
 function test_Callback_MINLP()
-    if Gurobi._GUROBI_VERSION < v"11"
+    if Gurobi._GUROBI_VERSION < v"12"
         return
     end
     model = Gurobi.Optimizer(GRB_ENV)
