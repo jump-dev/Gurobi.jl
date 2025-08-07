@@ -55,8 +55,15 @@ Once you have a license, follow Gurobi's instructions to
 
 The instructions depend on the type of license that you have obtained.
 
-As one exception, if you have used the default installation of Gurobi.jl and the
-instructions call for `grbgetkey`, do:
+### WLS
+
+If you are using the Web License Service (WLS), place the license file in
+your home directory.
+
+### grbgetkey
+
+If the instructions call for `grbgetkey` and you have used the default
+installation of Gurobi.jl, do:
 
 ```julia
 import Pkg
@@ -67,9 +74,11 @@ key = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 run(`$(Gurobi_jll.grbgetkey()) $key`)
 ```
 
+You do not need to run this code if you are using the Web License Service.
+
 ### Default installation
 
-Install Gurobi as follows:
+Install Gurobi.jl as follows:
 ```julia
 import Pkg
 Pkg.add("Gurobi")
