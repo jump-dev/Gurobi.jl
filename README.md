@@ -286,10 +286,9 @@ optimize!(model)
 The default behavior of `Gurobi.Optimizer()` is to create a new Gurobi
 environment (and license token) for each model.
 
-If you are using Gurobi in a setting where the number of concurrent
-Gurobi uses is limited (for example, ["Single-Use" or "Floating-Use" licenses](http://www.gurobi.com/products/licensing-pricing/licensing-overview)),
-you might instead prefer to obtain a single license token that is shared by all
-models that your program solves.
+If you are using Gurobi in a setting where the number of concurrent Gurobi
+licenses is limited you might instead prefer to obtain a single license token
+that is shared by all models that your program solves.
 
 You can do this by passing a `Gurobi.Env()` object as the first parameter to
 `Gurobi.Optimizer`. For example:
