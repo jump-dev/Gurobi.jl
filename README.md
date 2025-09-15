@@ -80,7 +80,7 @@ your home directory.
 
 #### grbgetkey
 
-If the instructions call for `grbgetkey`, do:
+If Gurobi's instructions call for `grbgetkey`, do:
 
 ```julia
 import Pkg
