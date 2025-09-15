@@ -48,36 +48,6 @@ Free Gurobi licenses are available for [academics and students](https://www.guro
 
 ## Installation
 
-To use Gurobi, you need a license, which you can obtain from [gurobi.com](https://www.gurobi.com).
-
-Once you have a license, follow Gurobi's instructions to
-[retrieve and set up a Gurobi license](https://support.gurobi.com/hc/en-us/articles/12872879801105-How-do-I-retrieve-and-set-up-a-Gurobi-license).
-
-The instructions depend on the type of license that you have obtained.
-
-### WLS
-
-If you are using the Web License Service (WLS), place the license file in
-your home directory.
-
-### grbgetkey
-
-If the instructions call for `grbgetkey` and you have used the default
-installation of Gurobi.jl, do:
-
-```julia
-import Pkg
-Pkg.add("Gurobi_jll")
-import Gurobi_jll
-# Replace the contents xxxxx with your actual key
-key = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-run(`$(Gurobi_jll.grbgetkey()) $key`)
-```
-
-You do not need to run this code if you are using the Web License Service.
-
-### Default installation
-
 Install Gurobi.jl as follows:
 ```julia
 import Pkg
@@ -94,7 +64,36 @@ To install a particular version of Gurobi, install the corresponding version of
 import Pkg; Pkg.pkg"add Gurobi_jll@11.0.3"
 ```
 
-### Manual installation
+### Install a license
+
+To use Gurobi, you need a license, which you can obtain from [gurobi.com](https://www.gurobi.com).
+
+Once you have a license, follow Gurobi's instructions to
+[retrieve and set up a Gurobi license](https://support.gurobi.com/hc/en-us/articles/12872879801105-How-do-I-retrieve-and-set-up-a-Gurobi-license).
+
+The instructions depend on the type of license that you have obtained.
+
+#### WLS
+
+If you are using the Web License Service (WLS), place the license file in
+your home directory.
+
+#### grbgetkey
+
+If the instructions call for `grbgetkey`, do:
+
+```julia
+import Pkg
+Pkg.add("Gurobi_jll")
+import Gurobi_jll
+# Replace the contents xxxxx with your actual key
+key = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+run(`$(Gurobi_jll.grbgetkey()) $key`)
+```
+
+You do not need to run this code if you are using the Web License Service.
+
+### Custom binary installation
 
 To opt-out of using the `Gurobi_jll` binaries, set the `GUROBI_HOME` environment
 variable to point to your local installation and set the
@@ -117,7 +116,7 @@ Pkg.add("Gurobi")
 Pkg.build("Gurobi")
 ```
 
-To change the location of a manual install, change the value of `GUROBI_HOME`,
+To change the location of a custom install, change the value of `GUROBI_HOME`,
 re-run `Pkg.build("Gurobi")`, and then re-start Julia for the change to take
 effect.
 
@@ -126,10 +125,10 @@ effect.
 This error occurs when Gurobi cannot find a valid license for the version that
 is running.
 
-If you intended to manually install and use and older version of Gurobi, but it
-reports that the `Version number is` a newer version, this means that your
-manual installation did not work and we have automatically installed the latest
-default version. Double check the "Manual installation" instructions above.
+If you intended to install and use an older version of Gurobi, but it reports
+that the `Version number is` a newer version, this means that your custom
+installation did not work and we have automatically installed the latest
+version. Double check the "Custom binary installation" instructions above.
 
 ## Use with JuMP
 
