@@ -19,12 +19,12 @@ jobs:
         os: [ubuntu-latest, macOS-latest, windows-latest]
         arch: [x64]
         # v9.5.2 does not support the web license service
-        jll_version: ['10.0.3', '11.0.1', '12.0.1']
+        jll_version: ['10.0.3', '11.0.1', '12.0.3']
         include:
          - version: '1'
            os: macos-14
            arch: aarch64
-           jll_version: '12.0.1'
+           jll_version: '12.0.3'
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
