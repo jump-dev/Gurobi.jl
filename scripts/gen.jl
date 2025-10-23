@@ -15,10 +15,11 @@
 
 using Clang.Generators
 
-const gurobi_c = "/Library/gurobi1200/macos_universal2/include/gurobi_c.h"
-const output_folder = "gen120"
+const gurobi_c = "/Library/gurobi1300/macos_universal2/include/gurobi_c.h"
+const output_folder = "gen130"
 
 options = load_options(joinpath(@__DIR__, "generate.toml"))
 options["general"]["output_file_path"] =
     joinpath(@__DIR__, "..", "src", output_folder, "libgrb_api.jl")
+mkpath(dirname(options["general"]["output_file_path"]))
 build!(create_context([gurobi_c], get_default_args(), options))
