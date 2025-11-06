@@ -7,6 +7,8 @@
 using Gurobi
 using Test
 
+@info "Running tests with $(Gurobi.libgurobi)"
+
 # When adding new tests, be mindful about creating new environments. Either
 # re-use an existing environment in the module, or name the test function
 # `test_MULTI_ENV_xxx` to trap the specific Gurobi error indicating that an
