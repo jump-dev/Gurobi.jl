@@ -47,7 +47,7 @@ jobs:
         with:
           file: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
-test-local:
+  test-local:
     name: Test-local-install
     runs-on: ubuntu-latest
     steps:
