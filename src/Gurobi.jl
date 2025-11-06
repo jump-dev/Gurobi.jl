@@ -44,14 +44,11 @@ const _GUROBI_VERSION = if libgurobi == "__skipped_installation__"
 else
     let
         majorP, minorP, technicalP = Ref{Cint}(), Ref{Cint}(), Ref{Cint}()
-        ccall(
-            (:GRBversion, libgurobi),
-            Cvoid,
-            (Ptr{Cint}, Ptr{Cint}, Ptr{Cint}),
-            majorP,
-            minorP,
-            technicalP,
-        )
+        @ccall libgurobi.GRBversion(
+            majorP::Ptr{Cint},
+            minorP::Ptr{Cint},
+            technicalP::Ptr{Cint},
+        )::Cvoid
         VersionNumber(majorP[], minorP[], technicalP[])
     end
 end

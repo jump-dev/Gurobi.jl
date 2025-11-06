@@ -47,3 +47,29 @@ jobs:
         with:
           file: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
+  test-local:
+    name: Test-local-install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+          arch: 'x64'
+      - uses: julia-actions/cache@v1
+      - shell: bash
+        run: |
+          echo "${{ secrets.GUROBI_LICENSE }}" > ~/gurobi.lic
+          cd deps
+          curl -L https://anaconda.org/Gurobi/gurobi/12.0.3/download/linux-64/gurobi-12.0.3-py311_0.tar.bz2 -o x86_64-linux-gnu.tar.bz2
+          tar -xjf x86_64-linux-gnu.tar.bz2
+      - uses: julia-actions/julia-buildpkg@v1
+        env:
+          GUROBI_JL_USE_GUROBI_JLL: false
+          GUROBI_HOME: "/home/runner/work/Gurobi.jl/Gurobi.jl/deps"
+      - uses: julia-actions/julia-runtest@v1
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v4
+        with:
+          file: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
