@@ -2844,71 +2844,46 @@ end
 
 # These strings are taken directly from the following page of the online Gurobi
 # documentation:
-# https://www.gurobi.com/documentation/10.0/refman/optimization_status_codes.html#sec:StatusCodes
-const _RAW_STATUS_STRINGS = [
-    # TerminationStatus,          RawStatusString
-    (
-        MOI.OPTIMIZE_NOT_CALLED,
-        "Model is loaded, but no solution information is available.",
-    ),
-    (
-        MOI.OPTIMAL,
-        "Model was solved to optimality (subject to tolerances), and an optimal solution is available.",
-    ),
-    (MOI.INFEASIBLE, "Model was proven to be infeasible."),
-    (
-        MOI.INFEASIBLE_OR_UNBOUNDED,
-        "Model was proven to be either infeasible or unbounded. To obtain a more definitive conclusion, set the DualReductions parameter to 0 and reoptimize.",
-    ),
-    (
-        MOI.DUAL_INFEASIBLE,
-        "Model was proven to be unbounded. Important note: an unbounded status indicates the presence of an unbounded ray that allows the objective to improve without limit. It says nothing about whether the model has a feasible solution. If you require information on feasibility, you should set the objective to zero and reoptimize.",
-    ),
-    (
-        MOI.OBJECTIVE_LIMIT,
-        "Optimal objective for model was proven to be worse than the value specified in the Cutoff parameter. No solution information is available.",
-    ),
-    (
-        MOI.ITERATION_LIMIT,
-        "Optimization terminated because the total number of simplex iterations performed exceeded the value specified in the IterationLimit parameter, or because the total number of barrier iterations exceeded the value specified in the BarIterLimit parameter.",
-    ),
-    (
-        MOI.NODE_LIMIT,
-        "Optimization terminated because the total number of branch-and-cut nodes explored exceeded the value specified in the NodeLimit parameter.",
-    ),
-    (
-        MOI.TIME_LIMIT,
-        "Optimization terminated because the time expended exceeded the value specified in the TimeLimit parameter.",
-    ),
-    (
-        MOI.SOLUTION_LIMIT,
-        "Optimization terminated because the number of solutions found reached the value specified in the SolutionLimit parameter.",
-    ),
-    (MOI.INTERRUPTED, "Optimization was terminated by the user."),
-    (
-        MOI.NUMERICAL_ERROR,
-        "Optimization was terminated due to unrecoverable numerical difficulties.",
-    ),
-    (
-        MOI.LOCALLY_SOLVED,
-        "Unable to satisfy optimality tolerances; a sub-optimal solution is available.",
-    ),
-    (
-        MOI.OTHER_ERROR,
-        "An asynchronous optimization call was made, but the associated optimization run is not yet complete.",
-    ),
-    (
-        MOI.OBJECTIVE_LIMIT,
-        "User specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached.",
-    ),
-    (
-        MOI.OTHER_LIMIT,
-        "Optimization terminated because the work expended exceeded the value specified in the WorkLimit parameter.",
-    ),
-    (
-        MOI.MEMORY_LIMIT,
-        "Optimization terminated because the total amount of allocated memory exceeded the value specified in the SoftMemLimit parameter.",
-    ),
+# https://docs.gurobi.com/projects/optimizer/en/13.0/reference/numericcodes/statuscodes.html
+const _GRB_STATUS_CODES = [
+    # GRB_LOADED = 1
+    MOI.OPTIMIZE_NOT_CALLED => "Model is loaded, but no solution information is available.",
+    # GRB_OPTIMAL = 2
+    MOI.OPTIMAL => "Model was solved to optimality (subject to tolerances), and an optimal solution is available.",
+    # GRB_INFEASIBLE = 3
+    MOI.INFEASIBLE => "Model was proven to be infeasible.",
+    # GRB_INF_OR_UNBD = 4
+    MOI.INFEASIBLE_OR_UNBOUNDED => "Model was proven to be either infeasible or unbounded. To obtain a more definitive conclusion, set the DualReductions parameter to 0 and reoptimize.",
+    # GRB_UNBOUNDED = 5
+    MOI.DUAL_INFEASIBLE => "Model was proven to be unbounded. Important note: an unbounded status indicates the presence of an unbounded ray that allows the objective to improve without limit. It says nothing about whether the model has a feasible solution. If you require information on feasibility, you should set the objective to zero and reoptimize.",
+    # GRB_CUTOFF = 6
+    MOI.OBJECTIVE_LIMIT => "Optimal objective for model was proven to be worse than the value specified in the Cutoff parameter. No solution information is available.",
+    # GRB_ITERATION_LIMIT = 7
+    MOI.ITERATION_LIMIT => "Optimization terminated because the total number of simplex iterations performed exceeded the value specified in the IterationLimit parameter, or because the total number of barrier iterations exceeded the value specified in the BarIterLimit parameter.",
+    # GRB_NODE_LIMIT = 8
+    MOI.NODE_LIMIT => "Optimization terminated because the total number of branch-and-cut nodes explored exceeded the value specified in the NodeLimit parameter.",
+    # GRB_TIME_LIMIT = 9
+    MOI.TIME_LIMIT => "Optimization terminated because the time expended exceeded the value specified in the TimeLimit parameter.",
+    # GRB_SOLUTION_LIMIT = 10
+    MOI.SOLUTION_LIMIT => "Optimization terminated because the number of solutions found reached the value specified in the SolutionLimit parameter.",
+    # GRB_INTERRUPTED = 11
+    MOI.INTERRUPTED => "Optimization was terminated by the user.",
+    # GRB_NUMERIC = 12
+    MOI.NUMERICAL_ERROR => "Optimization was terminated due to unrecoverable numerical difficulties.",
+    # GRB_SUBOPTIMAL = 13
+    MOI.LOCALLY_SOLVED => "Unable to satisfy optimality tolerances; a sub-optimal solution is available.",
+    # GRB_INPROGRESS = 14
+    MOI.OTHER_ERROR => "An asynchronous optimization call was made, but the associated optimization run is not yet complete.",
+    # GRB_USER_OBJ_LIMIT = 15
+    MOI.OBJECTIVE_LIMIT => "User specified an objective limit (a bound on either the best objective or the best bound), and that limit has been reached.",
+    # GRB_WORK_LIMIT = 16
+    MOI.OTHER_LIMIT => "Optimization terminated because the work expended exceeded the value specified in the WorkLimit parameter.",
+    # GRB_MEM_LIMIT = 17
+    MOI.MEMORY_LIMIT => "Optimization terminated because the total amount of allocated memory exceeded the value specified in the SoftMemLimit parameter.",
+    # GRB_LOCALLY_OPTIMAL = 18
+    MOI.LOCALLY_SOLVED => "Model solved to local optimality. A solution satisfying the first-order optimality conditions (subject to tolerances) was found and is available.",
+    # GRB_LOCALLY_INFEASIBLE = 19
+    MOI.LOCALLY_INFEASIBLE => "Model appears to be locally infeasible. A first-order minimizer of a measure for the constraint violations was found.",
 ]
 
 function _raw_status(model::Optimizer)
@@ -2918,8 +2893,8 @@ function _raw_status(model::Optimizer)
     valueP = Ref{Cint}()
     ret = GRBgetintattr(model, "Status", valueP)
     _check_ret(model, ret)
-    @assert 1 <= valueP[] <= 17
-    return _RAW_STATUS_STRINGS[valueP[]]
+    @assert 1 <= valueP[] <= 19
+    return _GRB_STATUS_CODES[valueP[]]
 end
 
 function MOI.get(model::Optimizer, attr::MOI.RawStatusString)
