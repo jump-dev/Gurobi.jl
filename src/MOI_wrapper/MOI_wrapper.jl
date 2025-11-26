@@ -2807,7 +2807,7 @@ function MOI.optimize!(model::Optimizer)
         #
         # As an optimization, run this callback only during POLLING and MESSAGE
         # callbacks. We don't need it all the time.
-        wheres = (1 << GRB_CB_POLLING) | (1 << GRB_CB_MESSAGE)
+        wheres = Cuint(1 << GRB_CB_POLLING | 1 << GRB_CB_MESSAGE)
         MOI.set(model, CallbackFunction(wheres), (x, y) -> nothing)
         set_temporary_callback = true
     end
