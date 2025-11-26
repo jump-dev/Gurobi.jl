@@ -51,9 +51,13 @@ function _gurobi_callback_wrapper(
 end
 
 """
-    CallbackFunction()
+    CallbackFunction(wheres::Cuint = 0xffffffff)
 
 Set a generic Gurobi callback function.
+
+`wheres` is a bit vector defining for which where flags the callback should be
+invoked. It should contain value 1 in the n-th position if you want the callback
+to be invoked for the where flag of value n.
 
 Callback function should be of the form
 
@@ -62,9 +66,13 @@ Callback function should be of the form
 Note: before accessing `MOI.CallbackVariablePrimal`, you must call
 `Gurobi.load_callback_variable_primal(cb_data, cb_where)`.
 """
-struct CallbackFunction <: MOI.AbstractCallback end
+struct CallbackFunction <: MOI.AbstractCallback
+    wheres::Cuint
 
-function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
+    CallbackFunction(wheres::Cuint = 0xffffffff) = new(wheres)
+end
+
+function MOI.set(model::Optimizer, attr::CallbackFunction, f::Function)
     grb_callback = @cfunction(
         _gurobi_callback_wrapper,
         Cint,
@@ -79,8 +87,13 @@ function MOI.set(model::Optimizer, ::CallbackFunction, f::Function)
             return
         end,
     )
-    ret = GRBsetcallbackfunc(model, grb_callback, user_data)
-    _check_ret(model, ret)
+    if _GUROBI_VERSION >= v"13"
+        ret = GRBsetcallbackfuncadv(model, grb_callback, user_data, attr.wheres)
+        _check_ret(model, ret)
+    else
+        ret = GRBsetcallbackfunc(model, grb_callback, user_data)
+        _check_ret(model, ret)
+    end
     # We need to keep a reference to the callback function so that it isn't
     # garbage collected.
     model.generic_callback = user_data
