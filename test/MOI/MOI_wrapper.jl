@@ -1659,7 +1659,7 @@ function test_set_nonlinear_objective_twice()
 end
 
 function test_nonlinear_constraint_tanh()
-    if !(_GUROBI_VERSION >= v"13")
+    if !(Gurobi._GUROBI_VERSION >= v"13")
         return
     end
     model = Gurobi.Optimizer(GRB_ENV)
@@ -1674,7 +1674,7 @@ function test_nonlinear_constraint_tanh()
 end
 
 function test_nonlinear_constraint_signpower()
-    if !(_GUROBI_VERSION >= v"13")
+    if !(Gurobi._GUROBI_VERSION >= v"13")
         return
     end
     model = Gurobi.Optimizer(GRB_ENV)
