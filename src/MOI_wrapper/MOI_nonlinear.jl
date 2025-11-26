@@ -25,6 +25,10 @@ if _supports_nonlinear()
         :log10 => GRB_OPCODE_LOG10,
         :logistic => GRB_OPCODE_LOGISTIC,
     )
+    if _GUROBI_VERSION >= v"13"
+        _OPCODE_MAP[:tanh] = GRB_OPCODE_TANH
+        _OPCODE_MAP[:signpower] = GRB_OPCODE_TANH
+    end
 else
     const _OPCODE_MAP = Dict()
 end

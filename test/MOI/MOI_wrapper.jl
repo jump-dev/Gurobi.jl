@@ -1658,6 +1658,42 @@ function test_set_nonlinear_objective_twice()
     return
 end
 
+function test_nonlinear_constraint_tanh()
+    if !(_GUROBI_VERSION >= v"13")
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variable(model)
+    f = MOI.ScalarNonlinearFunction(:tanh, Any[x])
+    MOI.add_constraint(model, f, MOI.EqualTo(0.5))
+    MOI.optimize!(model)
+    x_val = MOI.get(model, MOI.VariablePrimal(), x)
+    @test ≈(x_val, atanh(0.5); atol = 1e-6)
+    return
+end
+
+function test_nonlinear_constraint_signpower()
+    if !(_GUROBI_VERSION >= v"13")
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variable(model)
+    f = MOI.ScalarNonlinearFunction(:signpower, Any[x, 2])
+    MOI.add_constraint(model, f, MOI.EqualTo(0.25))
+    MOI.optimize!(model)
+    @test ≈(MOI.get(model, MOI.VariablePrimal(), x), 0.5; atol = 1e-6)
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variable(model)
+    f = MOI.ScalarNonlinearFunction(:signpower, Any[x, 2])
+    MOI.add_constraint(model, f, MOI.EqualTo(-0.25))
+    MOI.optimize!(model)
+    @test ≈(MOI.get(model, MOI.VariablePrimal(), x), -0.5; atol = 1e-6)
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
