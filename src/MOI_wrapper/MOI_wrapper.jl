@@ -2804,7 +2804,11 @@ function MOI.optimize!(model::Optimizer)
         # Julia introduces an interruptible ccall --- which it likely won't
         # https://github.com/JuliaLang/julia/issues/2622 --- set a null
         # callback.
-        MOI.set(model, CallbackFunction(), (x, y) -> nothing)
+        #
+        # As an optimization, run this callback only during POLLING and MESSAGE
+        # callbacks. We don't need it all the time.
+        wheres = Cuint(1 << GRB_CB_POLLING | 1 << GRB_CB_MESSAGE)
+        MOI.set(model, CallbackFunction(wheres), (x, y) -> nothing)
         set_temporary_callback = true
     end
 
