@@ -3046,6 +3046,9 @@ function _has_primal_ray(model::Optimizer)
     return ret == 0
 end
 
+# A deprecation added in Gurobi 13
+_XN = ifelse(_GUROBI_VERSION >= v"13", "PoolNX", "Xn")
+
 function MOI.get(
     model::Optimizer,
     attr::MOI.VariablePrimal,
@@ -3060,7 +3063,7 @@ function MOI.get(
             MOI.RawOptimizerAttribute("SolutionNumber"),
             attr.result_index - 1,
         )
-        key = "Xn"
+        key = _XN
     end
     valueP = Ref{Cdouble}()
     ret = GRBgetdblattrelement(model, key, c_column(model, x), valueP)
@@ -3290,6 +3293,9 @@ function MOI.get(
     return _dual_multiplier(model) * valueP[]
 end
 
+# A deprecation added in Gurobi 13
+_POOLOBJVAL = ifelse(_GUROBI_VERSION >= v"13", "PoolNObjVal", "PoolObjVal")
+
 function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
     _throw_if_optimize_in_progress(model, attr)
     MOI.check_result_index_bounds(model, attr)
@@ -3308,7 +3314,7 @@ function MOI.get(model::Optimizer, attr::MOI.ObjectiveValue)
         return [MOI.get(model, MultiObjectiveValue(i)) for i in 1:N]
     end
     valueP = Ref{Cdouble}()
-    key = attr.result_index == 1 ? "ObjVal" : "PoolObjVal"
+    key = attr.result_index == 1 ? "ObjVal" : _POOLOBJVAL
     ret = GRBgetdblattr(model, key, valueP)
     _check_ret(model, ret)
     return valueP[]
