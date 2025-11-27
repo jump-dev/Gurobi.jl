@@ -468,7 +468,7 @@ function MOI.get(
             MOI.RawOptimizerAttribute("SolutionNumber"),
             attr.result_index - 1,
         )
-        key = "Xn"
+        key = _XN
     end
     valueP = Ref{Cdouble}()
     ret = GRBgetdblattrelement(model, key, Cint(info.resvar_index - 1), valueP)
