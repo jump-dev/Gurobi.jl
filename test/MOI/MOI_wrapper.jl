@@ -1701,9 +1701,10 @@ function test_issue_662()
     MOI.set(model, MOI.Silent(), true)
     MOI.copy_to(model, src)
     MOI.optimize!(model)
-    @test MOI.get(model, MOI.TerminationStatus()) == MOI.LOCALLY_SOLVED
+    stat = MOI.get(model, MOI.TerminationStatus())
+    @test stat in (MOI.OPTIMAL, MOI.LOCALLY_SOLVED)
     @test MOI.get(model, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
-    @test MOI.get(model, MOI.DualalStatus()) == MOI.FEASIBLE_POINT
+    @test MOI.get(model, MOI.DualStatus()) == MOI.FEASIBLE_POINT
     return
 end
 
