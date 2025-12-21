@@ -2933,9 +2933,9 @@ function MOI.get(model::Optimizer, attr::MOI.PrimalStatus)
     _check_ret(model, ret)
     if !(1 <= attr.result_index <= valueP[])
         return MOI.NO_SOLUTION
-    elseif term in (MOI.OPTIMAL, MOI.SOLUTION_LIMIT)
+    elseif term in (MOI.OPTIMAL, MOI.LOCALLY_SOLVED, MOI.SOLUTION_LIMIT)
         # Assume that if Gurobi tells us the problem is optimal, or if it found
-        # too manny solutions, then we have a feasible point.
+        # too many solutions, then we have a feasible point.
         return MOI.FEASIBLE_POINT
     elseif _is_primal_feasible_to_tolerance(model)
         # Feasibility of solution is unknown. Check for violations.
@@ -3030,7 +3030,7 @@ function MOI.get(model::Optimizer, attr::MOI.DualStatus)
     if ret != 0  # Something went wrong
         return MOI.NO_SOLUTION
     end
-    if term in (MOI.OPTIMAL, MOI.SOLUTION_LIMIT)
+    if term in (MOI.OPTIMAL, MOI.LOCALLY_SOLVED, MOI.SOLUTION_LIMIT)
         return MOI.FEASIBLE_POINT
     end
     # There is no easy equivalence to _is_primal_feasible_to_tolerance, so we
