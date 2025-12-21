@@ -1694,6 +1694,19 @@ function test_nonlinear_constraint_signpower()
     return
 end
 
+function test_issue_662()
+    src = MOI.FileFormats.MOF.Model()
+    MOI.read_from_file(src, joinpath(@__DIR__, "issue_662.mof.json"))
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.copy_to(model, src)
+    MOI.optimize!(model)
+    @test MOI.get(model, MOI.TerminationStatus()) == MOI.LOCALLY_SOLVED
+    @test MOI.get(model, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+    @test MOI.get(model, MOI.DualalStatus()) == MOI.FEASIBLE_POINT
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
