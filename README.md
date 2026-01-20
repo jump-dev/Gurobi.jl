@@ -305,8 +305,11 @@ set_attribute(model_2, "OutputFlag", 0)
 
 ### Environments are not thread-safe
 
-`Gurobi.Env` are NOT thread-safe. If two models both use the same environment
-you must not solve them simultaneously on different threads.
+`Gurobi.Env` are NOT thread-safe.
+
+You must not create models using the same environment from separate threads.
+Moreover, if two models both use the same environment you must not solve them
+simultaneously on different threads.
 
 ### Environments inside a module
 
