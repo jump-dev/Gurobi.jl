@@ -114,7 +114,7 @@ struct MultiObjectiveWeight <: MOI.AbstractModelAttribute
     index::Int
 end
 
-function MOI.set(model::Optimizer, attr::MultiObjectiveWeight, weight::Float64)
+function MOI.set(model::Optimizer, attr::MultiObjectiveWeight, weight::Real)
     MOI.set(model, MultiObjectiveAttribute(attr.index, "ObjNWeight"), weight)
     return
 end

@@ -99,6 +99,11 @@ c4: y >= 0.25
     @test MOI.get(model, MOI.VariablePrimal(), y) ≈ BFS[3].y
     @test MOI.get(model, Gurobi.MultiObjectiveValue(1)) ≈ BFS[3].f1
     @test MOI.get(model, Gurobi.MultiObjectiveValue(2)) ≈ BFS[3].f2
+
+    MOI.set(model, Gurobi.MultiObjectiveWeight(1), 1)
+    MOI.set(model, Gurobi.MultiObjectiveWeight(2), 1)
+    @test MOI.get(model, Gurobi.MultiObjectiveWeight(1)) == 1.0
+    @test MOI.get(model, Gurobi.MultiObjectiveWeight(2)) == 1.0
 end
 
 function test_example_biobjective_knapsack()
