@@ -4599,3 +4599,37 @@ function MOI.write_to_file(model::Optimizer, filename::String)
     _check_ret(model, ret)
     return
 end
+
+# LazyScalarSet
+
+function MOI.supports_constraint(
+    model::Gurobi.Optimizer,
+    ::Type{MOI.ScalarAffineFunction{Float64}},
+    ::Type{MOI.LazyScalarSet{S}},
+) where {
+    S<:Union{
+        MOI.GreaterThan{Float64},
+        MOI.EqualTo{Float64},
+        MOI.LessThan{Float64},
+    },
+}
+    return true
+end
+
+# This isn't a complete implementation, but it's enough of a work-in-progress to
+# decide if this is worth pursuing.
+function MOI.add_constraint(
+    model::Gurobi.Optimizer,
+    f::MOI.ScalarAffineFunction{Float64},
+    s::MOI.LazyScalarSet{S},
+) where {
+    S<:Union{
+        MOI.GreaterThan{Float64},
+        MOI.EqualTo{Float64},
+        MOI.LessThan{Float64},
+    },
+}
+    ci = MOI.add_constraint(model, f, s.set)
+    MOI.set(model, ConstraintAttribute("Lazy"), ci, 1)
+    return MOI.ConstraintIndex{typeof(f),typeof(s)}(ci.value)
+end
