@@ -1708,6 +1708,32 @@ function test_issue_662()
     return
 end
 
+function test_lazy_constraint()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variable(model)
+    y = MOI.add_variable(model)
+    # y >= f(x) --> y >= f(x_k) + f'(x_k) * (x - x_k)
+    # f(x) = (x - 1)^2
+    # --> y >= (x_k - 1)^2 + 2 * (x_k - 1) * (x - x_k)
+    # --> -2 * (x_k - 1) * x + y >= (x_k - 1)^2 - 2 * (x_k - 1) * x_k
+    for x_k in -1.0:0.1:3.0
+        df_k = 2 * (x_k - 1)
+        set = MOI.GreaterThan((x_k - 1)^2 - df_k * x_k)
+        MOI.add_constraint(model, -df_k * x + 1.0 * y, MOI.LazyScalarSet(set))
+    end
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    obj = 1.0 * y
+    MOI.set(model, MOI.ObjectiveFunction{typeof(obj)}(), obj)
+    MOI.optimize!(model)
+    MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
+    x_star = MOI.get(model, MOI.VariablePrimal(), x)
+    # Minimum won't be exactly at the minmum
+    @test 0.95 <= x_star <= 1.05
+    @test isapprox(MOI.get(model, MOI.VariablePrimal(), y), 0)
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()

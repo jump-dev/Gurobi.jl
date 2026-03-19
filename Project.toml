@@ -11,12 +11,12 @@ PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 
 [compat]
 Gurobi_jll = "~9.5, ~10.0, ~11.0, ~12.0, ~13.0"
-Libdl = "<0.0.1, 1.6"
+Libdl = "1"
 MathOptInterface = "1.21"
 PrecompileTools = "1"
-Random = "<0.0.1, 1.6"
-Test = "<0.0.1, 1.6"
-julia = "1.6"
+Random = "1"
+Test = "1"
+julia = "1.10"
 
 [extras]
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
@@ -24,3 +24,6 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Random", "Test"]
+
+[sources]
+MathOptInterface = {url = "https://github.com/jump-dev/MathOptInterface.jl", rev = "od/lazy-scalar-set"}
