@@ -1953,6 +1953,12 @@ function MOI.add_constraint(
     ret =
         GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('B'))
     _check_ret(model, ret)
+    ret =
+        GRBsetdblattrelement(model, "LB", Cint(info.column - 1), 0.0)
+    _check_ret(model, ret)
+    ret =
+        GRBsetdblattrelement(model, "UB", Cint(info.column - 1), 1.0)
+    _check_ret(model, ret)
     _require_update(model, attribute_change = true)
     info.type = GRB_BINARY
     return MOI.ConstraintIndex{MOI.VariableIndex,MOI.ZeroOne}(f.value)
