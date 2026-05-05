@@ -1950,14 +1950,14 @@ function MOI.add_constraint(
     ::MOI.ZeroOne,
 )
     info = _info(model, f)
-    ret =
-        GRBsetcharattrelement(model, "VType", Cint(info.column - 1), Char('B'))
+    col = Cint(info.column - 1)
+    ret = GRBsetcharattrelement(model, "VType", col, Char('B'))
     _check_ret(model, ret)
-    ret =
-        GRBsetdblattrelement(model, "LB", Cint(info.column - 1), 0.0)
+    # These are needed due to a bug in Gurobi 13, which may cause some
+    # problems to be inferred as unbounded instead of infeasible. 
+    ret = GRBsetdblattrelement(model, "LB", col, 0.0)
     _check_ret(model, ret)
-    ret =
-        GRBsetdblattrelement(model, "UB", Cint(info.column - 1), 1.0)
+    ret = GRBsetdblattrelement(model, "UB", col, 1.0)
     _check_ret(model, ret)
     _require_update(model, attribute_change = true)
     info.type = GRB_BINARY
