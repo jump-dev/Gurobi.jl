@@ -197,6 +197,7 @@ function MOI.delete(
     c::MOI.ConstraintIndex{<:MOI.VectorAffineFunction,<:MOI.Indicator},
 )
     MOI.throw_if_not_valid(model, c)
+    _update_if_necessary(model)
     row = _info(model, c).row
     ind = Ref{Cint}(row - 1)
     ret = GRBdelgenconstrs(model, 1, ind)

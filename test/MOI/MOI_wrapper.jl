@@ -1637,6 +1637,19 @@ function test_issue_662()
     return
 end
 
+function test_deleting_indicator()
+    model = Gurobi.Optimizer()
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.ZeroOne())
+    f = MOI.Utilities.vectorize(1.0 .* x)
+    set = MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    c = MOI.add_constraint(model, f, set)
+    MOI.delete(model, c)
+    @test !MOI.is_valid(model, c)
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
