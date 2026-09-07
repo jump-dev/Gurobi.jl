@@ -6,37 +6,38 @@
 
 module TestMOIWrapper
 
+using Gurobi
 using Test
 
-using Gurobi
 import MathOptInterface as MOI
 import Random
 
+function _handle_ex(name, ex)
+    err = ErrorException("Gurobi Error 10009: Failed to obtain a valid license")
+    if startswith("$(name)", "test_MULTI_ENV") && ex == err
+        @warn(
+            """
+            Skipping a test because there was an issue creating multiple \
+            licenses. This is probably because you have a limited license.
+            """,
+        )
+    else
+        rethrow(ex)
+    end
+    return
+end
+
 function runtests()
-    for name in names(@__MODULE__; all = true)
-        if !startswith("$(name)", "test_")
+    is_test(name) = startswith("$name", "test_")
+    is_nonlinear(name) = startswith("$name", "test_nonlinear")
+    @testset "$name" for name in filter(is_test, names(@__MODULE__; all = true))
+        if is_nonlinear(name) && !Gurobi._supports_nonlinear()
             continue
         end
-        @testset "$(name)" begin
-            if startswith("$(name)", "test_MULTI_ENV")
-                try
-                    getfield(@__MODULE__, name)()
-                catch ex
-                    if ex == ErrorException(
-                        "Gurobi Error 10009: Failed to obtain a valid license",
-                    )
-                        @warn(
-                            "Skipping a test because there was an issue " *
-                            "creating multiple licenses. This is probably " *
-                            "because you have a limited license."
-                        )
-                    else
-                        rethrow(ex)
-                    end
-                end
-            else
-                getfield(@__MODULE__, name)()
-            end
+        try
+            getfield(@__MODULE__, name)()
+        catch ex
+            _handle_ex(name, ex)
         end
     end
     return
@@ -128,7 +129,6 @@ function test_User_limit_handling_issue_140()
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(.-item_values, x), 0.0),
     )
     MOI.optimize!(m)
-
     @test MOI.get(m, MOI.TerminationStatus()) == MOI.SOLUTION_LIMIT
     # We should have a primal feasible solution:
     @test MOI.get(m, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
@@ -152,7 +152,6 @@ function test_Constant_objective_issue_111()
     p = Ref{Cdouble}()
     Gurobi.GRBgetdblattr(m, "ObjCon", p)
     @test p[] == 2.0
-
     MOI.modify(
         m,
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
@@ -230,15 +229,15 @@ function test_QCPDual_1()
     MOI.Utilities.loadfromstring!(
         model,
         """
-variables: x, y, z
-minobjective: 1.0 * x + 1.0 * y + 1.0 * z
-c1: x + y == 2.0
-c2: x + y + z >= 0.0
-c3: 1.0 * x * x + -1.0 * y * y + -1.0 * z * z >= 0.0
-x >= 0.0
-y >= 0.0
-z >= 0.0
-""",
+        variables: x, y, z
+        minobjective: 1.0 * x + 1.0 * y + 1.0 * z
+        c1: x + y == 2.0
+        c2: x + y + z >= 0.0
+        c3: 1.0 * x * x + -1.0 * y * y + -1.0 * z * z >= 0.0
+        x >= 0.0
+        y >= 0.0
+        z >= 0.0
+        """,
     )
     MOI.optimize!(model)
     @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
@@ -259,15 +258,15 @@ function test_QCPDual_default()
     MOI.Utilities.loadfromstring!(
         model,
         """
-variables: x, y, z
-minobjective: 1.0 * x + 1.0 * y + 1.0 * z
-c1: x + y == 2.0
-c2: x + y + z >= 0.0
-c3: 1.0 * x * x + -1.0 * y * y + -1.0 * z * z >= 0.0
-x >= 0.0
-y >= 0.0
-z >= 0.0
-""",
+        variables: x, y, z
+        minobjective: 1.0 * x + 1.0 * y + 1.0 * z
+        c1: x + y == 2.0
+        c2: x + y + z >= 0.0
+        c3: 1.0 * x * x + -1.0 * y * y + -1.0 * z * z >= 0.0
+        x >= 0.0
+        y >= 0.0
+        z >= 0.0
+        """,
     )
     MOI.optimize!(model)
     @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
@@ -325,12 +324,12 @@ function test_ConstraintAttribute()
     MOI.Utilities.loadfromstring!(
         model,
         """
-variables: x
-minobjective: x
-x >= 0.0
-c: 2x >= 1.0
-x in Integer()
-""",
+        variables: x
+        minobjective: x
+        x >= 0.0
+        c: 2x >= 1.0
+        x in Integer()
+        """,
     )
     c2 = MOI.get(model, MOI.ConstraintIndex, "c")
     # Linear constraints are supported - one test for each different type.
@@ -366,12 +365,12 @@ function test_VariableAttribute()
     MOI.Utilities.loadfromstring!(
         model,
         """
-variables: x
-minobjective: x
-c1: x >= 0.0
-c2: 2x >= 1.0
-c3: x in Integer()
-""",
+        variables: x
+        minobjective: x
+        c1: x >= 0.0
+        c2: 2x >= 1.0
+        c3: x in Integer()
+        """,
     )
     x = MOI.get(model, MOI.VariableIndex, "x")
     # Setting attributes of each type
@@ -408,12 +407,12 @@ function test_ModelAttribute()
     MOI.Utilities.loadfromstring!(
         model,
         """
-variables: x
-minobjective: x
-c1: x >= 0.0
-c2: 2x >= 1.0
-c3: x in Integer()
-""",
+        variables: x
+        minobjective: x
+        c1: x >= 0.0
+        c2: 2x >= 1.0
+        c3: x in Integer()
+        """,
     )
     # Setting attributes of each type
     # Integer attribute
@@ -523,16 +522,13 @@ function _build_basis_model()
     # Min -x
     # s.t. x + y <= 1
     # x, y >= 0
-
     x = MOI.add_variable(model)
     y = MOI.add_variable(model)
-
     cf = MOI.ScalarAffineFunction{T}(
         MOI.ScalarAffineTerm{T}.([one(T), one(T)], [x, y]),
         zero(T),
     )
     c = MOI.add_constraint(model, cf, MOI.LessThan(one(T)))
-
     vc1 = MOI.add_constraint(model, x, MOI.GreaterThan(zero(T)))
     vc2 = MOI.add_constraint(model, y, MOI.GreaterThan(zero(T)))
     objf = MOI.ScalarAffineFunction{T}(
@@ -721,9 +717,7 @@ end
 
 function test_multiple_modifications()
     model = Gurobi.Optimizer(GRB_ENV)
-
     x = MOI.add_variables(model, 3)
-
     saf = MOI.ScalarAffineFunction(
         [
             MOI.ScalarAffineTerm(1.0, x[1]),
@@ -734,13 +728,11 @@ function test_multiple_modifications()
     )
     ci1 = MOI.add_constraint(model, saf, MOI.LessThan(1.0))
     ci2 = MOI.add_constraint(model, saf, MOI.LessThan(2.0))
-
     MOI.set(
         model,
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
         saf,
     )
-
     fc1 = MOI.get(model, MOI.ConstraintFunction(), ci1)
     @test MOI.coefficient.(fc1.terms) == [1.0, 1.0, 1.0]
     fc2 = MOI.get(model, MOI.ConstraintFunction(), ci2)
@@ -750,19 +742,16 @@ function test_multiple_modifications()
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
     )
     @test MOI.coefficient.(obj.terms) == [1.0, 1.0, 1.0]
-
     changes_cis = [
         MOI.ScalarCoefficientChange(MOI.VariableIndex(1), 4.0)
         MOI.ScalarCoefficientChange(MOI.VariableIndex(1), 0.5)
         MOI.ScalarCoefficientChange(MOI.VariableIndex(3), 2.0)
     ]
     MOI.modify(model, [ci1, ci2, ci2], changes_cis)
-
     fc1 = MOI.get(model, MOI.ConstraintFunction(), ci1)
     @test MOI.coefficient.(fc1.terms) == [4.0, 1.0, 1.0]
     fc2 = MOI.get(model, MOI.ConstraintFunction(), ci2)
     @test MOI.coefficient.(fc2.terms) == [0.5, 1.0, 2.0]
-
     changes_obj = [
         MOI.ScalarCoefficientChange(MOI.VariableIndex(1), 4.0)
         MOI.ScalarCoefficientChange(MOI.VariableIndex(2), 10.0)
@@ -773,7 +762,6 @@ function test_multiple_modifications()
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
         changes_obj,
     )
-
     obj = MOI.get(
         model,
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
@@ -1054,9 +1042,6 @@ function test_primal_feasible_status()
 end
 
 function test_nonlinear()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     @test MOI.supports_constraint(
         model,
@@ -1077,9 +1062,6 @@ function test_nonlinear()
 end
 
 function test_nonlinear_constraint_sin()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x1 = MOI.add_variable(model)
@@ -1103,9 +1085,6 @@ function test_nonlinear_constraint_sin()
 end
 
 function test_nonlinear_constraint_log()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variable(model)
@@ -1135,9 +1114,6 @@ function test_nonlinear_constraint_log()
 end
 
 function test_nonlinear_constraint_unsupported()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     x = MOI.add_variable(model)
     f = MOI.ScalarNonlinearFunction(:foo, Any[x])
@@ -1149,9 +1125,6 @@ function test_nonlinear_constraint_unsupported()
 end
 
 function test_nonlinear_constraint_uminus()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variable(model)
@@ -1169,9 +1142,6 @@ function test_nonlinear_constraint_uminus()
 end
 
 function test_nonlinear_constraint_scalar_affine_function()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x1 = MOI.add_variable(model)
@@ -1195,9 +1165,6 @@ function test_nonlinear_constraint_scalar_affine_function()
 end
 
 function test_nonlinear_get_constraint_by_name()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variable(model)
@@ -1210,9 +1177,6 @@ function test_nonlinear_get_constraint_by_name()
 end
 
 function test_nonlinear_constraint_delete()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variable(model)
@@ -1233,9 +1197,6 @@ function test_nonlinear_constraint_delete()
 end
 
 function test_nonlinear_constraint_vector_delete()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variable(model)
@@ -1256,9 +1217,6 @@ function test_nonlinear_constraint_vector_delete()
 end
 
 function test_nonlinear_pow2()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     # max x + y
@@ -1283,9 +1241,6 @@ end
 
 function test_nonlinear_quadratic_1()
     # Present products as ScalarNonlinearFunctions
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     # max x + y
@@ -1310,9 +1265,6 @@ end
 
 function test_nonlinear_quadratic_2()
     # Present products as ScalarAffineTerms nested in ScalarNonlinearFunctions
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     # max x + y
@@ -1337,9 +1289,6 @@ end
 
 function test_nonlinear_quadratic_3()
     # Present products as ScalarQuadraticTerms
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     # max x + y
@@ -1364,9 +1313,6 @@ end
 
 function test_nonlinear_quadratic_4()
     # Present products as ScalarQuadraticFunctions (complete with 2x factor ...)
-    if !Gurobi._supports_nonlinear()
-        return
-    end
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     # max x + y
@@ -1428,10 +1374,7 @@ function test_ConstrName_too_long()
     return
 end
 
-function test_delete_nonlinear_index()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
+function test_nonlinear_delete_index()
     model = Gurobi.Optimizer(GRB_ENV)
     x1 = MOI.add_variable(model)
     x2 = MOI.add_variable(model)
@@ -1456,10 +1399,7 @@ function test_delete_nonlinear_index()
     return
 end
 
-function test_scalar_quadratic_function_with_off_diag_in_scalar_nonlinear()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
+function test_nonlinear_scalar_quadratic_function_with_off_diag()
     for (a, b, status) in [
         (1.0, 2.0, MOI.OPTIMAL),
         (1.0, 3.0, MOI.INFEASIBLE),
@@ -1478,10 +1418,7 @@ function test_scalar_quadratic_function_with_off_diag_in_scalar_nonlinear()
     return
 end
 
-function test_multiple_solution_nonlinear_objective()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
+function test_nonlinear_multiple_solution_nonlinear_objective()
     model =
         MOI.Bridges.full_bridge_optimizer(Gurobi.Optimizer(GRB_ENV), Float64)
     N = 30
@@ -1641,10 +1578,7 @@ function test_objbound_errors_when_GRB_INFINITY()
     return
 end
 
-function test_set_nonlinear_objective_twice()
-    if !Gurobi._supports_nonlinear()
-        return
-    end
+function test_nonlinear_set_objective_twice()
     model =
         MOI.Bridges.full_bridge_optimizer(Gurobi.Optimizer(GRB_ENV), Float64)
     MOI.set(model, MOI.Silent(), true)
