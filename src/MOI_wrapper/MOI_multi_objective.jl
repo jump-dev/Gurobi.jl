@@ -30,15 +30,6 @@ function MOI.set(
     f::MOI.ScalarAffineFunction,
 )
     _update_if_necessary(model)
-    pInt = Ref{Cint}(0)
-    ret = GRBgetintattr(model, "NumVars", pInt)
-    _check_ret(model, ret)
-    num_vars = pInt[]
-    obj = zeros(Float64, num_vars)
-    for term in f.terms
-        column = _info(model, term.variable).column
-        obj[column] += term.coefficient
-    end
     indices, coefficients = _indices_and_coefficients(model, f)
     ret = GRBsetobjectiven(
         model,
