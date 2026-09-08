@@ -1637,6 +1637,171 @@ function test_issue_662()
     return
 end
 
+function test_deleting_indicator()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.ZeroOne())
+    f = MOI.Utilities.vectorize(1.0 .* x)
+    set = MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    c = MOI.add_constraint(model, f, set)
+    MOI.delete(model, c)
+    @test !MOI.is_valid(model, c)
+    return
+end
+
+function test_nonlinear_and_indicator_delete_nonlinear_1()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.ZeroOne())
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * x[1] - 0.1 * x[2]
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    set = MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    f_ind = MOI.Utilities.vectorize(1.0 .* x)
+    c_ind = MOI.add_constraint(model, f_ind, set)
+    f_nl = MOI.ScalarNonlinearFunction(:sin, Any[x[2]])
+    c_nl = MOI.add_constraint(model, f_nl, MOI.EqualTo(0.0))
+    @test model.indicator_constraint_info[c_ind.value].row !=
+          model.nl_constraint_info[c_nl.value].row
+    MOI.delete(model, c_nl)
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.VariablePrimal(), x), [1, 1]; atol = 1e-4)
+    @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c_ind), f_ind)
+    @test MOI.is_valid(model, c_ind)
+    @test !MOI.is_valid(model, c_nl)
+    @test model.indicator_constraint_info[c_ind.value].row == 1
+    return
+end
+
+function test_nonlinear_and_indicator_delete_nonlinear_2()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.ZeroOne())
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * x[1] - 0.1 * x[2]
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    f_nl = MOI.ScalarNonlinearFunction(:sin, Any[x[2]])
+    c_nl = MOI.add_constraint(model, f_nl, MOI.EqualTo(0.0))
+    set = MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    f_ind = MOI.Utilities.vectorize(1.0 .* x)
+    c_ind = MOI.add_constraint(model, f_ind, set)
+    @test model.indicator_constraint_info[c_ind.value].row !=
+          model.nl_constraint_info[c_nl.value].row
+    MOI.delete(model, c_nl)
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.VariablePrimal(), x), [1, 1]; atol = 1e-4)
+    @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c_ind), f_ind)
+    @test MOI.is_valid(model, c_ind)
+    @test !MOI.is_valid(model, c_nl)
+    @test model.indicator_constraint_info[c_ind.value].row == 1
+    return
+end
+
+function test_nonlinear_and_indicator_delete_nonlinear_vec()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.ZeroOne())
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * x[1] - 0.1 * x[2]
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    set = MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    f_ind = MOI.Utilities.vectorize(1.0 .* x)
+    c_ind = MOI.add_constraint(model, f_ind, set)
+    f_nl = MOI.ScalarNonlinearFunction(:sin, Any[x[2]])
+    c_nl = MOI.add_constraint(model, f_nl, MOI.EqualTo(0.0))
+    @test model.indicator_constraint_info[c_ind.value].row !=
+          model.nl_constraint_info[c_nl.value].row
+    MOI.delete(model, [c_nl])
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.VariablePrimal(), x), [1, 1]; atol = 1e-4)
+    @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c_ind), f_ind)
+    @test MOI.is_valid(model, c_ind)
+    @test !MOI.is_valid(model, c_nl)
+    @test model.indicator_constraint_info[c_ind.value].row == 1
+    return
+end
+
+function test_nonlinear_then_indicator_delete_nl_vector()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.ZeroOne())
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * x[1] - 0.1 * x[2]
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    f_nl = MOI.ScalarNonlinearFunction(:sin, Any[x[2]])
+    c_nl = MOI.add_constraint(model, f_nl, MOI.EqualTo(0.0))
+    set = MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    f_ind = MOI.Utilities.vectorize(1.0 .* x)
+    c_ind = MOI.add_constraint(model, f_ind, set)
+    @test model.indicator_constraint_info[c_ind.value].row !=
+          model.nl_constraint_info[c_nl.value].row
+    MOI.delete(model, [c_nl])
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.VariablePrimal(), x), [1, 1]; atol = 1e-4)
+    @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c_ind), f_ind)
+    @test MOI.is_valid(model, c_ind)
+    @test !MOI.is_valid(model, c_nl)
+    @test model.indicator_constraint_info[c_ind.value].row == 1
+    return
+end
+
+function test_nonlinear_and_indicator_delete_indicator_1()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.ZeroOne())
+    MOI.add_constraint(model, x[2], MOI.Interval(0.0, 3.0))
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * x[1] - 0.1 * x[2]
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    set = MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    f_ind = MOI.Utilities.vectorize(1.0 .* x)
+    c_ind = MOI.add_constraint(model, f_ind, set)
+    f_nl = MOI.ScalarNonlinearFunction(:sin, Any[x[2]])
+    c_nl = MOI.add_constraint(model, f_nl, MOI.EqualTo(0.0))
+    @test model.indicator_constraint_info[c_ind.value].row !=
+          model.nl_constraint_info[c_nl.value].row
+    MOI.delete(model, c_ind)
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.VariablePrimal(), x), [1, 0]; atol = 1e-4)
+    @test isapprox(MOI.get(model, MOI.ConstraintPrimal(), c_nl), 0; atol = 1e-4)
+    @test !MOI.is_valid(model, c_ind)
+    @test MOI.is_valid(model, c_nl)
+    @test model.nl_constraint_info[c_nl.value].row == 1
+    return
+end
+
+function test_nonlinear_and_indicator_delete_indicator_2()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.ZeroOne())
+    MOI.add_constraint(model, x[2], MOI.Interval(0.0, 3.0))
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * x[1] - 0.1 * x[2]
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    f_nl = MOI.ScalarNonlinearFunction(:sin, Any[x[2]])
+    c_nl = MOI.add_constraint(model, f_nl, MOI.EqualTo(0.0))
+    set = MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
+    f_ind = MOI.Utilities.vectorize(1.0 .* x)
+    c_ind = MOI.add_constraint(model, f_ind, set)
+    @test model.indicator_constraint_info[c_ind.value].row !=
+          model.nl_constraint_info[c_nl.value].row
+    MOI.delete(model, c_ind)
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.VariablePrimal(), x), [1, 0]; atol = 1e-4)
+    @test isapprox(MOI.get(model, MOI.ConstraintPrimal(), c_nl), 0; atol = 1e-4)
+    @test !MOI.is_valid(model, c_ind)
+    @test MOI.is_valid(model, c_nl)
+    @test model.nl_constraint_info[c_nl.value].row == 1
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()

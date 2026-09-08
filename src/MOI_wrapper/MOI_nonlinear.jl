@@ -352,8 +352,11 @@ function MOI.add_constraint(
     _check_ret(model, ret)
     _require_update(model, model_change = true)
     model.last_constraint_index += 1
-    model.nl_constraint_info[model.last_constraint_index] =
-        _NLConstraintInfo(length(model.nl_constraint_info) + 1, s, column)
+    offset =
+        length(model.indicator_constraint_info) +
+        length(model.nl_constraint_info)
+    info = _NLConstraintInfo(offset + 1, s, column)
+    model.nl_constraint_info[model.last_constraint_index] = info
     return MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,typeof(s)}(
         model.last_constraint_index,
     )
@@ -380,6 +383,11 @@ function MOI.delete(
             info_2.row -= 1
         end
     end
+    for (_, info_2) in model.indicator_constraint_info
+        if info_2.row > info.row
+            info_2.row -= 1
+        end
+    end
     delete!(model.nl_constraint_info, c.value)
     model.name_to_constraint_index = nothing
     # Delete resultant variable from the Gurobi model. These are not tracked in
@@ -402,6 +410,9 @@ function MOI.delete(
     ret = GRBdelgenconstrs(model, length(rows_to_delete), rows_to_delete)
     _check_ret(model, ret)
     for (_, info) in model.nl_constraint_info
+        info.row -= searchsortedlast(rows_to_delete, info.row - 1)
+    end
+    for (_, info) in model.indicator_constraint_info
         info.row -= searchsortedlast(rows_to_delete, info.row - 1)
     end
     model.name_to_constraint_index = nothing
