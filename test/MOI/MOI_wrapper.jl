@@ -1650,7 +1650,7 @@ function test_deleting_indicator()
     return
 end
 
-function test_indicator_then_nonlinear_delete_nl()
+function test_nonlinear_and_indicator_delete_nonlinear_1()
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
@@ -1675,7 +1675,7 @@ function test_indicator_then_nonlinear_delete_nl()
     return
 end
 
-function test_nonlinear_then_indicator_delete_nl()
+function test_nonlinear_and_indicator_delete_nonlinear_2()
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
@@ -1700,7 +1700,7 @@ function test_nonlinear_then_indicator_delete_nl()
     return
 end
 
-function test_indicator_then_nonlinear_delete_nl_vector()
+function test_nonlinear_and_indicator_delete_nonlinear_vec()
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
@@ -1750,7 +1750,7 @@ function test_nonlinear_then_indicator_delete_nl_vector()
     return
 end
 
-function test_indicator_then_nonlinear_delete_indicator()
+function test_nonlinear_and_indicator_delete_indicator_1()
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
@@ -1776,7 +1776,7 @@ function test_indicator_then_nonlinear_delete_indicator()
     return
 end
 
-function test_nonlinear_then_indicator_delete_indicator()
+function test_nonlinear_and_indicator_delete_indicator_2()
     model = Gurobi.Optimizer(GRB_ENV)
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
