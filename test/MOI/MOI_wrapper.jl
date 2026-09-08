@@ -17,7 +17,7 @@ function _handle_ex(name, ex)
     if startswith("$(name)", "test_MULTI_ENV") && ex == err
         @warn(
             """
-            Skipping a test because there was an issue creating multiple \
+            Skipping a test because there was an issue creating multiple
             licenses. This is probably because you have a limited license.
             """,
         )
