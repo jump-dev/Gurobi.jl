@@ -14,17 +14,12 @@ import Random
 
 function _handle_ex(name, ex)
     err = ErrorException("Gurobi Error 10009: Failed to obtain a valid license")
-    if startswith("$(name)", "test_MULTI_ENV") && ex == err
-        @warn(
-            """
-            Skipping a test because there was an issue creating multiple
-            licenses. This is probably because you have a limited license.
-            """,
-        )
-    else
-        rethrow(ex)
+    if startswith("$name", "test_MULTI_ENV") && ex == err
+        # Skipping a test because there was an issue creating multiple licenses.            
+        # This is probably because the user has a limited license.
+        return
     end
-    return
+    return rethrow(ex)
 end
 
 function runtests()
