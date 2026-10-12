@@ -332,30 +332,51 @@ function MOI.add_constraint(
     data = Cdouble[]
     parent = Cint[]
     _process_nonlinear(model, f, opcode, data, parent)
-    # Add resultant variable. We don't use MOI.add_constrained_variable because
-    # we don't want it to show up in the bound constraints, etc.
-    column = _get_next_column(model)
-    lb, ub = _bounds(s)
-    lb = something(lb, -Inf)
-    ub = something(ub, Inf)
-    ret = GRBaddvar(model, 0, C_NULL, C_NULL, 0.0, lb, ub, GRB_CONTINUOUS, "")
-    _check_ret(model, ret)
-    ret = GRBaddgenconstrNL(
-        model,
-        C_NULL,
-        column - 1,
-        length(opcode),
-        opcode,
-        data,
-        parent,
-    )
-    _check_ret(model, ret)
-    _require_update(model, model_change = true)
-    model.last_constraint_index += 1
-    offset =
-        length(model.indicator_constraint_info) +
-        length(model.nl_constraint_info)
-    info = _NLConstraintInfo(offset + 1, s, column)
+    if _GUROBI_VERSION >= v"14"
+        sense, rhs = _sense_and_rhs(s)
+        ret = GRBaddnlconstr(
+            model,
+            length(opcode),
+            opcode,
+            data,
+            parent,
+            sense,
+            rhs,
+            C_NULL,
+        )
+        _check_ret(model, ret)
+        _require_update(model, model_change = true)
+        model.last_constraint_index += 1
+        offset =
+            length(model.indicator_constraint_info) +
+            length(model.nl_constraint_info)
+        info = _NLConstraintInfo(offset + 1, s, nothing)
+    else
+        # Add resultant variable. We don't use MOI.add_constrained_variable because
+        # we don't want it to show up in the bound constraints, etc.
+        column = _get_next_column(model)
+        lb, ub = _bounds(s)
+        lb = something(lb, -Inf)
+        ub = something(ub, Inf)
+        ret = GRBaddvar(model, 0, C_NULL, C_NULL, 0.0, lb, ub, GRB_CONTINUOUS, "")
+        _check_ret(model, ret)
+        ret = GRBaddgenconstrNL(
+            model,
+            C_NULL,
+            column - 1,
+            length(opcode),
+            opcode,
+            data,
+            parent,
+        )
+        _check_ret(model, ret)
+        _require_update(model, model_change = true)
+        model.last_constraint_index += 1
+        offset =
+            length(model.indicator_constraint_info) +
+            length(model.nl_constraint_info)
+        info = _NLConstraintInfo(offset + 1, s, column)
+    end
     model.nl_constraint_info[model.last_constraint_index] = info
     return MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,typeof(s)}(
         model.last_constraint_index,
@@ -376,8 +397,20 @@ function MOI.delete(
 )
     info = _info(model, c)
     _update_if_necessary(model)
-    ret = GRBdelgenconstrs(model, 1, Ref(Cint(info.row - 1)))
-    _check_ret(model, ret)
+    if _GUROBI_VERSION >= v"14"
+        ret = GRBdelnlconstrs(model, 1, Ref(Cint(info.row - 1)))
+        _check_ret(model, ret)
+    else
+        ret = GRBdelgenconstrs(model, 1, Ref(Cint(info.row - 1)))
+        _check_ret(model, ret)
+        # Delete resultant variable from the Gurobi model. These are not tracked in
+        # model.variable_info but they do need to be accounted for in index
+        # adjustment.
+        del_cols = [Cint(info.resvar_index - 1)]
+        ret = GRBdelvars(model, length(del_cols), del_cols)
+        _check_ret(model, ret)
+        append!(model.columns_deleted_since_last_update, del_cols .+ 1)
+    end
     for (_, info_2) in model.nl_constraint_info
         if info_2.row > info.row
             info_2.row -= 1
@@ -390,13 +423,6 @@ function MOI.delete(
     end
     delete!(model.nl_constraint_info, c.value)
     model.name_to_constraint_index = nothing
-    # Delete resultant variable from the Gurobi model. These are not tracked in
-    # model.variable_info but they do need to be accounted for in index
-    # adjustment.
-    del_cols = [Cint(info.resvar_index - 1)]
-    ret = GRBdelvars(model, length(del_cols), del_cols)
-    _check_ret(model, ret)
-    append!(model.columns_deleted_since_last_update, del_cols .+ 1)
     _require_update(model, model_change = true)
     return
 end
@@ -407,28 +433,33 @@ function MOI.delete(
 )
     rows_to_delete = sort!([Cint(_info(model, c).row - 1) for c in cs])
     _update_if_necessary(model)
-    ret = GRBdelgenconstrs(model, length(rows_to_delete), rows_to_delete)
-    _check_ret(model, ret)
+    if _GUROBI_VERSION >= v"14"
+        ret = GRBdelgenconstrs(model, length(rows_to_delete), rows_to_delete)
+        _check_ret(model, ret)
+    else
+        ret = GRBdelnlconstrs(model, length(rows_to_delete), rows_to_delete)
+        _check_ret(model, ret)
+        # Delete resultant variables from the Gurobi model for all removed
+        # constraints. These are not tracked in model.variable_info but they do
+        # need to be accounted for in index adjustment.
+        del_cols = [Cint(_info(model, c).resvar_index - 1) for c in cs]
+        ret = GRBdelvars(model, length(del_cols), del_cols)
+        _check_ret(model, ret)
+        append!(model.columns_deleted_since_last_update, del_cols .+ 1)
+        _require_update(model, model_change = true)
+    end
     for (_, info) in model.nl_constraint_info
         info.row -= searchsortedlast(rows_to_delete, info.row - 1)
     end
     for (_, info) in model.indicator_constraint_info
         info.row -= searchsortedlast(rows_to_delete, info.row - 1)
     end
-    model.name_to_constraint_index = nothing
-    # Delete resultant variables from the Gurobi model for all removed
-    # constraints. These are not tracked in model.variable_info but they do
-    # need to be accounted for in index adjustment.
-    del_cols = [Cint(_info(model, c).resvar_index - 1) for c in cs]
-    ret = GRBdelvars(model, length(del_cols), del_cols)
-    _check_ret(model, ret)
-    append!(model.columns_deleted_since_last_update, del_cols .+ 1)
-    _require_update(model, model_change = true)
     # Remove entries from nl constraint tracking
     cs_values = sort!(getfield.(cs, :value))
     filter!(model.nl_constraint_info) do pair
         return isempty(searchsorted(cs_values, pair.first))
     end
+    model.name_to_constraint_index = nothing
     _require_update(model, model_change = true)
     return
 end

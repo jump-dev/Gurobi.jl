@@ -96,8 +96,8 @@ mutable struct _NLConstraintInfo
     # Storage for constraint names. Where possible, these are also stored in
     # the Gurobi model.
     name::String
-    resvar_index::Int
-    function _NLConstraintInfo(row::Int, set, resvar_index::Int)
+    resvar_index::Union{Int,Nothing}
+    function _NLConstraintInfo(row::Int, set, resvar_index::Union{Int,Nothing})
         return new(row, set, "", resvar_index)
     end
 end
@@ -592,11 +592,13 @@ function _update_if_necessary(
                 var_info.column,
             )
         end
-        for nl_info in values(model.nl_constraint_info)
-            nl_info.resvar_index -= searchsortedlast(
-                model.columns_deleted_since_last_update,
-                nl_info.resvar_index,
-            )
+        if _GUROBI_VERSION < v"14"
+            for nl_info in values(model.nl_constraint_info)
+                nl_info.resvar_index -= searchsortedlast(
+                    model.columns_deleted_since_last_update,
+                    nl_info.resvar_index,
+                )
+            end
         end
         model.next_column -= length(model.columns_deleted_since_last_update)
         empty!(model.columns_deleted_since_last_update)
