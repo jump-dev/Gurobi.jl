@@ -138,10 +138,14 @@ function MOI.add_constraint(
     )
     _check_ret(model, ret)
     model.last_constraint_index += 1
-    offset =
-        length(model.indicator_constraint_info) +
-        length(model.nl_constraint_info)
-    info = _ConstraintInfo(offset + 1, s)
+    if _GUROBI_VERSION >= v"14"
+        info = _ConstraintInfo(length(model.indicator_constraint_info) + 1, s)
+    else
+        offset =
+            length(model.indicator_constraint_info) +
+            length(model.nl_constraint_info)
+        info = _ConstraintInfo(offset + 1, s)
+    end
     model.indicator_constraint_info[model.last_constraint_index] = info
     _require_update(model, model_change = true)
     return MOI.ConstraintIndex{typeof(func),typeof(s)}(
@@ -211,9 +215,11 @@ function MOI.delete(
             info.row -= 1
         end
     end
-    for info in values(model.nl_constraint_info)
-        if info.row > row
-            info.row -= 1
+    if _GUROBI_VERSION < v"14"
+        for info in values(model.nl_constraint_info)
+            if info.row > row
+                info.row -= 1
+            end
         end
     end
     _update_if_necessary(model, force = true)

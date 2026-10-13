@@ -1655,6 +1655,7 @@ function test_nonlinear_and_indicator_delete_nonlinear_1()
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
     MOI.add_constraint(model, x[1], MOI.ZeroOne())
+    MOI.add_constraint(model, x[2], MOI.GreaterThan(0.0))
     MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
     f = 1.0 * x[1] - 0.1 * x[2]
     MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
@@ -1663,14 +1664,20 @@ function test_nonlinear_and_indicator_delete_nonlinear_1()
     c_ind = MOI.add_constraint(model, f_ind, set)
     f_nl = MOI.ScalarNonlinearFunction(:sin, Any[x[2]])
     c_nl = MOI.add_constraint(model, f_nl, MOI.EqualTo(0.0))
-    @test model.indicator_constraint_info[c_ind.value].row !=
-          model.nl_constraint_info[c_nl.value].row
+    if Gurobi._GUROBI_VERSION >= v"14"
+        @test model.indicator_constraint_info[c_ind.value].row == 1
+        @test model.nl_constraint_info[c_nl.value].row == 1
+    else
+        @test model.indicator_constraint_info[c_ind.value].row !=
+              model.nl_constraint_info[c_nl.value].row
+    end
     MOI.delete(model, c_nl)
     MOI.optimize!(model)
     @test isapprox(MOI.get(model, MOI.VariablePrimal(), x), [1, 1]; atol = 1e-4)
     @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c_ind), f_ind)
     @test MOI.is_valid(model, c_ind)
     @test !MOI.is_valid(model, c_nl)
+    # This is still true in v14, but not because we deleted the other constraint
     @test model.indicator_constraint_info[c_ind.value].row == 1
     return
 end
@@ -1680,6 +1687,7 @@ function test_nonlinear_and_indicator_delete_nonlinear_2()
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
     MOI.add_constraint(model, x[1], MOI.ZeroOne())
+    MOI.add_constraint(model, x[2], MOI.GreaterThan(0.0))
     MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
     f = 1.0 * x[1] - 0.1 * x[2]
     MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
@@ -1688,14 +1696,20 @@ function test_nonlinear_and_indicator_delete_nonlinear_2()
     set = MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
     f_ind = MOI.Utilities.vectorize(1.0 .* x)
     c_ind = MOI.add_constraint(model, f_ind, set)
-    @test model.indicator_constraint_info[c_ind.value].row !=
-          model.nl_constraint_info[c_nl.value].row
+    if Gurobi._GUROBI_VERSION >= v"14"
+        @test model.indicator_constraint_info[c_ind.value].row == 1
+        @test model.nl_constraint_info[c_nl.value].row == 1
+    else
+        @test model.indicator_constraint_info[c_ind.value].row !=
+              model.nl_constraint_info[c_nl.value].row
+    end
     MOI.delete(model, c_nl)
     MOI.optimize!(model)
     @test isapprox(MOI.get(model, MOI.VariablePrimal(), x), [1, 1]; atol = 1e-4)
     @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c_ind), f_ind)
     @test MOI.is_valid(model, c_ind)
     @test !MOI.is_valid(model, c_nl)
+    # This is still true in v14, but not because we deleted the other constraint
     @test model.indicator_constraint_info[c_ind.value].row == 1
     return
 end
@@ -1705,6 +1719,7 @@ function test_nonlinear_and_indicator_delete_nonlinear_vec()
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
     MOI.add_constraint(model, x[1], MOI.ZeroOne())
+    MOI.add_constraint(model, x[2], MOI.GreaterThan(0.0))
     MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
     f = 1.0 * x[1] - 0.1 * x[2]
     MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
@@ -1713,14 +1728,20 @@ function test_nonlinear_and_indicator_delete_nonlinear_vec()
     c_ind = MOI.add_constraint(model, f_ind, set)
     f_nl = MOI.ScalarNonlinearFunction(:sin, Any[x[2]])
     c_nl = MOI.add_constraint(model, f_nl, MOI.EqualTo(0.0))
-    @test model.indicator_constraint_info[c_ind.value].row !=
-          model.nl_constraint_info[c_nl.value].row
+    if Gurobi._GUROBI_VERSION >= v"14"
+        @test model.indicator_constraint_info[c_ind.value].row == 1
+        @test model.nl_constraint_info[c_nl.value].row == 1
+    else
+        @test model.indicator_constraint_info[c_ind.value].row !=
+              model.nl_constraint_info[c_nl.value].row
+    end
     MOI.delete(model, [c_nl])
     MOI.optimize!(model)
     @test isapprox(MOI.get(model, MOI.VariablePrimal(), x), [1, 1]; atol = 1e-4)
     @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c_ind), f_ind)
     @test MOI.is_valid(model, c_ind)
     @test !MOI.is_valid(model, c_nl)
+    # This is still true in v14, but not because we deleted the other constraint
     @test model.indicator_constraint_info[c_ind.value].row == 1
     return
 end
@@ -1730,6 +1751,7 @@ function test_nonlinear_then_indicator_delete_nl_vector()
     MOI.set(model, MOI.Silent(), true)
     x = MOI.add_variables(model, 2)
     MOI.add_constraint(model, x[1], MOI.ZeroOne())
+    MOI.add_constraint(model, x[2], MOI.GreaterThan(0.0))
     MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
     f = 1.0 * x[1] - 0.1 * x[2]
     MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
@@ -1738,14 +1760,20 @@ function test_nonlinear_then_indicator_delete_nl_vector()
     set = MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
     f_ind = MOI.Utilities.vectorize(1.0 .* x)
     c_ind = MOI.add_constraint(model, f_ind, set)
-    @test model.indicator_constraint_info[c_ind.value].row !=
-          model.nl_constraint_info[c_nl.value].row
+    if Gurobi._GUROBI_VERSION >= v"14"
+        @test model.indicator_constraint_info[c_ind.value].row == 1
+        @test model.nl_constraint_info[c_nl.value].row == 1
+    else
+        @test model.indicator_constraint_info[c_ind.value].row !=
+              model.nl_constraint_info[c_nl.value].row
+    end
     MOI.delete(model, [c_nl])
     MOI.optimize!(model)
     @test isapprox(MOI.get(model, MOI.VariablePrimal(), x), [1, 1]; atol = 1e-4)
     @test isapprox(MOI.get(model, MOI.ConstraintFunction(), c_ind), f_ind)
     @test MOI.is_valid(model, c_ind)
     @test !MOI.is_valid(model, c_nl)
+    # This is still true in v14, but not because we deleted the other constraint
     @test model.indicator_constraint_info[c_ind.value].row == 1
     return
 end
@@ -1764,14 +1792,20 @@ function test_nonlinear_and_indicator_delete_indicator_1()
     c_ind = MOI.add_constraint(model, f_ind, set)
     f_nl = MOI.ScalarNonlinearFunction(:sin, Any[x[2]])
     c_nl = MOI.add_constraint(model, f_nl, MOI.EqualTo(0.0))
-    @test model.indicator_constraint_info[c_ind.value].row !=
-          model.nl_constraint_info[c_nl.value].row
+    if Gurobi._GUROBI_VERSION >= v"14"
+        @test model.indicator_constraint_info[c_ind.value].row == 1
+        @test model.nl_constraint_info[c_nl.value].row == 1
+    else
+        @test model.indicator_constraint_info[c_ind.value].row !=
+              model.nl_constraint_info[c_nl.value].row
+    end
     MOI.delete(model, c_ind)
     MOI.optimize!(model)
     @test isapprox(MOI.get(model, MOI.VariablePrimal(), x), [1, 0]; atol = 1e-4)
     @test isapprox(MOI.get(model, MOI.ConstraintPrimal(), c_nl), 0; atol = 1e-4)
     @test !MOI.is_valid(model, c_ind)
     @test MOI.is_valid(model, c_nl)
+    # This is true in v14, but not because we deleted the indicator
     @test model.nl_constraint_info[c_nl.value].row == 1
     return
 end
@@ -1790,14 +1824,20 @@ function test_nonlinear_and_indicator_delete_indicator_2()
     set = MOI.Indicator{MOI.ACTIVATE_ON_ONE}(MOI.GreaterThan(1.0))
     f_ind = MOI.Utilities.vectorize(1.0 .* x)
     c_ind = MOI.add_constraint(model, f_ind, set)
-    @test model.indicator_constraint_info[c_ind.value].row !=
-          model.nl_constraint_info[c_nl.value].row
+    if Gurobi._GUROBI_VERSION >= v"14"
+        @test model.indicator_constraint_info[c_ind.value].row == 1
+        @test model.nl_constraint_info[c_nl.value].row == 1
+    else
+        @test model.indicator_constraint_info[c_ind.value].row !=
+              model.nl_constraint_info[c_nl.value].row
+    end
     MOI.delete(model, c_ind)
     MOI.optimize!(model)
     @test isapprox(MOI.get(model, MOI.VariablePrimal(), x), [1, 0]; atol = 1e-4)
     @test isapprox(MOI.get(model, MOI.ConstraintPrimal(), c_nl), 0; atol = 1e-4)
     @test !MOI.is_valid(model, c_ind)
     @test MOI.is_valid(model, c_nl)
+    # This is still true in v14, but not because we deleted the indicator constraint
     @test model.nl_constraint_info[c_nl.value].row == 1
     return
 end

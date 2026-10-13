@@ -347,10 +347,7 @@ function MOI.add_constraint(
         _check_ret(model, ret)
         _require_update(model, model_change = true)
         model.last_constraint_index += 1
-        offset =
-            length(model.indicator_constraint_info) +
-            length(model.nl_constraint_info)
-        info = _NLConstraintInfo(offset + 1, s, nothing)
+        info = _NLConstraintInfo(length(model.nl_constraint_info) + 1, s, nothing)
     else
         # Add resultant variable. We don't use MOI.add_constrained_variable because
         # we don't want it to show up in the bound constraints, etc.
@@ -410,13 +407,15 @@ function MOI.delete(
         ret = GRBdelvars(model, length(del_cols), del_cols)
         _check_ret(model, ret)
         append!(model.columns_deleted_since_last_update, del_cols .+ 1)
-    end
-    for (_, info_2) in model.nl_constraint_info
-        if info_2.row > info.row
-            info_2.row -= 1
+        # Pre-Gurobi 14, NL and indicator constraints use indices into the
+        # same array, so we have to modify indicator indices as well.
+        for (_, info_2) in model.indicator_constraint_info
+            if info_2.row > info.row
+                info_2.row -= 1
+            end
         end
     end
-    for (_, info_2) in model.indicator_constraint_info
+    for (_, info_2) in model.nl_constraint_info
         if info_2.row > info.row
             info_2.row -= 1
         end
@@ -434,10 +433,10 @@ function MOI.delete(
     rows_to_delete = sort!([Cint(_info(model, c).row - 1) for c in cs])
     _update_if_necessary(model)
     if _GUROBI_VERSION >= v"14"
-        ret = GRBdelgenconstrs(model, length(rows_to_delete), rows_to_delete)
+        ret = GRBdelnlconstrs(model, length(rows_to_delete), rows_to_delete)
         _check_ret(model, ret)
     else
-        ret = GRBdelnlconstrs(model, length(rows_to_delete), rows_to_delete)
+        ret = GRBdelgenconstrs(model, length(rows_to_delete), rows_to_delete)
         _check_ret(model, ret)
         # Delete resultant variables from the Gurobi model for all removed
         # constraints. These are not tracked in model.variable_info but they do
@@ -447,11 +446,13 @@ function MOI.delete(
         _check_ret(model, ret)
         append!(model.columns_deleted_since_last_update, del_cols .+ 1)
         _require_update(model, model_change = true)
+        # Pre-Gurobi 14, NL and indicator constraints use indices into the
+        # same array, so we have to modify indicator indices as well.
+        for (_, info) in model.indicator_constraint_info
+            info.row -= searchsortedlast(rows_to_delete, info.row - 1)
+        end
     end
     for (_, info) in model.nl_constraint_info
-        info.row -= searchsortedlast(rows_to_delete, info.row - 1)
-    end
-    for (_, info) in model.indicator_constraint_info
         info.row -= searchsortedlast(rows_to_delete, info.row - 1)
     end
     # Remove entries from nl constraint tracking
