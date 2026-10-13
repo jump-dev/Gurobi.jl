@@ -482,10 +482,11 @@ function MOI.set(
     _update_if_necessary(model, force = true)
     info = _info(model, c)
     info.name = name
+    key = _GUROBI_VERSION >= v"14" ? "NLCName" : "GenConstrName"
     if length(name) <= GRB_MAX_NAMELEN
         ret = GRBsetstrattrelement(
             model,
-            "GenConstrName",
+            key,
             Cint(info.row - 1),
             name,
         )
