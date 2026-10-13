@@ -513,7 +513,20 @@ function MOI.get(
         key = _XN
     end
     valueP = Ref{Cdouble}()
-    ret = GRBgetdblattrelement(model, key, Cint(info.resvar_index - 1), valueP)
-    _check_ret(model, ret)
+    if _GUROBI_VERSION >= v"14"
+        # TODO: Update for multiple solutions
+        slackP = Ref{Cdouble}()
+        rhsP = Ref{Cdouble}()
+        ret = GRBgetdblattrelement(model, "NLCSlack", Cint(info.row - 1), slackP)
+        _check_ret(model, ret)
+        ret = GRBgetdblattrelement(model, "NLCRHS", Cint(info.row - 1), rhsP)
+        _check_ret(model, ret)
+        # This assumes that Gurobi's RHS is the same as MOI's RHS. Check add_constraint
+        # above to confirm.
+        valueP[] = rhsP[] - slackP[]
+    else
+        ret = GRBgetdblattrelement(model, key, Cint(info.resvar_index - 1), valueP)
+        _check_ret(model, ret)
+    end
     return valueP[]
 end
