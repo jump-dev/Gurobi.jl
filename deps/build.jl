@@ -30,7 +30,7 @@ const ALIASES =
     ["gurobi140", "gurobi130", "gurobi120", "gurobi110", "gurobi100", "gurobi95", "gurobi91", "gurobi90"]
 
 function _try_local_install()
-    paths_to_try = copy(ALIASES)
+    paths_to_try = []
     for a in ALIASES
         root = get(ENV, "GUROBI_HOME", nothing)
         if root !== nothing
@@ -44,13 +44,18 @@ function _try_local_install()
                 push!(paths_to_try, joinpath(root, "lib", "lib$a.dylib"))
             end
         end
-        if Sys.isapple()  # gurobi uses .so on OS X for some reason
+    end
+    append!(paths_to_try, copy(ALIASES))
+    if Sys.isapple()  # gurobi uses .so on OS X for some reason
+        for a in ALIASES
             push!(paths_to_try, string("lib$a.so"))
             push!(paths_to_try, string("lib$a.dylib"))
         end
     end
+    display(paths_to_try)
     for l in paths_to_try
         if Libdl.dlopen_e(l) != C_NULL
+            println("Found library: $l")
             write_depsfile(l)
             return true
         end
