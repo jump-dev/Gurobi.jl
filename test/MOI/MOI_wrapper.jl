@@ -1842,6 +1842,43 @@ function test_nonlinear_and_indicator_delete_indicator_2()
     return
 end
 
+function test_nonlinear_multisolution_ConstraintPrimal()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    y = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.Interval(0.0, 2pi))
+    MOI.add_constraint(model, x[2], MOI.Interval(0.0, 2pi))
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MAX_SENSE)
+    f = 1.0 * y[1] + y[2]
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    f1_nl = MOI.ScalarNonlinearFunction(
+        :-,
+        Any[y[1], MOI.ScalarNonlinearFunction(:sin, Any[x[1]])],
+    )
+    f2_nl = MOI.ScalarNonlinearFunction(
+        :-,
+        Any[y[2], MOI.ScalarNonlinearFunction(:cos, Any[x[2]])],
+    )
+    f3_nl = MOI.ScalarNonlinearFunction(
+        :*,
+        Any[x[1], MOI.ScalarNonlinearFunction(:^, Any[x[2], 2])],
+    )
+    c1_nl = MOI.add_constraint(model, f1_nl, MOI.EqualTo(0.0))
+    c2_nl = MOI.add_constraint(model, f2_nl, MOI.EqualTo(0.0))
+    c3_nl = MOI.add_constraint(model, f3_nl, MOI.GreaterThan(-1.0))
+    MOI.set(model, MOI.RawOptimizerAttribute("PoolSearchMode"), 1)
+    MOI.set(model, MOI.RawOptimizerAttribute("PoolSolutions"), 2)
+    MOI.optimize!(model)
+    # Solutions are x = (pi/2, 0) and x = (pi/2, 2pi)
+    c3_val1 = MOI.get(model, MOI.ConstraintPrimal(1), c3_nl)
+    c3_val2 = MOI.get(model, MOI.ConstraintPrimal(2), c3_nl)
+    @test c3_val1 != c3_val2
+    @test isapprox(c3_val1, 0; atol = 1e-6) || isapprox(c3_val2, 0; atol = 1e-6)
+    @test isapprox(c3_val1, 2pi^3; atol = 1e-6) || isapprox(c3_val2, 2pi^3; atol = 1e-6)
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
