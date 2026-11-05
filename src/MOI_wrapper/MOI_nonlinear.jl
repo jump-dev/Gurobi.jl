@@ -32,6 +32,7 @@ if _supports_nonlinear()
 else
     const _OPCODE_MAP = Dict()
 end
+const _OPERATOR_LOOKUP = Dict(opcode => symbol for (symbol, opcode) in _OPCODE_MAP)
 
 function MOI.supports_constraint(
     ::Optimizer,
@@ -506,17 +507,11 @@ function MOI.get(
     MOI.check_result_index_bounds(model, attr)
     info = _info(model, c)
     key = "X"
-    if attr.result_index > 1
-        MOI.set(
-            model,
-            MOI.RawOptimizerAttribute("SolutionNumber"),
-            attr.result_index - 1,
-        )
-        key = _XN
-    end
     valueP = Ref{Cdouble}()
     if _GUROBI_VERSION >= v"14"
-        # TODO: Update for multiple solutions
+        if attr.result_index > 1
+            throw(ArgumentError("Cannot get ConstraintPrimal for result_index > 1"))
+        end
         slackP = Ref{Cdouble}()
         rhsP = Ref{Cdouble}()
         ret = GRBgetdblattrelement(model, "NLCSlack", Cint(info.row - 1), slackP)
@@ -527,8 +522,179 @@ function MOI.get(
         # above to confirm.
         valueP[] = rhsP[] - slackP[]
     else
+        if attr.result_index > 1
+            MOI.set(
+                model,
+                MOI.RawOptimizerAttribute("SolutionNumber"),
+                attr.result_index - 1,
+            )
+            key = _XN
+        end
         ret = GRBgetdblattrelement(model, key, Cint(info.resvar_index - 1), valueP)
         _check_ret(model, ret)
     end
     return valueP[]
+end
+
+function MOI.supports(
+    ::Optimizer,
+    ::MOI.ObjectiveFunction{MOI.ScalarNonlinearFunction},
+)
+    if _GUROBI_VERSION >= v"14"
+        return true
+    else
+        return false
+    end
+end
+
+function MOI.set(
+    model::Optimizer,
+    ::MOI.ObjectiveFunction{F},
+    f::F,
+) where {F<:MOI.ScalarNonlinearFunction}
+    _update_if_necessary(model)
+    if model.objective_type in (_SINGLE_VARIABLE, _SCALAR_AFFINE, _SCALAR_QUADRATIC)
+        # Zero out existing affine objective
+        pNumVars = Ref{Cint}(0)
+        ret = GRBgetintattr(model, "NumVars", pNumVars)
+        _check_ret(model, ret)
+        obj = zeros(pNumVars[])
+        ret = GRBsetdblattrarray(model, "Obj", 0, pNumVars[], obj)
+        _check_ret(model, ret)
+        ret = GRBsetdblattr(model, "ObjCon", 0.0)
+        _check_ret(model, ret)
+    end
+    if model.objective_type == _SCALAR_QUADRATIC
+        # Zero out existing quadratic objective
+        ret = GRBdelq(model)
+        _check_ret(model, ret)
+    end
+    if model.objective_type == _SCALAR_NONLINEAR
+        # Zero out existing nonlinear objective
+        ret = GRBdelnlobj(model)
+        _check_ret(model, ret)
+    end
+    # Set nonlinear objective
+    opcode = Cint[]
+    data = Cdouble[]
+    parent = Cint[]
+    _process_nonlinear(model, f, opcode, data, parent)
+    ret = GRBsetnlobj(
+        model,
+        length(opcode),
+        opcode,
+        data,
+        parent,
+    )
+    _check_ret(model, ret)
+    _require_update(model, attribute_change = true, model_change = true)
+    model.objective_type = _SCALAR_NONLINEAR
+    model.is_objective_set = true
+    return
+end
+
+function _process_opcodes(
+    opcode::Vector{Cint},
+    data::Vector{Cdouble},
+    args::Vector{Vector{Cint}},
+    index::Cint,
+    variable_index_lookup::Dict,
+)
+    if opcode[index] == GRB_OPCODE_CONSTANT
+        return data[index]
+    elseif opcode[index] == GRB_OPCODE_VARIABLE
+        return variable_index_lookup[data[index]]
+    elseif opcode[index] == GRB_OPCODE_PLUS && isempty(args[index])
+        # PLUS with no arguments should evaluate to 0. I don't know if MOI
+        # follows this convention, so I'll hard code it.
+        return 0.0
+    elseif opcode[index] == GRB_OPCODE_MULTIPLY && isempty(args[index])
+        return 1.0
+    else
+        op = _OPERATOR_LOOKUP[opcode[index]]
+        return MOI.ScalarNonlinearFunction(
+            op,
+            Any[
+                _process_opcodes(opcode, data, args, arg_index, variable_index_lookup)
+                for arg_index in args[index]
+            ],
+        )
+    end
+end
+
+function _opcodes_to_nonlinear_function(
+    opcode::Vector{Cint},
+    data::Vector{Cdouble},
+    parent::Vector{Cint},
+    variable_index_lookup::Dict,
+)
+    args = map(x -> Cint[], opcode)
+    for (i_node, i_parent) in enumerate(parent)
+        if i_parent >= 0
+            # Parent indices are zero-indexed
+            push!(args[i_parent + 1], i_node)
+        end
+    end
+    fcns = Any[]
+    for i in eachindex(opcode)
+        if opcode[i] == GRB_OPCODE_CONSTANT
+            push!(fcns, data[i])
+        elseif opcode[i] == GRB_OPCODE_VARIABLE
+            push!(fcns, variable_index_lookup[data[i]])
+        elseif opcode[i] == GRB_OPCODE_PLUS && isempty(args[i])
+            push!(fcns, 0.0)
+        elseif opcode[i] == GRB_OPCODE_MULTIPLY && isempty(args[i])
+            push!(fcns, 1.0)
+        elseif opcode[i] in keys(_OPERATOR_LOOKUP)
+            push!(fcns, MOI.ScalarNonlinearFunction(
+                _OPERATOR_LOOKUP[opcode[i]],
+                Any[],
+            ))
+        else
+            throw(ArgumentError, "Unrecognized opcode $(opcode[i])")
+        end
+    end
+    for (i, i_args) in enumerate(args)
+        for i_arg in i_args
+            push!(fcns[i].args, fcns[i_arg])
+        end
+    end
+    head = convert(Cint, only(findall(x -> x == -1, parent)))
+    return fcns[head]
+    #return _process_opcodes(opcode, data, args, head, variable_index_lookup)
+end
+
+function MOI.get(
+    model::Optimizer,
+    ::MOI.ObjectiveFunction{MOI.ScalarNonlinearFunction},
+)
+    _update_if_necessary(model)
+    nnodesP = Ref{Cint}(-1)
+    opcode = C_NULL
+    data = C_NULL
+    parent = C_NULL
+    ret = GRBgetnlobj(
+        model,
+        nnodesP,
+        opcode,
+        data,
+        parent,
+    )
+    @assert nnodesP[] >= 0
+    _check_ret(model, ret)
+    opcode = zeros(Cint, nnodesP[])
+    data = zeros(Cdouble, nnodesP[])
+    parent = zeros(Cint, nnodesP[])
+    ret = GRBgetnlobj(
+        model,
+        nnodesP,
+        opcode,
+        data,
+        parent,
+    )
+    _check_ret(model, ret)
+    c_vindex_lookup = Dict(
+        (info.column - 1) => info.index for info in values(model.variable_info)
+    )
+    return _opcodes_to_nonlinear_function(opcode, data, parent, c_vindex_lookup)
 end
