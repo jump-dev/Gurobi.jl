@@ -22,6 +22,7 @@ import MathOptInterface.Utilities: CleverDicts
     _SINGLE_VARIABLE,
     _SCALAR_AFFINE,
     _SCALAR_QUADRATIC,
+    _SCALAR_NONLINEAR,
     _VECTOR_AFFINE,
 )
 

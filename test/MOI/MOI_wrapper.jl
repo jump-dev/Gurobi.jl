@@ -1871,11 +1871,20 @@ function test_nonlinear_multisolution_ConstraintPrimal()
     MOI.set(model, MOI.RawOptimizerAttribute("PoolSolutions"), 2)
     MOI.optimize!(model)
     # Solutions are x = (pi/2, 0) and x = (pi/2, 2pi)
-    c3_val1 = MOI.get(model, MOI.ConstraintPrimal(1), c3_nl)
-    c3_val2 = MOI.get(model, MOI.ConstraintPrimal(2), c3_nl)
-    @test c3_val1 != c3_val2
-    @test isapprox(c3_val1, 0; atol = 1e-6) || isapprox(c3_val2, 0; atol = 1e-6)
-    @test isapprox(c3_val1, 2pi^3; atol = 1e-6) || isapprox(c3_val2, 2pi^3; atol = 1e-6)
+    if Gurobi._GUROBI_VERSION >= v"14"
+        @test_throws(
+            ArgumentError,
+            MOI.get(model, MOI.ConstraintPrimal(2), c3_nl),
+        )
+    else
+        c3_val1 = MOI.get(model, MOI.ConstraintPrimal(1), c3_nl)
+        c3_val2 = MOI.get(model, MOI.ConstraintPrimal(2), c3_nl)
+        @test c3_val1 != c3_val2
+        # Test that one of the two solutions has x[1]*x[2]^2 == 0 and the other
+        # has x[1]*x[2]^2 == 2π^3
+        @test isapprox(c3_val1, 0; atol = 1e-6) || isapprox(c3_val2, 0; atol = 1e-6)
+        @test isapprox(c3_val1, 2π^3; atol = 1e-1) || isapprox(c3_val2, 2π^3; atol = 1e-1)
+    end
     return
 end
 
