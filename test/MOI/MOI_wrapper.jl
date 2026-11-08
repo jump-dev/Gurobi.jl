@@ -1888,6 +1888,222 @@ function test_nonlinear_multisolution_ConstraintPrimal()
     return
 end
 
+function test_nonlinear_objective()
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.GreaterThan(0.0))
+    MOI.add_constraint(model, x[2], MOI.GreaterThan(0.0))
+    g = MOI.ScalarNonlinearFunction(
+        :*,
+        Any[x[1], MOI.ScalarNonlinearFunction(:^, Any[x[2], 1.1])],
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.add_constraint(model, g, MOI.GreaterThan(5.0))
+    f = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[
+            MOI.ScalarNonlinearFunction(:exp, Any[x[1]]),
+            MOI.ScalarNonlinearFunction(:exp, Any[x[2]]),
+        ],
+    )
+    if Gurobi._GUROBI_VERSION < v"14"
+        @test_throws(
+            ArgumentError, MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+        )
+        return
+    end
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.ObjectiveValue()), 17.191, rtol = 1e-4)
+    return
+end
+
+function test_nonlinear_after_variable_objective()
+    if Gurobi._GUROBI_VERSION < v"14"
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.GreaterThan(0.0))
+    MOI.add_constraint(model, x[1], MOI.LessThan(7.0))
+    MOI.add_constraint(model, x[2], MOI.GreaterThan(0.0))
+    g = MOI.ScalarNonlinearFunction(
+        :*,
+        Any[x[1], MOI.ScalarNonlinearFunction(:^, Any[x[2], 1.1])],
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.add_constraint(model, g, MOI.GreaterThan(5.0))
+    MOI.set(model, MOI.ObjectiveFunction{MOI.VariableIndex}(), x[2])
+    MOI.optimize!(model)
+    f = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[
+            MOI.ScalarNonlinearFunction(:^, Any[x[1], 3]),
+            MOI.ScalarNonlinearFunction(:^, Any[x[2], 3]),
+        ],
+    )
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.ObjectiveValue()), 19.91, rtol = 1e-4)
+    return
+end
+
+function test_nonlinear_after_affine_objective()
+    if Gurobi._GUROBI_VERSION < v"14"
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.GreaterThan(0.0))
+    MOI.add_constraint(model, x[2], MOI.GreaterThan(0.0))
+    g = MOI.ScalarNonlinearFunction(
+        :*,
+        Any[x[1], MOI.ScalarNonlinearFunction(:^, Any[x[2], 1.1])],
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.add_constraint(model, g, MOI.GreaterThan(5.0))
+    f = 1.0 * x[1] + 2.0 * x[2] + 3.0
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    f = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[
+            MOI.ScalarNonlinearFunction(:exp, Any[x[1]]),
+            MOI.ScalarNonlinearFunction(:exp, Any[x[2]]),
+        ],
+    )
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.ObjectiveValue()), 17.191, rtol = 1e-4)
+    return
+end
+
+function test_nonlinear_after_quadratic_objective()
+    if Gurobi._GUROBI_VERSION < v"14"
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.GreaterThan(0.0))
+    MOI.add_constraint(model, x[2], MOI.GreaterThan(0.0))
+    g = MOI.ScalarNonlinearFunction(
+        :*,
+        Any[x[1], MOI.ScalarNonlinearFunction(:^, Any[x[2], 1.1])],
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.add_constraint(model, g, MOI.GreaterThan(5.0))
+    f = 1.0 * x[1] + 2.0 * x[2] * x[2] + 3.0
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    f = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[
+            MOI.ScalarNonlinearFunction(:exp, Any[x[1]]),
+            MOI.ScalarNonlinearFunction(:exp, Any[x[2]]),
+        ],
+    )
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.ObjectiveValue()), 17.191, rtol = 1e-4)
+    return
+end
+
+function test_nonlinear_after_nonlinear_objective()
+    if Gurobi._GUROBI_VERSION < v"14"
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.GreaterThan(0.0))
+    MOI.add_constraint(model, x[2], MOI.GreaterThan(0.0))
+    g = MOI.ScalarNonlinearFunction(
+        :*,
+        Any[x[1], MOI.ScalarNonlinearFunction(:^, Any[x[2], 1.1])],
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.add_constraint(model, g, MOI.GreaterThan(5.0))
+    f = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[
+            MOI.ScalarNonlinearFunction(:^, Any[x[1], 3.0]),
+            MOI.ScalarNonlinearFunction(
+                :*,
+                Any[2.0, MOI.ScalarNonlinearFunction(:^, Any[x[2], 2.0])],
+            ),
+        ],
+    )
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    f = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[
+            MOI.ScalarNonlinearFunction(:exp, Any[x[1]]),
+            MOI.ScalarNonlinearFunction(:exp, Any[x[2]]),
+        ],
+    )
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.ObjectiveValue()), 17.191, rtol = 1e-4)
+    return
+end
+
+function test_nonlinear_get_nonlinear_objective()
+    model = Gurobi.Optimizer(GRB_ENV)
+    x = MOI.add_variables(model, 2)
+    f = MOI.ScalarNonlinearFunction(:+,
+        Any[
+            MOI.ScalarNonlinearFunction(:/, Any[MOI.ScalarNonlinearFunction(:sin, Any[x[1]]), x[1]]),
+            MOI.ScalarNonlinearFunction(:^, Any[MOI.ScalarNonlinearFunction(:cos, Any[x[2]]), 3.0]),
+        ],
+    )
+    if Gurobi._GUROBI_VERSION < v"14"
+        @test_throws(
+            ArgumentError, MOI.get(model, MOI.ObjectiveFunction{typeof(f)}())
+        )
+        return
+    end
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    obj_f = MOI.get(model, MOI.ObjectiveFunction{MOI.ScalarNonlinearFunction}())
+    @test string(f) == string(obj_f)
+    return
+end
+
+function test_nonlinear_before_quadratic_objective()
+    if Gurobi._GUROBI_VERSION < v"14"
+        return
+    end
+    model = Gurobi.Optimizer(GRB_ENV)
+    MOI.set(model, MOI.Silent(), true)
+    x = MOI.add_variables(model, 2)
+    MOI.add_constraint(model, x[1], MOI.GreaterThan(0.0))
+    MOI.add_constraint(model, x[2], MOI.GreaterThan(0.0))
+    g = MOI.ScalarNonlinearFunction(
+        :*,
+        Any[x[1], MOI.ScalarNonlinearFunction(:^, Any[x[2], 1.1])],
+    )
+    MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    MOI.add_constraint(model, g, MOI.GreaterThan(5.0))
+    f = MOI.ScalarNonlinearFunction(
+        :+,
+        Any[
+            MOI.ScalarNonlinearFunction(:exp, Any[x[1]]),
+            MOI.ScalarNonlinearFunction(:exp, Any[x[2]]),
+        ],
+    )
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    f = 1.0 * x[1] * x[1] + 2.0 * x[2] * x[2]
+    MOI.set(model, MOI.ObjectiveFunction{typeof(f)}(), f)
+    MOI.optimize!(model)
+    @test isapprox(MOI.get(model, MOI.ObjectiveValue()), 13.30165, rtol = 1e-4)
+    return
+end
+
 end  # TestMOIWrapper
 
 TestMOIWrapper.runtests()
