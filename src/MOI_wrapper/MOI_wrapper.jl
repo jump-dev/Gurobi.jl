@@ -1282,6 +1282,10 @@ function MOI.set(
         ret = GRBdelq(model)
         _check_ret(model, ret)
     end
+    if model.objective_type == _SCALAR_NONLINEAR && _GUROBI_VERSION >= v"14"
+        ret = GRBdelnlobj(model)
+        _check_ret(model, ret)
+    end
     _update_if_necessary(model)
     pInt = Ref{Cint}(0)
     ret = GRBgetintattr(model, "NumVars", pInt)
@@ -1344,8 +1348,12 @@ function MOI.set(
 ) where {F<:MOI.ScalarQuadraticFunction{Float64}}
     affine_indices, affine_coefficients, I, J, V =
         _indices_and_coefficients(model, f)
-    # We need to zero out any existing linear objective.
     _update_if_necessary(model)
+    if model.objective_type == _SCALAR_NONLINEAR && _GUROBI_VERSION >= v"14"
+        ret = GRBdelnlobj(model)
+        _check_ret(model, ret)
+    end
+    # We need to zero out any existing linear objective.
     pInt = Ref{Cint}(0)
     ret = GRBgetintattr(model, "NumVars", pInt)
     _check_ret(model, ret)
