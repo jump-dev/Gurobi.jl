@@ -598,35 +598,6 @@ function MOI.set(
     return
 end
 
-function _process_opcodes(
-    opcode::Vector{Cint},
-    data::Vector{Cdouble},
-    args::Vector{Vector{Cint}},
-    index::Cint,
-    variable_index_lookup::Dict,
-)
-    if opcode[index] == GRB_OPCODE_CONSTANT
-        return data[index]
-    elseif opcode[index] == GRB_OPCODE_VARIABLE
-        return variable_index_lookup[data[index]]
-    elseif opcode[index] == GRB_OPCODE_PLUS && isempty(args[index])
-        # PLUS with no arguments should evaluate to 0. I don't know if MOI
-        # follows this convention, so I'll hard code it.
-        return 0.0
-    elseif opcode[index] == GRB_OPCODE_MULTIPLY && isempty(args[index])
-        return 1.0
-    else
-        op = _OPERATOR_LOOKUP[opcode[index]]
-        return MOI.ScalarNonlinearFunction(
-            op,
-            Any[
-                _process_opcodes(opcode, data, args, arg_index, variable_index_lookup)
-                for arg_index in args[index]
-            ],
-        )
-    end
-end
-
 function _opcodes_to_nonlinear_function(
     opcode::Vector{Cint},
     data::Vector{Cdouble},
@@ -647,6 +618,8 @@ function _opcodes_to_nonlinear_function(
         elseif opcode[i] == GRB_OPCODE_VARIABLE
             push!(fcns, variable_index_lookup[data[i]])
         elseif opcode[i] == GRB_OPCODE_PLUS && isempty(args[i])
+            # PLUS with no opcodes evaluates to zero in Gurobi. However, I don't
+            # think we should ever encounter this...
             push!(fcns, 0.0)
         elseif opcode[i] == GRB_OPCODE_MULTIPLY && isempty(args[i])
             push!(fcns, 1.0)
@@ -664,9 +637,8 @@ function _opcodes_to_nonlinear_function(
             push!(fcns[i].args, fcns[i_arg])
         end
     end
-    head = convert(Cint, only(findall(x -> x == -1, parent)))
+    head = only(findall(x -> x == -1, parent))
     return fcns[head]
-    #return _process_opcodes(opcode, data, args, head, variable_index_lookup)
 end
 
 function MOI.get(
