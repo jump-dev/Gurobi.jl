@@ -552,6 +552,12 @@ function MOI.set(
     ::MOI.ObjectiveFunction{F},
     f::F,
 ) where {F<:MOI.ScalarNonlinearFunction}
+    if _GUROBI_VERSION < v"14"
+        throw(
+            ArgumentError,
+            "Gurobi $(_GUROBI_VERSION) does not support nonlinear objectives"
+        )
+    end
     _update_if_necessary(model)
     if model.objective_type in (_SINGLE_VARIABLE, _SCALAR_AFFINE, _SCALAR_QUADRATIC)
         # Zero out existing affine objective
@@ -668,6 +674,12 @@ function MOI.get(
     model::Optimizer,
     ::MOI.ObjectiveFunction{MOI.ScalarNonlinearFunction},
 )
+    if _GUROBI_VERSION < v"14"
+        throw(
+            ArgumentError,
+            "Gurobi $(_GUROBI_VERSION) does not support nonlinear objectives"
+        )
+    end
     _update_if_necessary(model)
     nnodesP = Ref{Cint}(-1)
     opcode = C_NULL
