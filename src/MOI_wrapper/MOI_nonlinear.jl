@@ -553,10 +553,9 @@ function MOI.set(
     f::F,
 ) where {F<:MOI.ScalarNonlinearFunction}
     if _GUROBI_VERSION < v"14"
-        throw(
-            ArgumentError,
+        throw(ArgumentError(
             "Gurobi $(_GUROBI_VERSION) does not support nonlinear objectives"
-        )
+        ))
     end
     _update_if_necessary(model)
     if model.objective_type in (_SINGLE_VARIABLE, _SCALAR_AFFINE, _SCALAR_QUADRATIC)
@@ -657,7 +656,7 @@ function _opcodes_to_nonlinear_function(
                 Any[],
             ))
         else
-            throw(ArgumentError, "Unrecognized opcode $(opcode[i])")
+            throw(ArgumentError("Unrecognized opcode $(opcode[i])"))
         end
     end
     for (i, i_args) in enumerate(args)
@@ -675,10 +674,9 @@ function MOI.get(
     ::MOI.ObjectiveFunction{MOI.ScalarNonlinearFunction},
 )
     if _GUROBI_VERSION < v"14"
-        throw(
-            ArgumentError,
+        throw(ArgumentError(
             "Gurobi $(_GUROBI_VERSION) does not support nonlinear objectives"
-        )
+        ))
     end
     _update_if_necessary(model)
     nnodesP = Ref{Cint}(-1)
