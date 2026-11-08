@@ -52,10 +52,8 @@ function _try_local_install()
             push!(paths_to_try, string("lib$a.dylib"))
         end
     end
-    display(paths_to_try)
     for l in paths_to_try
         if Libdl.dlopen_e(l) != C_NULL
-            println("Found library: $l")
             write_depsfile(l)
             return true
         end
