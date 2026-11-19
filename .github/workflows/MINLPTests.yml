@@ -13,12 +13,12 @@ jobs:
     name: Julia 1 - ${{ github.event_name }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
         with:
           version: '1'
           arch: 'x64'
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
       - shell: bash
         run: echo "${{ secrets.GUROBI_LICENSE }}" > ~/gurobi.lic
       - shell: julia --project=. --color=yes {0}
