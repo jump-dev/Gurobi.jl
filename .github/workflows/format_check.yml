@@ -1,9 +1,7 @@
 name: format-check
 on:
   push:
-    branches:
-      - master
-      - release-*
+    branches: [master]
   pull_request:
     types: [opened, synchronize, reopened]
 jobs:
@@ -13,12 +11,12 @@ jobs:
       - uses: julia-actions/setup-julia@latest
         with:
           version: '1'
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Format check
         shell: julia --color=yes {0}
         run: |
           using Pkg
-          Pkg.add(PackageSpec(name="JuliaFormatter", version="1"))
+          Pkg.add(PackageSpec(name="JuliaFormatter", version="2"))
           using JuliaFormatter
           format("src/MOI_wrapper", verbose=true)
           format("test", verbose=true)
