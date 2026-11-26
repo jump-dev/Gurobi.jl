@@ -32,6 +32,7 @@ if _supports_nonlinear()
 else
     const _OPCODE_MAP = Dict()
 end
+const _OPERATOR_LOOKUP = Dict(opcode => symbol for (symbol, opcode) in _OPCODE_MAP)
 
 function MOI.supports_constraint(
     ::Optimizer,
@@ -332,30 +333,48 @@ function MOI.add_constraint(
     data = Cdouble[]
     parent = Cint[]
     _process_nonlinear(model, f, opcode, data, parent)
-    # Add resultant variable. We don't use MOI.add_constrained_variable because
-    # we don't want it to show up in the bound constraints, etc.
-    column = _get_next_column(model)
-    lb, ub = _bounds(s)
-    lb = something(lb, -Inf)
-    ub = something(ub, Inf)
-    ret = GRBaddvar(model, 0, C_NULL, C_NULL, 0.0, lb, ub, GRB_CONTINUOUS, "")
-    _check_ret(model, ret)
-    ret = GRBaddgenconstrNL(
-        model,
-        C_NULL,
-        column - 1,
-        length(opcode),
-        opcode,
-        data,
-        parent,
-    )
-    _check_ret(model, ret)
-    _require_update(model, model_change = true)
-    model.last_constraint_index += 1
-    offset =
-        length(model.indicator_constraint_info) +
-        length(model.nl_constraint_info)
-    info = _NLConstraintInfo(offset + 1, s, column)
+    if _GUROBI_VERSION >= v"14"
+        sense, rhs = _sense_and_rhs(s)
+        ret = GRBaddnlconstr(
+            model,
+            length(opcode),
+            opcode,
+            data,
+            parent,
+            sense,
+            rhs,
+            C_NULL,
+        )
+        _check_ret(model, ret)
+        _require_update(model, model_change = true)
+        model.last_constraint_index += 1
+        info = _NLConstraintInfo(length(model.nl_constraint_info) + 1, s, nothing)
+    else
+        # Add resultant variable. We don't use MOI.add_constrained_variable because
+        # we don't want it to show up in the bound constraints, etc.
+        column = _get_next_column(model)
+        lb, ub = _bounds(s)
+        lb = something(lb, -Inf)
+        ub = something(ub, Inf)
+        ret = GRBaddvar(model, 0, C_NULL, C_NULL, 0.0, lb, ub, GRB_CONTINUOUS, "")
+        _check_ret(model, ret)
+        ret = GRBaddgenconstrNL(
+            model,
+            C_NULL,
+            column - 1,
+            length(opcode),
+            opcode,
+            data,
+            parent,
+        )
+        _check_ret(model, ret)
+        _require_update(model, model_change = true)
+        model.last_constraint_index += 1
+        offset =
+            length(model.indicator_constraint_info) +
+            length(model.nl_constraint_info)
+        info = _NLConstraintInfo(offset + 1, s, column)
+    end
     model.nl_constraint_info[model.last_constraint_index] = info
     return MOI.ConstraintIndex{MOI.ScalarNonlinearFunction,typeof(s)}(
         model.last_constraint_index,
@@ -376,27 +395,34 @@ function MOI.delete(
 )
     info = _info(model, c)
     _update_if_necessary(model)
-    ret = GRBdelgenconstrs(model, 1, Ref(Cint(info.row - 1)))
-    _check_ret(model, ret)
-    for (_, info_2) in model.nl_constraint_info
-        if info_2.row > info.row
-            info_2.row -= 1
+    if _GUROBI_VERSION >= v"14"
+        ret = GRBdelnlconstrs(model, 1, Ref(Cint(info.row - 1)))
+        _check_ret(model, ret)
+    else
+        ret = GRBdelgenconstrs(model, 1, Ref(Cint(info.row - 1)))
+        _check_ret(model, ret)
+        # Delete resultant variable from the Gurobi model. These are not tracked in
+        # model.variable_info but they do need to be accounted for in index
+        # adjustment.
+        del_cols = [Cint(info.resvar_index - 1)]
+        ret = GRBdelvars(model, length(del_cols), del_cols)
+        _check_ret(model, ret)
+        append!(model.columns_deleted_since_last_update, del_cols .+ 1)
+        # Pre-Gurobi 14, NL and indicator constraints use indices into the
+        # same array, so we have to modify indicator indices as well.
+        for (_, info_2) in model.indicator_constraint_info
+            if info_2.row > info.row
+                info_2.row -= 1
+            end
         end
     end
-    for (_, info_2) in model.indicator_constraint_info
+    for (_, info_2) in model.nl_constraint_info
         if info_2.row > info.row
             info_2.row -= 1
         end
     end
     delete!(model.nl_constraint_info, c.value)
     model.name_to_constraint_index = nothing
-    # Delete resultant variable from the Gurobi model. These are not tracked in
-    # model.variable_info but they do need to be accounted for in index
-    # adjustment.
-    del_cols = [Cint(info.resvar_index - 1)]
-    ret = GRBdelvars(model, length(del_cols), del_cols)
-    _check_ret(model, ret)
-    append!(model.columns_deleted_since_last_update, del_cols .+ 1)
     _require_update(model, model_change = true)
     return
 end
@@ -407,28 +433,35 @@ function MOI.delete(
 )
     rows_to_delete = sort!([Cint(_info(model, c).row - 1) for c in cs])
     _update_if_necessary(model)
-    ret = GRBdelgenconstrs(model, length(rows_to_delete), rows_to_delete)
-    _check_ret(model, ret)
+    if _GUROBI_VERSION >= v"14"
+        ret = GRBdelnlconstrs(model, length(rows_to_delete), rows_to_delete)
+        _check_ret(model, ret)
+    else
+        ret = GRBdelgenconstrs(model, length(rows_to_delete), rows_to_delete)
+        _check_ret(model, ret)
+        # Delete resultant variables from the Gurobi model for all removed
+        # constraints. These are not tracked in model.variable_info but they do
+        # need to be accounted for in index adjustment.
+        del_cols = [Cint(_info(model, c).resvar_index - 1) for c in cs]
+        ret = GRBdelvars(model, length(del_cols), del_cols)
+        _check_ret(model, ret)
+        append!(model.columns_deleted_since_last_update, del_cols .+ 1)
+        _require_update(model, model_change = true)
+        # Pre-Gurobi 14, NL and indicator constraints use indices into the
+        # same array, so we have to modify indicator indices as well.
+        for (_, info) in model.indicator_constraint_info
+            info.row -= searchsortedlast(rows_to_delete, info.row - 1)
+        end
+    end
     for (_, info) in model.nl_constraint_info
         info.row -= searchsortedlast(rows_to_delete, info.row - 1)
     end
-    for (_, info) in model.indicator_constraint_info
-        info.row -= searchsortedlast(rows_to_delete, info.row - 1)
-    end
-    model.name_to_constraint_index = nothing
-    # Delete resultant variables from the Gurobi model for all removed
-    # constraints. These are not tracked in model.variable_info but they do
-    # need to be accounted for in index adjustment.
-    del_cols = [Cint(_info(model, c).resvar_index - 1) for c in cs]
-    ret = GRBdelvars(model, length(del_cols), del_cols)
-    _check_ret(model, ret)
-    append!(model.columns_deleted_since_last_update, del_cols .+ 1)
-    _require_update(model, model_change = true)
     # Remove entries from nl constraint tracking
     cs_values = sort!(getfield.(cs, :value))
     filter!(model.nl_constraint_info) do pair
         return isempty(searchsorted(cs_values, pair.first))
     end
+    model.name_to_constraint_index = nothing
     _require_update(model, model_change = true)
     return
 end
@@ -450,10 +483,11 @@ function MOI.set(
     _update_if_necessary(model, force = true)
     info = _info(model, c)
     info.name = name
+    key = _GUROBI_VERSION >= v"14" ? "NLCName" : "GenConstrName"
     if length(name) <= GRB_MAX_NAMELEN
         ret = GRBsetstrattrelement(
             model,
-            "GenConstrName",
+            key,
             Cint(info.row - 1),
             name,
         )
@@ -473,16 +507,176 @@ function MOI.get(
     MOI.check_result_index_bounds(model, attr)
     info = _info(model, c)
     key = "X"
-    if attr.result_index > 1
-        MOI.set(
-            model,
-            MOI.RawOptimizerAttribute("SolutionNumber"),
-            attr.result_index - 1,
-        )
-        key = _XN
-    end
     valueP = Ref{Cdouble}()
-    ret = GRBgetdblattrelement(model, key, Cint(info.resvar_index - 1), valueP)
-    _check_ret(model, ret)
+    if _GUROBI_VERSION >= v"14"
+        if attr.result_index > 1
+            throw(ArgumentError("Cannot get ConstraintPrimal for result_index > 1"))
+        end
+        slackP = Ref{Cdouble}()
+        rhsP = Ref{Cdouble}()
+        ret = GRBgetdblattrelement(model, "NLCSlack", Cint(info.row - 1), slackP)
+        _check_ret(model, ret)
+        ret = GRBgetdblattrelement(model, "NLCRHS", Cint(info.row - 1), rhsP)
+        _check_ret(model, ret)
+        # This assumes that Gurobi's RHS is the same as MOI's RHS. Check add_constraint
+        # above to confirm.
+        valueP[] = rhsP[] - slackP[]
+    else
+        if attr.result_index > 1
+            MOI.set(
+                model,
+                MOI.RawOptimizerAttribute("SolutionNumber"),
+                attr.result_index - 1,
+            )
+            key = _XN
+        end
+        ret = GRBgetdblattrelement(model, key, Cint(info.resvar_index - 1), valueP)
+        _check_ret(model, ret)
+    end
     return valueP[]
+end
+
+function MOI.supports(
+    ::Optimizer,
+    ::MOI.ObjectiveFunction{MOI.ScalarNonlinearFunction},
+)
+    if _GUROBI_VERSION >= v"14"
+        return true
+    else
+        return false
+    end
+end
+
+function MOI.set(
+    model::Optimizer,
+    ::MOI.ObjectiveFunction{F},
+    f::F,
+) where {F<:MOI.ScalarNonlinearFunction}
+    if _GUROBI_VERSION < v"14"
+        throw(ArgumentError(
+            "Gurobi $(_GUROBI_VERSION) does not support nonlinear objectives"
+        ))
+    end
+    _update_if_necessary(model)
+    if model.objective_type in (_SINGLE_VARIABLE, _SCALAR_AFFINE, _SCALAR_QUADRATIC)
+        # Zero out existing affine objective
+        pNumVars = Ref{Cint}(0)
+        ret = GRBgetintattr(model, "NumVars", pNumVars)
+        _check_ret(model, ret)
+        obj = zeros(pNumVars[])
+        ret = GRBsetdblattrarray(model, "Obj", 0, pNumVars[], obj)
+        _check_ret(model, ret)
+        ret = GRBsetdblattr(model, "ObjCon", 0.0)
+        _check_ret(model, ret)
+    end
+    if model.objective_type == _SCALAR_QUADRATIC
+        # Zero out existing quadratic objective
+        ret = GRBdelq(model)
+        _check_ret(model, ret)
+    end
+    if model.objective_type == _SCALAR_NONLINEAR
+        # Zero out existing nonlinear objective
+        ret = GRBdelnlobj(model)
+        _check_ret(model, ret)
+    end
+    # Set nonlinear objective
+    opcode = Cint[]
+    data = Cdouble[]
+    parent = Cint[]
+    _process_nonlinear(model, f, opcode, data, parent)
+    ret = GRBsetnlobj(
+        model,
+        length(opcode),
+        opcode,
+        data,
+        parent,
+    )
+    _check_ret(model, ret)
+    _require_update(model, attribute_change = true, model_change = true)
+    model.objective_type = _SCALAR_NONLINEAR
+    model.is_objective_set = true
+    return
+end
+
+function _opcodes_to_nonlinear_function(
+    opcode::Vector{Cint},
+    data::Vector{Cdouble},
+    parent::Vector{Cint},
+    variable_index_lookup::Dict,
+)
+    args = map(x -> Cint[], opcode)
+    for (i_node, i_parent) in enumerate(parent)
+        if i_parent >= 0
+            # Parent indices are zero-indexed
+            push!(args[i_parent + 1], i_node)
+        end
+    end
+    fcns = Any[]
+    for i in eachindex(opcode)
+        if opcode[i] == GRB_OPCODE_CONSTANT
+            push!(fcns, data[i])
+        elseif opcode[i] == GRB_OPCODE_VARIABLE
+            push!(fcns, variable_index_lookup[data[i]])
+        elseif opcode[i] == GRB_OPCODE_PLUS && isempty(args[i])
+            # PLUS with no opcodes evaluates to zero in Gurobi. However, I don't
+            # think we should ever encounter this...
+            push!(fcns, 0.0)
+        elseif opcode[i] == GRB_OPCODE_MULTIPLY && isempty(args[i])
+            push!(fcns, 1.0)
+        elseif opcode[i] in keys(_OPERATOR_LOOKUP)
+            push!(fcns, MOI.ScalarNonlinearFunction(
+                _OPERATOR_LOOKUP[opcode[i]],
+                Any[],
+            ))
+        else
+            throw(ArgumentError("Unrecognized opcode $(opcode[i])"))
+        end
+    end
+    for (i, i_args) in enumerate(args)
+        for i_arg in i_args
+            push!(fcns[i].args, fcns[i_arg])
+        end
+    end
+    head = only(findall(x -> x == -1, parent))
+    return fcns[head]
+end
+
+function MOI.get(
+    model::Optimizer,
+    ::MOI.ObjectiveFunction{MOI.ScalarNonlinearFunction},
+)
+    if _GUROBI_VERSION < v"14"
+        throw(ArgumentError(
+            "Gurobi $(_GUROBI_VERSION) does not support nonlinear objectives"
+        ))
+    end
+    _update_if_necessary(model)
+    nnodesP = Ref{Cint}(-1)
+    opcode = C_NULL
+    data = C_NULL
+    parent = C_NULL
+    ret = GRBgetnlobj(
+        model,
+        nnodesP,
+        opcode,
+        data,
+        parent,
+    )
+    @assert nnodesP[] >= 0
+    _check_ret(model, ret)
+    opcode = zeros(Cint, nnodesP[])
+    data = zeros(Cdouble, nnodesP[])
+    parent = zeros(Cint, nnodesP[])
+    ret = GRBgetnlobj(
+        model,
+        nnodesP,
+        opcode,
+        data,
+        parent,
+    )
+    _check_ret(model, ret)
+    c_vindex_lookup = Dict(
+        (info.column - 1) => info.index for info in values(model.variable_info)
+    )
+    return _opcodes_to_nonlinear_function(opcode, data, parent, c_vindex_lookup)
 end

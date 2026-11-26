@@ -22,6 +22,7 @@ import MathOptInterface.Utilities: CleverDicts
     _SINGLE_VARIABLE,
     _SCALAR_AFFINE,
     _SCALAR_QUADRATIC,
+    _SCALAR_NONLINEAR,
     _VECTOR_AFFINE,
 )
 
@@ -96,8 +97,8 @@ mutable struct _NLConstraintInfo
     # Storage for constraint names. Where possible, these are also stored in
     # the Gurobi model.
     name::String
-    resvar_index::Int
-    function _NLConstraintInfo(row::Int, set, resvar_index::Int)
+    resvar_index::Union{Int,Nothing}
+    function _NLConstraintInfo(row::Int, set, resvar_index::Union{Int,Nothing})
         return new(row, set, "", resvar_index)
     end
 end
@@ -592,11 +593,13 @@ function _update_if_necessary(
                 var_info.column,
             )
         end
-        for nl_info in values(model.nl_constraint_info)
-            nl_info.resvar_index -= searchsortedlast(
-                model.columns_deleted_since_last_update,
-                nl_info.resvar_index,
-            )
+        if _GUROBI_VERSION < v"14"
+            for nl_info in values(model.nl_constraint_info)
+                nl_info.resvar_index -= searchsortedlast(
+                    model.columns_deleted_since_last_update,
+                    nl_info.resvar_index,
+                )
+            end
         end
         model.next_column -= length(model.columns_deleted_since_last_update)
         empty!(model.columns_deleted_since_last_update)
@@ -1279,6 +1282,10 @@ function MOI.set(
         ret = GRBdelq(model)
         _check_ret(model, ret)
     end
+    if model.objective_type == _SCALAR_NONLINEAR && _GUROBI_VERSION >= v"14"
+        ret = GRBdelnlobj(model)
+        _check_ret(model, ret)
+    end
     _update_if_necessary(model)
     pInt = Ref{Cint}(0)
     ret = GRBgetintattr(model, "NumVars", pInt)
@@ -1341,8 +1348,12 @@ function MOI.set(
 ) where {F<:MOI.ScalarQuadraticFunction{Float64}}
     affine_indices, affine_coefficients, I, J, V =
         _indices_and_coefficients(model, f)
-    # We need to zero out any existing linear objective.
     _update_if_necessary(model)
+    if model.objective_type == _SCALAR_NONLINEAR && _GUROBI_VERSION >= v"14"
+        ret = GRBdelnlobj(model)
+        _check_ret(model, ret)
+    end
+    # We need to zero out any existing linear objective.
     pInt = Ref{Cint}(0)
     ret = GRBgetintattr(model, "NumVars", pInt)
     _check_ret(model, ret)
